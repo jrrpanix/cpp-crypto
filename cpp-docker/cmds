@@ -1,0 +1,5 @@
+docker build -t cpp-dev .
+docker run -it --rm cpp-dev
+docker images
+docker ps
+docker image prune
