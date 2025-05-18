@@ -53,3 +53,17 @@ install headers and lib
 
 ./run-build-ixwebsocket.sh
 ```
+
+
+### 4. Build book-ticker-test
+
+***Done in linux*** 
+
+This connects to channle bookTicker on binance and listens to btcusdt
+
+
+```sh
+cd book-ticker-test
+./run-build.sh
+./build/main  # you will immediately see a stream of data if it works 
+```
