@@ -21,6 +21,7 @@ This builds an Ubuntu-based image with all dependencies (e.g., CMake, OpenSSL, I
 
 ```sh
 ./run-build-linux-docker.sh
+```
 
 ### 2. Run the Docker Container
 
@@ -28,3 +29,4 @@ Run the Docker Image, creates a shell to do development in
 
 ```sh
 ./run-linux-docker.sh
+```
