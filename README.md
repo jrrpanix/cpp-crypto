@@ -38,7 +38,13 @@ Run the Docker Image, creates a shell to do development in
 
 ### 3. Build IXWebSocket
 
-This is done inside the linux shell. it will clone the IXWebSocket repo, build using TLS_ON and install headers and lib
+***Done in linux*** 
+
+clone the IXWebSocket repo
+
+USE_TLS=TRUE
+
+install headers and lib
 
 ```sh
 # installs headers to /workspace/install/include
