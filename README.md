@@ -3,4 +3,4 @@ Docker based cpp code for Centralized Digital Currency Exchanges
 
 - **Build Linux Docker image**  
   ```sh
-  ./build-docker.sh
+  ./build-linux.sh
