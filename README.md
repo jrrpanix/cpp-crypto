@@ -1,4 +1,4 @@
-## C++ Market Data Processor for Crypo Ecxhanges
+## C++ Market Data Processor for Crypto Ecxhanges
 
 This repository in written in C++ to connect to crypto exchanges.
 
@@ -6,7 +6,7 @@ It runs in a linux enviornment via Docker.
 
 The first exchange is Binance bookTicker Channel.
 
-All development has been done on a **MacBook** by running a **Docker** containter which contains the Linux env.
+All development has been done on a **MacBook** by running a **Docker** containter which contains the Linux env.  The choice was made to develop in a Docker Container because most people just carry around laptops and its cheaper to Develop locally on a Laptop inside of a Docker Linux Container than to run Linux on a cloud computing machine.  All that is required is a Docker subscripton to get going.  if you alraedy have a Linux enviornment and dont want to use Docker that works too.
 
 The code is compiled and run in Linux with the Linux shell running locally on a Mac by:
 
@@ -98,3 +98,17 @@ cd book-ticker-test
 ./run-build.sh
 ./build/main  # you will immediately see a stream of data if it works 
 ```
+### 5. Build simdjson , the fast json parser
+
+***Done in linux*** 
+
+***inside the linux shell run the following***
+ 
+```sh
+# installs headers to /workspace/install/include
+# installs lib     to /workspace/install/lib
+
+
+./run-build-simd.sh
+```
+
