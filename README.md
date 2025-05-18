@@ -6,7 +6,7 @@ It runs in a linux enviornment via Docker.
 
 The first exchange is Binance bookTicker Channel.
 
-All development has been done on a **MacBook** by running a **Docker** containter which contains the Linux env.  The choice was made to develop in a Docker Container because most people just carry around laptops and its cheaper to Develop locally on a Laptop inside of a Docker Linux Container than to run Linux on a cloud computing machine.  All that is required is a Docker subscripton to get going.  if you alraedy have a Linux enviornment and dont want to use Docker that works too.
+All development has been done on a **MacBook** by running a **Docker** containter which contains the Linux env.  The choice was made to develop in a Docker Container because most people just carry around laptops and its cheaper to Develop locally on a Laptop inside of a Docker Linux Container than to run Linux on a cloud computing machine.  All that is required is a Docker subscripton to get going.  if you already have a Linux enviornment and don't want to use Docker that works too.
 
 The code is compiled and run in Linux with the Linux shell running locally on a Mac by:
 
