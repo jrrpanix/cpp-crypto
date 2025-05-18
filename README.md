@@ -65,6 +65,12 @@ USE_TLS=TRUE
 install headers and lib
 
 ```sh
+# start the linux shell but running the docker image
+./run-linux-docker.sh $HOME/cpp-crypto
+```
+***inside the linux shell run the following***
+ 
+```sh
 # installs headers to /workspace/install/include
 # installs lib     to /workspace/install/lib
 
@@ -77,8 +83,15 @@ install headers and lib
 
 ***Done in linux*** 
 
-This connects to channle bookTicker on binance and listens to btcusdt
+This connects to bookTicker on binance and listens to btcusdt
 
+This version is just a simple websocket connection that prints out the exact json message coming from binance bookTicker
+
+```sh
+# start the linux shell but running the docker image
+./run-linux-docker.sh $HOME/cpp-crypto
+```
+***inside the linux shell run the following***
 
 ```sh
 cd book-ticker-test
