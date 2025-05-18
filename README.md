@@ -34,3 +34,16 @@ Run the Docker Image, creates a shell to do development in
 
 ./run-linux-docker.sh $HOME/cpp-crypto 
 ```
+
+
+### 3. Build IXWebSocket
+
+This is done inside the linux shell. it will clone the IXWebSocket repo, build using TLS_ON and install headers and lib
+
+```sh
+# installs headers to /workspace/install/include
+# installs lib     to /workspace/install/lib
+
+
+./run-build-ixwebsocket.sh
+```
