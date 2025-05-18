@@ -1,6 +1,12 @@
-# Linux Development via Docker on macOS
+## C++ Market Data Processor for Crypo Ecxhanges
 
-This repository is built on a **MacBook** using **Docker** to create a **Linux development environment**.  
+This repository in written in C++ to connect to crypto exchanges.
+
+It runs in a linux enviornment via Docker.
+
+The first exchange is Binance bookTicker Channel.
+
+This repository was developed on a **MacBook** using **Docker** to create a **Linux development environment**.  
 All development is performed inside Linux containers for consistency and compatibility.
 
 Although the code is compiled and run in Linux, it can also be developed locally on a Mac by:
@@ -12,6 +18,7 @@ Although the code is compiled and run in Linux, it can also be developed locally
 This setup enables fully containerized C++ development that integrates seamlessly with local file editing.
 
 ---
+## Tech Stack
 
 | Library         | Purpose                                   | How to Get It                                                                             |
 | --------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------- |
