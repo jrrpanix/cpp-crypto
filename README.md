@@ -28,5 +28,9 @@ This builds an Ubuntu-based image with all dependencies (e.g., CMake, OpenSSL, I
 Run the Docker Image, creates a shell to do development in
 
 ```sh
-./run-linux-docker.sh
+# run the docker image
+# specify the mount point
+# this will be where r/w access between mac/docker will be
+
+./run-linux-docker.sh $HOME/cpp-crypto 
 ```
