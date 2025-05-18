@@ -42,7 +42,7 @@ Run the Docker Image, creates a shell to do development in
 
 clone the IXWebSocket repo
 
-TLS_ON=TRUE
+USE_TLS=TRUE
 
 install headers and lib
 
