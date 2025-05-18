@@ -23,11 +23,11 @@ This setup enables fully containerized C++ development that integrates seamlessl
 | --------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------- |
 | **IXWebSocket** | WebSocket client for C++ with TLS support | ✅ **Build from source**: [IXWebSocket GitHub](https://github.com/machinezone/IXWebSocket) |
 | **simdjson**    | SIMD-accelerated real-time JSON parsing   | ✅ **Build from source**: [simdjson GitHub](https://github.com/simdjson/simdjson)          |
+| **fast\_float** | Fastest string-to-float/double parsing    | ✅ **Header-only**: [fast\_float GitHub](https://github.com/fastfloat/fast_float)          |
 | **OpenSSL**     | TLS/SSL support (`libssl`, `libcrypto`)   | 🐳 Installed in Docker via `libssl-dev`                                                   |
 | **zlib**        | Compression and decompression support     | 🐳 Installed in Docker via `zlib1g-dev`                                                   |
 | **CMake**       | Cross-platform build system               | 🐳 Installed in Docker                                                                    |
 | **g++**         | C++17-compatible compiler                 | 🐳 Installed in Docker                                                                    |
-
 
 
 
