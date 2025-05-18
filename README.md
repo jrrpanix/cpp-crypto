@@ -35,15 +35,21 @@ This setup enables fully containerized C++ development that integrates seamlessl
 
 ### 1. Build the Docker container
 
+***Run on Mac (should also work on Linux or Windows)***
+
+Docker is cross platform so building the Docker image should work on most OS.  It was only tested on ***MacBook***
+
 This builds an Ubuntu-based image with all dependencies (e.g., CMake, OpenSSL, IXWebSocket):
 
 ```sh
 ./run-build-linux-docker.sh
 ```
 
-### 2. Run the Docker Container
+### 2. Start the Linux Shell
 
 Run the Docker Image, creates a shell to do development in
+
+***start this on your MacBook***
 
 ```sh
 # run the docker image
