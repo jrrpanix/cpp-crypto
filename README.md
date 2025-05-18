@@ -6,10 +6,9 @@ It runs in a linux enviornment via Docker.
 
 The first exchange is Binance bookTicker Channel.
 
-This repository was developed on a **MacBook** using **Docker** to create a **Linux development environment**.  
-All development is performed inside Linux containers for consistency and compatibility.
+All development has been done on a **MacBook** by running a **Docker** containter which contains the Linux env.
 
-Although the code is compiled and run in Linux, it can also be developed locally on a Mac by:
+The code is compiled and run in Linux with the Linux shell running locally on a Mac by:
 
 - Creating a Linux-based Docker image (e.g., Ubuntu)
 - Running the container on macOS using Docker
