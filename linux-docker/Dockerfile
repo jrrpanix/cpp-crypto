@@ -9,6 +9,7 @@ RUN apt-get update && \
     apt-get install -y \
     build-essential \
     cmake \
+    time \
     git \
     curl \
     pkg-config \
