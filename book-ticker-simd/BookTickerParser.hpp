@@ -1,6 +1,7 @@
 // BookTickerParser.hpp
 #pragma once
 #include <simdjson.h>
+#include <fast_float/fast_float.h>
 #include "BookTicker.hpp"
 
 bool parse_book_ticker(simdjson::ondemand::parser &parser, const std::string &s, BookTicker &bt) {
