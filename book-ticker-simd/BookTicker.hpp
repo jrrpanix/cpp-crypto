@@ -14,7 +14,7 @@ struct alignas(64) BookTicker {
   int64_t event_time; // "E"
 
   int32_t id;      // internal symbol ID (e.g. 0 = BTCUSDT)
-  int32_t padding; // pad to keep struct 64-byte aligned
+  int32_t my_receive_time_us;  // compressed receive time us from midnight
 };
 
 

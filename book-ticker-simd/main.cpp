@@ -9,6 +9,7 @@
 #include <vector>
 #include "BookTicker.hpp"
 #include "BookTickerParser.hpp"
+#include "time_utils.hpp"
 
 //#include <immintrin.h>  // For _alignas128 or _alignas64 if needed
 

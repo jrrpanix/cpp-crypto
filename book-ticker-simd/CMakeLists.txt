@@ -12,17 +12,16 @@ set(LOCAL_LIB_DIR "${CMAKE_SOURCE_DIR}/install/lib" CACHE PATH "IXWebSocket/simd
 
 # Add your executable
 add_executable(main main.cpp)
-
-# Include headers from install/include
 target_include_directories(main PRIVATE ${LOCAL_INCLUDE_DIR})
-
-# Link against libixwebsocket and dependencies from install/lib
 target_link_directories(main PRIVATE ${LOCAL_LIB_DIR})
 target_compile_options(main PRIVATE -O3 -march=native)
-
-# Define compile-time flags
-#target_compile_definitions(main PRIVATE)
-
-# Link libraries
 target_link_libraries(main PRIVATE simdjson ixwebsocket ssl crypto z pthread)
+
+
+# Add your executable
+add_executable(test_clock_time test_clock_time.cpp)
+target_include_directories(test_clock_time PRIVATE ${LOCAL_INCLUDE_DIR})
+target_link_directories(test_clock_time PRIVATE ${LOCAL_LIB_DIR})
+target_compile_options(test_clock_time PRIVATE -O3 -march=native)
+target_link_libraries(test_clock_time PRIVATE simdjson ixwebsocket ssl crypto z pthread)
 
