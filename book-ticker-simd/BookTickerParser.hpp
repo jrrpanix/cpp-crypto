@@ -4,7 +4,13 @@
 #include <fast_float/fast_float.h>
 #include "BookTicker.hpp"
 
-bool parse_book_ticker(simdjson::ondemand::parser &parser, const std::string &s, BookTicker &bt) {
+inline bool field_exists(simdjson::ondemand::object obj, const std::string &field) {
+  auto result = obj.find_field(field);
+  return result.error() == simdjson::SUCCESS;
+}
+
+
+inline bool parse_book_ticker(simdjson::ondemand::parser &parser, const std::string &s, BookTicker &bt) {
   simdjson::padded_string padded(s);
   auto doc = parser.iterate(padded);
 
@@ -34,6 +40,7 @@ bool parse_book_ticker(simdjson::ondemand::parser &parser, const std::string &s,
   //std::string_view symbol = std::string(doc["s"].get_string().value());
 
   bt.trade_time = doc["T"].get_int64().value();
+  
   bt.event_time = doc["E"].get_int64().value();
   return true;
 }
