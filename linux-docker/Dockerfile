@@ -12,6 +12,7 @@ RUN apt-get update && \
     time \
     git \
     curl \
+    wget \
     pkg-config \
     libssl-dev \
     zlib1g-dev \
