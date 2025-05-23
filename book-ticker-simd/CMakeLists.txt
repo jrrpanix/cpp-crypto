@@ -33,3 +33,17 @@ target_link_directories(test_simd_parser PRIVATE ${LOCAL_LIB_DIR})
 target_compile_options(test_simd_parser PRIVATE -O3 -march=native)
 target_link_libraries(test_simd_parser PRIVATE simdjson ixwebsocket ssl crypto z pthread)
 
+# Add your executable
+add_executable(test_lookup test_lookup.cpp)
+target_include_directories(test_lookup PRIVATE ${LOCAL_INCLUDE_DIR})
+target_link_directories(test_lookup PRIVATE ${LOCAL_LIB_DIR})
+target_compile_options(test_lookup PRIVATE -O3 -march=native)
+target_link_libraries(test_lookup PRIVATE simdjson ixwebsocket ssl crypto z pthread)
+
+# Add your executable
+add_executable(msub msub.cpp)
+target_include_directories(msub PRIVATE ${LOCAL_INCLUDE_DIR})
+target_link_directories(msub PRIVATE ${LOCAL_LIB_DIR})
+target_compile_options(msub PRIVATE -O3 -march=native)
+target_link_libraries(msub PRIVATE simdjson ixwebsocket ssl crypto z pthread)
+
