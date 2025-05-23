@@ -39,11 +39,12 @@ void time_loop(const std::vector<std::string> &data, bool upd_time) {
   auto end = std::chrono::high_resolution_clock::now();
   auto duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   int T = N + BAD;
-  std::cout << "--" << "\n";
-  std::cout << "Total time: " << duration_ns << " ns\n";
-  std::cout << "Update time: " << upd_time << "\n";
-  std::cout << "Total calls: " << N << " BAD=" << BAD << "\n";
-  std::cout << "Average time per call: " << (duration_ns / T) << " ns\n";
+  std::cout << "Total=" << duration_ns
+	    << ";N=" << N
+	    << ";BAD=" << BAD 
+	    << ";Avg=" << (duration_ns / T) << "ns"
+	    << ";UPD_ON=" << (upd_time ? "YES": "NO")
+	    << "\n";
 }
 
 
