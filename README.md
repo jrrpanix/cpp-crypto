@@ -19,15 +19,44 @@ This setup enables fully containerized C++ development that integrates seamlessl
 ---
 ## Tech Stack
 
-| Library         | Purpose                                   | How to Get It                                                                             |
-| --------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------- |
-| **IXWebSocket** | WebSocket client for C++ with TLS support | ✅ **Build from source**: [IXWebSocket GitHub](https://github.com/machinezone/IXWebSocket) |
-| **simdjson**    | SIMD-accelerated real-time JSON parsing   | ✅ **Build from source**: [simdjson GitHub](https://github.com/simdjson/simdjson)          |
-| **fast\_float** | Fastest string-to-float/double parsing    | ✅ **Header-only**: [fast\_float GitHub](https://github.com/fastfloat/fast_float)          |
-| **OpenSSL**     | TLS/SSL support (`libssl`, `libcrypto`)   | 🐳 Installed in Docker via `libssl-dev`                                                   |
-| **zlib**        | Compression and decompression support     | 🐳 Installed in Docker via `zlib1g-dev`                                                   |
-| **CMake**       | Cross-platform build system               | 🐳 Installed in Docker                                                                    |
-| **g++**         | C++17-compatible compiler                 | 🐳 Installed in Docker                                                                    |
+| Library           | Purpose                                                                 | How to Get It                                                                                  |
+| ----------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **IXWebSocket**   | WebSocket client for C++ with TLS support                               | 🔧 **Build from source**: [IXWebSocket GitHub](https://github.com/machinezone/IXWebSocket)    |
+| **simdjson**      | SIMD-accelerated real-time JSON parsing from the exchange               | 🔧 **Build from source**: [simdjson GitHub](https://github.com/simdjson/simdjson)             |
+| **nlohmann::json**| Used for constructing outbound JSON (e.g., subscription messages)       | 🔧 **Header-only**: [nlohmann/json GitHub](https://github.com/nlohmann/json)                  |
+| **fast_float**    | Fastest string-to-float/double conversion                               | 🔧 **Header-only**: [fast_float GitHub](https://github.com/fastfloat/fast_float)              |
+| **OpenSSL**       | TLS/SSL support (`libssl`, `libcrypto`)                                 | 📦 Installed in Docker via `libssl-dev`                                                        |
+| **zlib**          | Compression and decompression support                                   | 📦 Installed in Docker via `zlib1g-dev`                                                        |
+| **CMake**         | Cross-platform build system                                              | 📦 Installed in Docker                                                                         |
+| **g++**           | C++23-compatible compiler                                                | 📦 Installed in Docker (e.g., `g++-13` for full C++23 support)                                 |
+
+### Notes
+
+- The project is written in **C++23**.
+- `nlohmann::json` is used primarily to construct outgoing messages (e.g., subscriptions during `on_open`).
+- `simdjson` is used to parse incoming high-frequency JSON messages from the exchange with maximum performance.
+
+## JSON Parser Benchmark (Binance `bookTicker` Messages)
+
+Parsed 128,398 JSON messages from Binance using two libraries:
+
+| Parser        | Total Time (ms) | Avg Time per Message (ns) | Speedup vs. nlohmann |
+|---------------|------------------|----------------------------|------------------------|
+| **nlohmann**  | ~185–190 ms      | ~1,416–1,475 ns            | 1×                     |
+| **simdjson**  | ~19.4–19.5 ms    | ~151–152 ns                | **~9–10× faster**      |
+
+### Summary
+
+- `simdjson` demonstrates ~10× faster parsing performance compared to `nlohmann::json` on compact Binance `bookTicker` messages.
+- Ideal for high-throughput, low-latency applications (e.g. WebSocket feeds, trading systems).
+- `nlohmann::json` still offers excellent usability and STL-style APIs for general-purpose usage.
+
+### Test Details
+
+- Messages loaded from a file: `test_data.json` (128,398 lines)
+- Benchmarked using two functions:
+  - `parse_book_ticker_nlohmann(const std::string& s, BookTicker& bt)`
+  - `parse_book_ticker(const std::string& s, BookTicker& bt)`
 
 
 
