@@ -1,6 +1,6 @@
 // BookTickerParser.hpp
 #pragma once
-#include "BookTicker.hpp"
+#include "book_ticker.hpp"
 #include <fast_float/fast_float.h>
 #include <simdjson.h>
 

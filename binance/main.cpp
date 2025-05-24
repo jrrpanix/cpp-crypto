@@ -1,44 +1,37 @@
-#include "BookTicker.hpp"
-#include "BookTickerParser.hpp"
+#include "book_ticker.hpp"
+#include "book_ticker_parser.hpp"
 #include "time_utils.hpp"
+#include "setup_websocket.hpp"
+#include "parse_config.hpp"
 #include <cstdint>
 #include <iostream>
+#include <fstream>
 #include <ixwebsocket/IXWebSocket.h>
 #include <simdjson.h>
 #include <string>
 #include <system_error>
 #include <vector>
 
+bool get_config(const char *file_name, std::string &endpoint, std::vector<std::string> &subs) {
+  std::ifstream infile(file_name);
+  if (!infile.is_open()) {
+    std::cerr << "❌ Failed to open file.\n";
+    return false;
+  }
+  return parse_config(infile, endpoint, subs);
+
+}
+
 int main(int argc, char **argv) {
-  ix::WebSocket ws;
-  ws.setUrl("wss://fstream.binance.com/ws/btcusdt@bookTicker");
-
-  // Persistent simdjson objects
-  simdjson::ondemand::parser parser;
-
-  ws.setPingInterval(30);
-
-  ws.setOnMessageCallback([&parser](const ix::WebSocketMessagePtr &msg) {
-    if (msg->type == ix::WebSocketMessageType::Message) {
-      try {
-        std::cout << msg->str << std::endl;
-        simdjson::padded_string padded(msg->str);
-        auto doc = parser.iterate(padded);
-        std::string symbol = std::string(doc["s"].get_string().value());
-        std::string bid = std::string(doc["b"].get_string().value());
-        std::string ask = std::string(doc["a"].get_string().value());
-
-        std::cout << "Symbol: " << symbol << " | Bid: " << bid
-                  << " | Ask: " << ask << "\n";
-      } catch (const simdjson::simdjson_error &e) {
-        std::cerr << "JSON parse error: " << e.what() << "\n";
-        throw std::runtime_error(e.what());
-      }
+    ix::WebSocket ws;
+    std::string endpoint;
+    std::vector<std::string> subs;
+    if (!get_config(argv[1], endpoint, subs)) {
+      return 1;
     }
-  });
-
-  ws.start();
-  std::this_thread::sleep_for(std::chrono::minutes(10));
-  ws.stop();
-  return 0;
+    std::cout << "endpoint=" << endpoint << std::endl;
+    setup_websocket(ws, endpoint, subs);
+    //// Prevent main thread from exiting
+    std::this_thread::sleep_for(std::chrono::minutes(10));
+    return 0;
 }

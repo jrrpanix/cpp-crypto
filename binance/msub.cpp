@@ -2,6 +2,9 @@
 #include <ixwebsocket/IXWebSocket.h>
 #include <nlohmann/json.hpp>
 #include <vector>
+#include "parse_config.hpp"
+
+
 
 int main() {
   ix::WebSocket ws;
