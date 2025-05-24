@@ -71,7 +71,7 @@ Docker is cross platform so building the Docker image should work on most OS.  I
 This builds an Ubuntu-based image with all dependencies (e.g., CMake, OpenSSL, IXWebSocket):
 
 ```sh
-./make-linux-docker.sh
+./build_linux_docker.sh
 ```
 
 ### 2. Start the Linux Shell
@@ -82,10 +82,10 @@ Run the Docker Image, creates a shell to do development in
 
 ```sh
 # run the docker image
-# specify the mount point
+# specify the mount point : optional defaults to $HOME/cpp-crypto
 # this will be where r/w access between mac/docker will be
 
-./run-linux-docker.sh $HOME/cpp-crypto 
+./launch-linux-dev.sh
 ```
 
 ### 3. Run Dependency Installation Script
