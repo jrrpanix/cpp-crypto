@@ -88,62 +88,17 @@ Run the Docker Image, creates a shell to do development in
 ./run-linux-docker.sh $HOME/cpp-crypto 
 ```
 
+### 3. Run Dependency Installation Script
 
-### 3. Build IXWebSocket
+This script automates the download, build, and installation of the following C++ libraries:
 
-***Done in linux*** 
+- **[IXWebSocket](https://github.com/machinezone/IXWebSocket)**: WebSocket client with TLS support
+- **[fast_float](https://github.com/fastfloat/fast_float)**: Fast string-to-float conversion library
+- **[nlohmann/json](https://github.com/nlohmann/json)**: Modern C++ JSON library (header-only)
+- **[simdjson](https://github.com/simdjson/simdjson)**: High-performance SIMD-accelerated JSON parser
 
-clone the IXWebSocket repo
-
-USE_TLS=TRUE
-
-install headers and lib
-
-```sh
-# start the linux shell but running the docker image
-./run-linux-docker.sh $HOME/cpp-crypto
-```
-***inside the linux shell run the following***
- 
-```sh
-# installs headers to /workspace/install/include
-# installs lib     to /workspace/install/lib
-
-
-./run-build-ixwebsocket.sh
-```
-
-
-### 4. Build book-ticker-test
-
-***Done in linux*** 
-
-This connects to bookTicker on binance and listens to btcusdt
-
-This version is just a simple websocket connection that prints out the exact json message coming from binance bookTicker
+### Usage
 
 ```sh
-# start the linux shell but running the docker image
-./run-linux-docker.sh $HOME/cpp-crypto
+sh install_deps.sh
 ```
-***inside the linux shell run the following***
-
-```sh
-cd book-ticker-test
-./run-build.sh
-./build/main  # you will immediately see a stream of data if it works 
-```
-### 5. Build simdjson , the fast json parser
-
-***Done in linux*** 
-
-***inside the linux shell run the following***
- 
-```sh
-# installs headers to /workspace/install/include
-# installs lib     to /workspace/install/lib
-
-
-./run-build-simd.sh
-```
-
