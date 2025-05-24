@@ -47,3 +47,10 @@ target_link_directories(msub PRIVATE ${LOCAL_LIB_DIR})
 target_compile_options(msub PRIVATE -O3 -march=native)
 target_link_libraries(msub PRIVATE simdjson ixwebsocket ssl crypto z pthread)
 
+# Add your executable
+add_executable(test_json_times test_json_times.cpp)
+target_include_directories(test_json_times PRIVATE ${LOCAL_INCLUDE_DIR})
+target_link_directories(test_json_times PRIVATE ${LOCAL_LIB_DIR})
+target_compile_options(test_json_times PRIVATE -O3 -march=native)
+target_link_libraries(test_json_times PRIVATE simdjson ixwebsocket ssl crypto z pthread)
+

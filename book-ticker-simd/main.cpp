@@ -1,3 +1,6 @@
+#include "BookTicker.hpp"
+#include "BookTickerParser.hpp"
+#include "time_utils.hpp"
 #include <cstdint>
 #include <iostream>
 #include <ixwebsocket/IXWebSocket.h>
@@ -5,10 +8,6 @@
 #include <string>
 #include <system_error>
 #include <vector>
-#include "BookTicker.hpp"
-#include "BookTickerParser.hpp"
-#include "time_utils.hpp"
-
 
 int main(int argc, char **argv) {
   ix::WebSocket ws;
