@@ -1,95 +1,81 @@
-# 🔍 Benchmark: `unordered_map` vs `gperf` for Symbol Lookup
+# 🔎 Symbol Lookup Benchmark
 
-This directory contains a performance benchmark comparing two methods for mapping cryptocurrency symbol strings (e.g. `"btcusdt"`) to integer IDs:
+This subdirectory benchmarks various symbol lookup methods for use in high-performance market data applications.
 
-- `std::unordered_map<std::string, int32_t>`
-- A perfect hash function generated using `gperf`
+It compares the average lookup speed of:
 
-The benchmark performs **1,000,000 randomized lookups** across approximately **1434 Binance trading symbols**.
+- ✅ `std::unordered_map`
+- ✅ `robin_hood::unordered_flat_map`
+- ✅ `gperf` (perfect hash)
+- ✅ Python `dict`
+
+These tests are designed to simulate high-frequency symbol-to-ID mapping — such as translating Binance `bookTicker` symbols to internal numeric IDs.
 
 ---
 
-## 🚀 Quick Start
+## 🧪 Benchmark Results
 
-To build and run the benchmark:
+Each method was tested over 1,000,000 randomized lookups on ~1400 Binance symbols:
+
+| Method                     | Avg Lookup Time (ns) |
+|----------------------------|----------------------|
+| `std::unordered_map`       | 44.44 ns             |
+| `robin_hood::flat_map`     | 35.47 ns             |
+| `gperf` (perfect hash)     | 24.92 ns             |
+| Python `dict` (CPython 3.12)| 45.94 ns            |
+
+---
+
+## ⚙️ Build and Run
+
+### 🔨 Build the benchmark
 
 ```sh
 ./build_local.sh
-./build/bench
 ```
 
-This will output the average lookup time for both methods.
+This compiles the C++ benchmarks for `unordered_map`, `robin_hood`, and `gperf`.
 
----
-
-## ⚙️ Benchmark Summary
-
-| Method             | Key Count | Avg Lookup Time | Relative Speed |
-|--------------------|-----------|------------------|----------------|
-| `unordered_map`     | 1434      | **44.25 ns**      | 1×             |
-| `gperf`             | 1434      | **17.61 ns**      | ~**2.5× faster** |
-
----
-
-## 📂 Files
-
-| File                   | Purpose                                                                 |
-|------------------------|-------------------------------------------------------------------------|
-| `build_local.sh`       | Compiles the benchmark (`benchmark_symbol_lookup.cpp`)                  |
-| `symbols.json`         | Symbol-to-ID map generated from Binance exchange info                   |
-| `symbol_keywords.gperf`| Gperf input used to generate `symbol_lookup.hpp`                        |
-| `symbol_lookup.hpp`    | Auto-generated header with perfect hash lookup function                 |
-| `benchmark_symbol_lookup.cpp` | Benchmark code comparing both methods                         |
-
----
-
-## 🌐 Binance Exchange Data Source
-
-The symbol list is dynamically sourced from Binance's official **Exchange Information** endpoint:
-
-```
-https://api.binance.com/api/v3/exchangeInfo
-```
-
-This provides all active trading pairs (e.g. `"btcusdt"`, `"ethusdt"`) for the current day. Only pairs with `"status": "TRADING"` are included.
-
----
-
-## 📈 Notes
-
-- `gperf` provides **constant-time, collision-free** lookups using precomputed hash tables
-- `unordered_map` offers **dynamic flexibility** but incurs runtime hashing and memory overhead
-- At this scale (~1400 keys), `gperf` is ~2.5× faster and uses less memory
-- 🧠 **Performance improves significantly when the number of symbols is smaller**, especially for `unordered_map`, due to better CPU cache locality and fewer collisions
-
----
-
-## 🛠️ Dependencies
-
-- `g++` with C++17 support
-- [`nlohmann/json`](https://github.com/nlohmann/json) (header-only, for parsing `symbols.json`)
-- [`gperf`](https://www.gnu.org/software/gperf/)
-
-Install on Ubuntu:
+### 🚀 Run the benchmark
 
 ```sh
-sudo apt-get install g++ gperf
+./run.sh
 ```
+
+This executes the compiled C++ benchmarks and the Python timing code. Results are printed to stdout.
 
 ---
 
-## 🧪 Want to regenerate symbols?
+## 📦 Dependencies
 
-Use the `generate_symbol_files.py` script (Python 3.12+ with `requests`):
+- C++17+ compiler (e.g., g++ 11 or higher)
+- `robin_hood.h` (included or installed via `install_deps.sh`)
+- `gperf` (precompiled static perfect hash lookup table)
+- Python 3.12+ (for Python dict timing)
+- `nlohmann/json` and `Polars` for loading `symbols.json`
+
+---
+
+## 📁 Files
+
+| File             | Purpose                                     |
+|------------------|---------------------------------------------|
+| `build_local.sh` | Builds all benchmark binaries               |
+| `run.sh`         | Runs all benchmark tests (C++ and Python)   |
+| `symbols.json`   | Symbol-to-ID mapping input file             |
+| `symbol_lookup.hpp` | Generated gperf header from `symbols.json` |
+| `benchmark_all_maps.cpp` | Main C++ benchmark source            |
+| `dict_benchmark.py` | Python benchmark script                  |
+
+---
+
+## 📝 Notes
+
+- `gperf` is the fastest, but requires a static key set.
+- `robin_hood::flat_map` is a great drop-in replacement for `unordered_map` with no dependencies.
+- Python’s built-in `dict` is competitive for small to mid-size keysets.
 
 ```sh
-python3 generate_symbol_files.py
+Use this benchmark to guide your choice of lookup strategy depending on latency, key mutability, and codebase simplicity.
 ```
-
-This will:
-- Fetch Binance trading symbols
-- Create `symbol_keywords.gperf` and `symbols.json`
-- Use those as inputs for benchmarking
-
----
 
