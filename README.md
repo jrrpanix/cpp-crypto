@@ -50,21 +50,77 @@ Parsed ~128K Binance messages using two libraries:
 
 ## ⚙️ Development Workflow
 
-### ✅ One-Shot Setup (Recommended)
+All scripts are now in the `scripts/` subdirectory. You can either run them directly or use the `Makefile` for convenience.
 
-If you're on a Mac with Docker installed, just run:
+### ✅ Option 1: One-Shot Setup (Recommended)
+
+If you're on a Mac with Docker installed:
 
 ```sh
-./setup_and_run.sh
+./scripts/setup_and_run.sh
 ```
 
-This script will:
+This will:
 
 1. Build the Docker container (`cpp-dev` or `full-dev`)
-2. Launch the Linux dev container
-3. Install dependencies via `install_deps.sh`
-4. Build the Binance C++ project
-5. Run the program:
+2. Launch the Linux development environment
+3. Install C++ dependencies
+4. Build and run the Binance app:
+
+```sh
+./build/binance_main --config_file config.json --key spot
+```
+
+---
+
+### 🛠 Option 2: Manual Steps (or via `make`)
+
+#### Build Docker image:
+
+```sh
+./scripts/build_docker.sh cpp    # or full
+```
+
+Or using `make`:
+
+```sh
+make build-cpp
+make build-full
+```
+
+#### Launch Docker container:
+
+```sh
+./scripts/launch-dev.sh cpp    # or full
+```
+
+Or using `make`:
+
+```sh
+make run-cpp
+make run-full
+```
+
+#### Install dependencies (inside container):
+
+```sh
+./scripts/install_deps.sh
+```
+
+Or:
+
+```sh
+make deps
+```
+
+#### Build the app:
+
+```sh
+cd binance
+./build_local.sh
+```
+
+#### Run the app:
 
 ```sh
 ./build/binance_main --config_file config.json --key spot
@@ -78,29 +134,15 @@ To run the **futures feed**:
 
 ---
 
-### 🛠 Manual Setup (If Needed)
+## 🧾 Makefile Targets
 
-**Build Docker container**:
-
-```sh
-./build_docker.sh cpp     # Lightweight C++-only
-./build_docker.sh full    # Full C++ + Python stack
-```
-
-**Launch the container**:
+Once in the project root, you can also use:
 
 ```sh
-./launch-dev.sh cpp       # Use current dir
-./launch-dev.sh full $HOME/cpp-dev  # Optional path
-```
-
-**Inside the container**:
-
-```sh
-./install_deps.sh
-cd binance
-./build_local.sh
-./build/binance_main --config_file config.json --key spot
+make help        # list commands
+make build-cpp   # build C++ Docker image
+make run-cpp     # launch cpp-dev environment
+make setup       # full setup (build, launch, install)
 ```
 
 ---
@@ -108,7 +150,8 @@ cd binance
 ## 📝 Notes
 
 - Written in **C++23**, compiled with `g++ 11.4.0`
-- Partial C++23 support — upgrade to `g++ 13+` recommended
-- Designed for macOS-based development using Dockerized Ubuntu Linux
-- Uses `robin_hood::unordered_flat_map` for performant symbol lookup
+- Partial C++23 support — project will upgrade to `g++ 13+`
+- Optimized for macOS-based development via Dockerized Linux
+- Uses `robin_hood::unordered_flat_map` and `gperf` for efficient symbol lookups
+
 
