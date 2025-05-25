@@ -33,9 +33,22 @@ No need for cloud VMs or full Linux installs — just Docker.
 | **g++ 11.4.0**        | C++23-compatible compiler                                 | 📦 Installed in Docker                                                       |
 
 ---
-## 📊 JSON Parser Benchmark (Binance `bookTicker` Messages)
+# 📊 JSON Parsing Benchmark: Binance `bookTicker` Messages
 
-Parsed **128,398 JSON messages** from Binance perpetual `bookTicker` feed using both C++ and Python libraries:
+This benchmark compares the performance of several JSON parsers using real-time market data from Binance's perpetual futures `bookTicker` stream.
+
+---
+
+## 🧪 Dataset
+
+- **File**: `test_data/binance_perp_btc.json`
+- **Format**: One JSON object per line
+- **Source**: [Binance Exchange WebSocket](https://binance-docs.github.io/apidocs/futures/en/#individual-symbol-book-ticker-streams)
+- **Total messages**: 128,398
+
+---
+
+## 📈 Benchmark Results
 
 | Parser              | Total Time (ms) | Avg Time per Message (ns) | Language |
 |---------------------|------------------|----------------------------|----------|
@@ -45,20 +58,48 @@ Parsed **128,398 JSON messages** from Binance perpetual `bookTicker` feed using 
 
 ---
 
-### ✅ Summary
+## ✅ Summary
 
-- `simdjson` is the fastest, offering **~10× better performance** than `nlohmann::json` and significantly faster than Python.
-- `nlohmann::json` is a good balance of speed and usability for C++.
-- Python’s `json` module is quite performant for non-critical paths or scripting pipelines.
+- `simdjson` is the fastest, offering ~10× better performance than `nlohmann::json`.
+- Python’s built-in `json` parser is surprisingly efficient and competitive.
+- `nlohmann::json` is a strong middle-ground for developer ergonomics in C++.
 
 ---
 
-### 🧪 Benchmark Details
+## 🔁 Reproducing the Benchmark
 
-- File tested: `binance_perp_btc.json`
-- Format: 1 JSON object per line (Binance `bookTicker` messages)
-- Total messages: 128,398
-- Measurements include only **JSON parsing time**, not I/O or formatting
+### 🔧 C++ Timing
+
+```sh
+./binance/build/test_json_times ./test_data/binance_perp_btc.json
+```
+
+- Benchmarks both `simdjson` and `nlohmann::json`
+- Reports total and average time per message
+
+---
+
+### 🐍 Python Timing
+
+```sh
+python ./binance/tests/test_python_parser.py ./test_data/binance_perp_btc.json
+```
+
+- Uses Python's built-in `json` module
+- Measures total parsing time only (no I/O)
+
+---
+
+## 📝 Notes
+
+- All benchmarks use the same input file
+- Each line must be a valid JSON object (cleaned if needed)
+- No printing or validation performed during timed runs
+
+---
+
+Use this to evaluate trade-offs between performance and ease of use when choosing a JSON library for real-time parsing workloads.
+
 
 ---
 
