@@ -5,7 +5,7 @@ INSTALLDIR="/workspace/install"
 THIRD_PARTY_DIR="/workspace/third_party"
 
 # Create required directories
-mkdir -p "$INSTALLDIR"
+mkdir -p "$INSTALLDIR/include"
 mkdir -p "$THIRD_PARTY_DIR"
 cd "$THIRD_PARTY_DIR"
 
@@ -34,8 +34,11 @@ build_project() {
 # Build IXWebSocket (with TLS)
 build_project "IXWebSocket" "https://github.com/machinezone/IXWebSocket.git" "-DUSE_TLS=TRUE"
 
-# Build fast_float (header-only, but we're installing via CMake)
+# Build fast_float
 build_project "fast_float" "https://github.com/fastfloat/fast_float.git" ""
+
+# Build simdjson
+build_project "simdjson" "https://github.com/simdjson/simdjson.git" ""
 
 # Install nlohmann/json single-header
 NLOHMANN_HEADER="$INSTALLDIR/include/nlohmann/json.hpp"
@@ -48,6 +51,13 @@ else
       -O "$NLOHMANN_HEADER"
 fi
 
-# Build simdjson
-build_project "simdjson" "https://github.com/simdjson/simdjson.git" ""
+# Install robin_hood single-header
+ROBIN_HOOD_HEADER="$INSTALLDIR/include/robin_hood.h"
+if [ -f "$ROBIN_HOOD_HEADER" ]; then
+  echo "✅ robin_hood.h already exists, skipping download."
+else
+  echo "📥 Downloading robin_hood.h..."
+  wget -q https://raw.githubusercontent.com/martinus/robin-hood-hashing/master/src/include/robin_hood.h \
+      -O "$ROBIN_HOOD_HEADER"
+fi
 
