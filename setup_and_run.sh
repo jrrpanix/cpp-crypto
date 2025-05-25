@@ -9,12 +9,12 @@ WORKDIR=${WORKDIR:-$DEFAULT_WORKDIR}
 
 # Step 1: Build the Docker container
 echo "🛠️  Building Docker container..."
-./build_linux_docker.sh
+./build_docker.sh cpp
 
 # Step 2: Launch the container and run build and run scripts inside
 echo "🚀 Launching container and running setup..."
 
-docker run -it --rm -v "$WORKDIR:/workspace" linux-dev /bin/bash -c '
+docker run -it --rm -v "$WORKDIR:/workspace" cpp-dev /bin/bash -c '
   set -e
   echo "🔧 Running install_deps.sh..."
   ./install_deps.sh
