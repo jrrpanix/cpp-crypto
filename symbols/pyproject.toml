@@ -1,0 +1,15 @@
+[project]
+name = "binance-data-tools"
+version = "0.1.0"
+description = "Tools for downloading and processing Binance market data"
+requires-python = ">=3.12"
+
+dependencies = [
+    "polars",
+    "pandas",
+    "matplotlib",
+    "requests",
+    "rich"
+]
+
+
