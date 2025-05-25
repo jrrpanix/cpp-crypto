@@ -1,13 +1,6 @@
-#include "book_ticker.hpp"
-#include "book_ticker_parser.hpp"
 #include "endpoint_config.hpp"
 #include "setup_websocket.hpp"
-#include "time_utils.hpp"
-#include <cstdint>
-#include <fstream>
-#include <iostream>
 #include <ixwebsocket/IXWebSocket.h>
-#include <simdjson.h>
 #include <string>
 #include <system_error>
 #include <vector>

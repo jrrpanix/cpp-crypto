@@ -16,10 +16,10 @@ include_directories(
 )
 
 # Main executable
-add_executable(simd_main main.cpp)
-target_link_directories(simd_main PRIVATE ${LOCAL_LIB_DIR})
-target_compile_options(simd_main PRIVATE -O3 -march=native)
-target_link_libraries(simd_main
+add_executable(binance_main binance.cpp)
+target_link_directories(binance_main PRIVATE ${LOCAL_LIB_DIR})
+target_compile_options(binance_main PRIVATE -O3 -march=native)
+target_link_libraries(binance_main
     PRIVATE
         simdjson
         ixwebsocket      # <-- This was missing
