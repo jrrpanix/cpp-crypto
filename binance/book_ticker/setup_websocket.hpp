@@ -64,6 +64,4 @@ inline void setup_websocket(ix::WebSocket &ws, const std::string &endpoint,
       break;
     }
   });
-
-  ws.start(); // Begin connection
 }
