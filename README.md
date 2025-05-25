@@ -33,18 +33,32 @@ No need for cloud VMs or full Linux installs — just Docker.
 | **g++ 11.4.0**        | C++23-compatible compiler                                 | 📦 Installed in Docker                                                       |
 
 ---
-
 ## 📊 JSON Parser Benchmark (Binance `bookTicker` Messages)
 
-Parsed ~128K Binance messages using two libraries:
+Parsed **128,398 JSON messages** from Binance perpetual `bookTicker` feed using both C++ and Python libraries:
 
-| Parser         | Total Time (ms) | Avg Time per Message (ns) | Speedup |
-|----------------|------------------|----------------------------|---------|
-| **nlohmann**   | ~185–190         | ~1,416–1,475               | 1×      |
-| **simdjson**   | ~19.4–19.5       | ~151–152                   | ~10×    |
+| Parser              | Total Time (ms) | Avg Time per Message (ns) | Language |
+|---------------------|------------------|----------------------------|----------|
+| `simdjson`          | 18.50 ms         | 144 ns                     | C++      |
+| `nlohmann::json`    | 180.90 ms        | 1408 ns                    | C++      |
+| Python `json`       | 139.11 ms        | 1083 ns                    | Python   |
 
-- `simdjson` is ideal for high-throughput applications.
-- `nlohmann::json` is excellent for readability and outbound message composition.
+---
+
+### ✅ Summary
+
+- `simdjson` is the fastest, offering **~10× better performance** than `nlohmann::json` and significantly faster than Python.
+- `nlohmann::json` is a good balance of speed and usability for C++.
+- Python’s `json` module is quite performant for non-critical paths or scripting pipelines.
+
+---
+
+### 🧪 Benchmark Details
+
+- File tested: `binance_perp_btc.json`
+- Format: 1 JSON object per line (Binance `bookTicker` messages)
+- Total messages: 128,398
+- Measurements include only **JSON parsing time**, not I/O or formatting
 
 ---
 
