@@ -1,49 +1,53 @@
 #!/bin/sh
-set -e  # Exit immediately on error
+set -e  # Exit on error
 
 INSTALLDIR="/workspace/install"
 THIRD_PARTY_DIR="/workspace/third_party"
 
-# Create necessary directories
+# Create required directories
 mkdir -p "$INSTALLDIR"
 mkdir -p "$THIRD_PARTY_DIR"
-
 cd "$THIRD_PARTY_DIR"
 
-# Check if IXWebSocket directory already exists
-if [ -d IXWebSocket ]; then
-    echo "Directory '$THIRD_PARTY_DIR/IXWebSocket' already exists."
-    echo "To perform a clean build, please remove it:"
-    echo "  rm -rf $THIRD_PARTY_DIR/IXWebSocket"
-    exit 1
+build_project() {
+  local name="$1"
+  local git_url="$2"
+  local cmake_flags="$3"
+
+  if [ -d "$name" ]; then
+    echo "✅ $name already exists, skipping clone and build."
+    return
+  fi
+
+  echo "📥 Cloning $name..."
+  git clone "$git_url" "$name"
+
+  echo "🔧 Building $name..."
+  cd "$name"
+  mkdir -p build && cd build
+  cmake -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" $cmake_flags ..
+  make -j"$(nproc)"
+  make install
+  cd "$THIRD_PARTY_DIR"
+}
+
+# Build IXWebSocket (with TLS)
+build_project "IXWebSocket" "https://github.com/machinezone/IXWebSocket.git" "-DUSE_TLS=TRUE"
+
+# Build fast_float (header-only, but we're installing via CMake)
+build_project "fast_float" "https://github.com/fastfloat/fast_float.git" ""
+
+# Install nlohmann/json single-header
+NLOHMANN_HEADER="$INSTALLDIR/include/nlohmann/json.hpp"
+if [ -f "$NLOHMANN_HEADER" ]; then
+  echo "✅ nlohmann/json.hpp already exists, skipping download."
+else
+  echo "📥 Downloading nlohmann/json.hpp..."
+  mkdir -p "$INSTALLDIR/include/nlohmann"
+  wget -q https://github.com/nlohmann/json/releases/latest/download/json.hpp \
+      -O "$NLOHMANN_HEADER"
 fi
 
-# Clone and build IXWebSocket with TLS support
-git clone https://github.com/machinezone/IXWebSocket.git
-cd IXWebSocket
-mkdir -p build && cd build
-cmake -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" -DUSE_TLS=TRUE ..
-make -j$(nproc)
-make install
-cd "$THIRD_PARTY_DIR"
-
-# Clone and build fast_float
-git clone https://github.com/fastfloat/fast_float.git
-cd fast_float && mkdir build && cd build
-cmake -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" ..
-make -j$(nproc)
-make install
-cd "$THIRD_PARTY_DIR"
-
-# Download nlohmann/json single header
-mkdir -p "$INSTALLDIR/include/nlohmann"
-wget -q https://github.com/nlohmann/json/releases/latest/download/json.hpp \
-    -O "$INSTALLDIR/include/nlohmann/json.hpp"
-
-# Clone and build simdjson
-git clone https://github.com/simdjson/simdjson.git
-cd simdjson && mkdir build && cd build
-cmake -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" ..
-make -j$(nproc)
-make install
+# Build simdjson
+build_project "simdjson" "https://github.com/simdjson/simdjson.git" ""
 
