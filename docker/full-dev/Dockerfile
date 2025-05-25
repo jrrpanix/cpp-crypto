@@ -11,6 +11,7 @@ RUN apt-get update && \
     git \
     curl \
     wget \
+    gperf \
     pkg-config \
     libssl-dev \
     zlib1g-dev \
