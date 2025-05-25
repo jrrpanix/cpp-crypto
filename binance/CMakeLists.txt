@@ -16,7 +16,7 @@ include_directories(
 )
 
 # Main executable
-add_executable(binance_main binance.cpp)
+add_executable(binance_main binance_main.cpp)
 target_link_directories(binance_main PRIVATE ${LOCAL_LIB_DIR})
 target_compile_options(binance_main PRIVATE -O3 -march=native)
 target_link_libraries(binance_main
