@@ -2,7 +2,7 @@
 
 This project provides a **C++23-based framework** for connecting to crypto exchanges. It is designed to run in a **Linux environment via Docker** but is fully developed and tested on a **MacBook** using Docker containers.
 
-The first integration is with the **Binance Spot bookTicker WebSocket feed**, which delivers real-time bid/ask updates.
+The system currently supports the **Binance Spot** and **Binance Perpetual Futures (futures)** `bookTicker` WebSocket channels, which deliver real-time bid/ask updates.
 
 ---
 
@@ -29,7 +29,7 @@ No need for cloud VMs or full Linux installs — just Docker.
 | **OpenSSL**         | TLS support (`libssl`, `libcrypto`)                 | 📦 Installed in Docker                                                       |
 | **zlib**            | Compression library                                  | 📦 Installed in Docker                                                       |
 | **CMake**           | Build system                                         | 📦 Installed in Docker                                                       |
-| **g++**             | C++23-compatible compiler                            | 📦 Installed in Docker (e.g., `g++-13`)                                      |
+| **g++ 11.4.0**      | C++23-compatible compiler                            | 📦 Installed in Docker                                                       |
 
 ---
 
@@ -104,11 +104,17 @@ cd binance
 ./build/binance_main --config_file config.json --key spot
 ```
 
+> To run the perpetual futures feed, use:
+> ```sh
+> ./build/binance_main --config_file config.json --key fut
+> ```
+
 ---
 
 ### 📝 Notes
 
-- The project is built using **C++23**
-- Developed on **macOS**, executed in **Dockerized Linux**
-- The architecture is designed for extensibility to other exchanges beyond Binance
+- The project is written using **C++23**, compiled with `g++ 11.4.0`
+- `g++ 11.4.0` provides **partial** C++23 support; the project plans to upgrade to **`g++ 13+`** for full standard compliance and access to newer language features
+- Developed on **macOS**, executed in a **Dockerized Ubuntu Linux** environment
+- Designed to easily support multiple exchange backends (e.g., Binance Spot & Futures)
 
