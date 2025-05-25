@@ -43,11 +43,24 @@ This will output the average lookup time for both methods.
 
 ---
 
+## 🌐 Binance Exchange Data Source
+
+The symbol list is dynamically sourced from Binance's official **Exchange Information** endpoint:
+
+```
+https://api.binance.com/api/v3/exchangeInfo
+```
+
+This provides all active trading pairs (e.g. `"btcusdt"`, `"ethusdt"`) for the current day. Only pairs with `"status": "TRADING"` are included.
+
+---
+
 ## 📈 Notes
 
 - `gperf` provides **constant-time, collision-free** lookups using precomputed hash tables
 - `unordered_map` offers **dynamic flexibility** but incurs runtime hashing and memory overhead
 - At this scale (~1400 keys), `gperf` is ~2.5× faster and uses less memory
+- 🧠 **Performance improves significantly when the number of symbols is smaller**, especially for `unordered_map`, due to better CPU cache locality and fewer collisions
 
 ---
 
