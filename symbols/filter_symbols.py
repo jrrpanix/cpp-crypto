@@ -1,40 +1,43 @@
 import json
 from pathlib import Path
+import argparse
 
-def filter_symbols(input_path: str, output_path: str, keyword: str = "USDT"):
-    input_file = Path(input_path)
-    output_file = Path(output_path)
-
-    if not input_file.exists():
+def filter_symbols(input_path: Path, output_path: Path, keyword: str, capitalize: bool):
+    if not input_path.exists():
         print(f"❌ Input file does not exist: {input_path}")
         return
 
-    with input_file.open("r") as f:
+    with input_path.open("r") as f:
         symbol_map = json.load(f)
 
     keyword = keyword.lower()
 
-    # Filter keys while preserving order and original casing
+    # Filter and optionally capitalize
     filtered = {
-        sym: id_
+        (sym.upper() if capitalize else sym): id_
         for sym, id_ in symbol_map.items()
         if keyword in sym.lower()
     }
 
-    with output_file.open("w") as f:
+    with output_path.open("w") as f:
         json.dump(filtered, f, indent=2)
 
-    print(f"✅ Filtered {len(filtered)} symbols into {output_path}")
+    print(f"✅ Filtered {len(filtered)} symbols → {output_path}")
+
 
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) < 3:
-        print("Usage: python filter_symbols.py <input.json> <output.json> [FILTER]")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Filter symbols from JSON by keyword.")
+    parser.add_argument("-i", "--input-file", required=True, help="Path to input symbols.json")
+    parser.add_argument("-o", "--output-file", required=True, help="Path to output filtered.json")
+    parser.add_argument("-k", "--keyword", default="USDT", help="Substring to match (case-insensitive)")
+    parser.add_argument("-c", "--capitalize", action="store_true", help="Capitalize output keys")
 
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
-    filter_keyword = sys.argv[3] if len(sys.argv) > 3 else "USDT"
+    args = parser.parse_args()
 
-    filter_symbols(input_file, output_file, filter_keyword)
+    filter_symbols(
+        input_path=Path(args.input_file),
+        output_path=Path(args.output_file),
+        keyword=args.keyword,
+        capitalize=args.capitalize
+    )
 
