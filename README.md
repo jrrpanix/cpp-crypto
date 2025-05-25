@@ -1,104 +1,114 @@
-## C++ Market Data Processor for Crypto Ecxhanges
+## 🚀 C++ Market Data Processor for Crypto Exchanges
 
-This repository in written in C++ to connect to crypto exchanges.
+This project provides a **C++23-based framework** for connecting to crypto exchanges. It is designed to run in a **Linux environment via Docker** but is fully developed and tested on a **MacBook** using Docker containers.
 
-It runs in a linux enviornment via Docker.
-
-The first exchange is Binance bookTicker Channel.
-
-All development has been done on a **MacBook** by running a **Docker** containter which contains the Linux env.  The choice was made to develop in a Docker Container because most people just carry around laptops and its cheaper to Develop locally on a Laptop inside of a Docker Linux Container than to run Linux on a cloud computing machine.  All that is required is a Docker subscripton to get going.  if you already have a Linux enviornment and don't want to use Docker that works too.
-
-The code is compiled and run in Linux with the Linux shell running locally on a Mac by:
-
-- Creating a Linux-based Docker image (e.g., Ubuntu)
-- Running the container on macOS using Docker
-- Mounting your macOS file system into the container using volumes
-
-This setup enables fully containerized C++ development that integrates seamlessly with local file editing.
+The first integration is with the **Binance Spot bookTicker WebSocket feed**, which delivers real-time bid/ask updates.
 
 ---
-## Tech Stack
 
-| Library           | Purpose                                                                 | How to Get It                                                                                  |
-| ----------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **IXWebSocket**   | WebSocket client for C++ with TLS support                               | 🔧 **Build from source**: [IXWebSocket GitHub](https://github.com/machinezone/IXWebSocket)    |
-| **simdjson**      | SIMD-accelerated real-time JSON parsing from the exchange               | 🔧 **Build from source**: [simdjson GitHub](https://github.com/simdjson/simdjson)             |
-| **nlohmann::json**| Used for constructing outbound JSON (e.g., subscription messages)       | 🔧 **Header-only**: [nlohmann/json GitHub](https://github.com/nlohmann/json)                  |
-| **fast_float**    | Fastest string-to-float/double conversion                               | 🔧 **Header-only**: [fast_float GitHub](https://github.com/fastfloat/fast_float)              |
-| **OpenSSL**       | TLS/SSL support (`libssl`, `libcrypto`)                                 | 📦 Installed in Docker via `libssl-dev`                                                        |
-| **zlib**          | Compression and decompression support                                   | 📦 Installed in Docker via `zlib1g-dev`                                                        |
-| **CMake**         | Cross-platform build system                                              | 📦 Installed in Docker                                                                         |
-| **g++**           | C++23-compatible compiler                                                | 📦 Installed in Docker (e.g., `g++-13` for full C++23 support)                                 |
+### 💡 Why Docker?
 
-### Notes
+Most developers use laptops (e.g., macOS), which aren’t native Linux systems. Docker provides a lightweight, reproducible Linux environment for:
 
-- The project is written in **C++23**.
-- `nlohmann::json` is used primarily to construct outgoing messages (e.g., subscriptions during `on_open`).
-- `simdjson` is used to parse incoming high-frequency JSON messages from the exchange with maximum performance.
+- Running C++17/20/23 toolchains
+- Installing build dependencies like OpenSSL, IXWebSocket, etc.
+- Mounting your Mac filesystem for seamless development
 
-## JSON Parser Benchmark (Binance `bookTicker` Messages)
+No need for cloud VMs or full Linux installs — just Docker.
 
-Parsed 128,398 JSON messages from Binance using two libraries:
+---
 
-| Parser        | Total Time (ms) | Avg Time per Message (ns) | Speedup vs. nlohmann |
-|---------------|------------------|----------------------------|------------------------|
-| **nlohmann**  | ~185–190 ms      | ~1,416–1,475 ns            | 1×                     |
-| **simdjson**  | ~19.4–19.5 ms    | ~151–152 ns                | **~9–10× faster**      |
+## 🧰 Tech Stack
 
-### Summary
+| Library            | Purpose                                               | Installation                                                                 |
+|--------------------|-------------------------------------------------------|------------------------------------------------------------------------------|
+| **IXWebSocket**     | WebSocket client with TLS                            | 🔧 Build from source ([GitHub](https://github.com/machinezone/IXWebSocket)) |
+| **simdjson**        | Ultra-fast SIMD JSON parsing                         | 🔧 Build from source ([GitHub](https://github.com/simdjson/simdjson))       |
+| **nlohmann::json**  | Friendly JSON API for C++                            | 📄 Header-only ([GitHub](https://github.com/nlohmann/json))                 |
+| **fast_float**      | High-performance float parsing                       | 📄 Header-only ([GitHub](https://github.com/fastfloat/fast_float))          |
+| **OpenSSL**         | TLS support (`libssl`, `libcrypto`)                 | 📦 Installed in Docker                                                       |
+| **zlib**            | Compression library                                  | 📦 Installed in Docker                                                       |
+| **CMake**           | Build system                                         | 📦 Installed in Docker                                                       |
+| **g++**             | C++23-compatible compiler                            | 📦 Installed in Docker (e.g., `g++-13`)                                      |
 
-- `simdjson` demonstrates ~10× faster parsing performance compared to `nlohmann::json` on compact Binance `bookTicker` messages.
-- Ideal for high-throughput, low-latency applications (e.g. WebSocket feeds, trading systems).
-- `nlohmann::json` still offers excellent usability and STL-style APIs for general-purpose usage.
+---
 
-### Test Details
+## 📊 JSON Parser Benchmark (Binance `bookTicker` Messages)
 
-- Messages loaded from a file: `test_data.json` (128,398 lines)
-- Benchmarked using two functions:
-  - `parse_book_ticker_nlohmann(const std::string& s, BookTicker& bt)`
-  - `parse_book_ticker(const std::string& s, BookTicker& bt)`
+Parsed ~128K Binance messages using both libraries:
 
+| Parser        | Total Time (ms) | Avg Time per Message (ns) | Speedup |
+|---------------|------------------|----------------------------|---------|
+| **nlohmann**  | ~185–190         | ~1,416–1,475               | 1×      |
+| **simdjson**  | ~19.4–19.5       | ~151–152                   | ~10×    |
 
+- `simdjson` is ideal for high-throughput applications.
+- `nlohmann::json` is excellent for readability and outbound message composition.
 
-## 🚀 Development Workflow
+---
 
-### 1. Build the Docker container
+## ⚙️ Development Workflow
 
-***Run on Mac (should also work on Linux or Windows)***
+### ✅ One-Shot Setup (Recommended)
 
-Docker is cross platform so building the Docker image should work on most OS.  It was only tested on ***MacBook***
+If you're on a Mac with Docker installed, just run:
 
-This builds an Ubuntu-based image with all dependencies (e.g., CMake, OpenSSL, IXWebSocket):
+```sh
+./setup_and_run.sh
+```
+
+This script will:
+1. Build the Docker container
+2. Launch the Linux development environment
+3. Install all C++ dependencies
+4. Build the Binance app
+5. Run the program:
+   ```sh
+   ./build/binance_main --config_file config.json --key spot
+   ```
+
+---
+
+### 🧭 Manual Steps (Alternative)
+
+#### 1. Build the Docker container
 
 ```sh
 ./build_linux_docker.sh
 ```
 
-### 2. Start the Linux Shell
-
-Run the Docker Image, creates a shell to do development in
-
-***start this on your MacBook***
+#### 2. Start the Linux container shell
 
 ```sh
-# run the docker image
-# specify the mount point : optional defaults to $HOME/cpp-crypto
-# this will be where r/w access between mac/docker will be
-
 ./launch-linux-dev.sh
 ```
 
-### 3. Run Dependency Installation Script
+You can optionally mount a directory (default: `$HOME/cpp-crypto`).
 
-This script automates the download, build, and installation of the following C++ libraries:
-
-- **[IXWebSocket](https://github.com/machinezone/IXWebSocket)**: WebSocket client with TLS support
-- **[fast_float](https://github.com/fastfloat/fast_float)**: Fast string-to-float conversion library
-- **[nlohmann/json](https://github.com/nlohmann/json)**: Modern C++ JSON library (header-only)
-- **[simdjson](https://github.com/simdjson/simdjson)**: High-performance SIMD-accelerated JSON parser
-
-### Usage
+#### 3. Install dependencies
 
 ```sh
-sh install_deps.sh
+./install_deps.sh
 ```
+
+#### 4. Build the source code
+
+```sh
+cd binance
+./build_local.sh
+```
+
+#### 5. Run the program
+
+```sh
+./build/binance_main --config_file config.json --key spot
+```
+
+---
+
+### 📝 Notes
+
+- The project is built using **C++23**
+- Developed on **macOS**, executed in **Dockerized Linux**
+- The architecture is designed for extensibility to other exchanges beyond Binance
+
