@@ -1,4 +1,3 @@
-#include "endpoint_config.hpp"
 #include "setup_websocket.hpp"
 #include "stream_config.hpp"
 #include <atomic>
