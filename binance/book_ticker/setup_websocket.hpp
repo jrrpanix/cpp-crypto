@@ -1,3 +1,4 @@
+#include "stream_config.hpp"
 #include <iostream>
 #include <ixwebsocket/IXWebSocket.h>
 #include <nlohmann/json.hpp>
@@ -19,11 +20,10 @@
  * }
  *
  */
-inline void setup_websocket(ix::WebSocket &ws, const std::string &endpoint,
-                            const nlohmann::json &subs) {
-  ws.setUrl(endpoint);
+inline void setup_websocket(ix::WebSocket &ws, const StreamConfig &cfg) {
+  ws.setUrl(cfg.endpoint);
 
-  ws.setOnMessageCallback([&ws, subs](const ix::WebSocketMessagePtr &msg) {
+  ws.setOnMessageCallback([&ws, cfg](const ix::WebSocketMessagePtr &msg) {
     using ix::WebSocketMessageType;
 
     switch (msg->type) {
@@ -36,8 +36,7 @@ inline void setup_websocket(ix::WebSocket &ws, const std::string &endpoint,
                 << std::endl;
       {
         std::vector<std::string> streams;
-        for (auto it = subs.begin(); it != subs.end(); ++it) {
-          const auto &sym = it.key();
+        for (const auto &sym : cfg.subs) {
           streams.push_back(sym + "@bookTicker");
         }
 

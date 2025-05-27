@@ -59,7 +59,6 @@ int main(int argc, char **argv) {
     return 1;
   }
   write_stream_config(std::cout, cfgmap);
-
   // Validate key
   if (cfgmap.find(key) == cfgmap.end()) {
     std::cerr << "❌ Key not found in config: " << key << "\n";
@@ -71,13 +70,16 @@ int main(int argc, char **argv) {
 
   // Setup and start WebSocket
   const StreamConfig &stream_config = cfgmap[key];
-  SymbolIdMap symbol_lookup = json_to_upper_flat_map(stream_config.subs);
+  // SymbolIdMap symbol_lookup = json_to_upper_flat_map(stream_config.subs);
+  // std::cerr << "2xxx" << std::endl;
 
-  for (const auto &[symbol, id] : symbol_lookup) {
-    std::cout << symbol << " → " << id << '\n';
-  }
+  // for (const auto &[symbol, id] : symbol_lookup) {
+  //   std::cout << symbol << " → " << id << '\n';
+  // }
+  // std::cerr << "3xxx" << std::endl;
+
   ix::WebSocket ws;
-  setup_websocket(ws, stream_config.endpoint, stream_config.subs);
+  setup_websocket(ws, stream_config);
   ws.start();
 
   std::cout << "🟢 WebSocket client running. Press Ctrl+C to exit.\n";

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fstream>
+#include <iostream>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <unordered_map>
@@ -9,6 +10,18 @@
  * @brief Represents a WebSocket stream configuration for a market type (e.g.,
  * spot or fut).
  */
+#include <string>
+#include <vector>
+
+struct StreamConfig {
+  /// WebSocket endpoint URL
+  std::string endpoint;
+
+  /// List of subscribed symbols
+  std::vector<std::string> subs;
+};
+
+/**
 struct StreamConfig {
   /// WebSocket endpoint URL
   std::string endpoint;
@@ -16,6 +29,7 @@ struct StreamConfig {
   /// Symbol-to-ID subscription map
   std::unordered_map<std::string, int> subs;
 };
+**/
 
 /**
  * @brief JSON deserialization function for StreamConfig using nlohmann::json.
