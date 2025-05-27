@@ -1,6 +1,7 @@
 // BookTickerParser.hpp
 #pragma once
 #include "book_ticker.hpp"
+#include "symbol_id_map.hpp"
 #include <fast_float/fast_float.h>
 #include <simdjson.h>
 
@@ -21,7 +22,8 @@ inline bool field_exists(simdjson::ondemand::object obj,
  */
 
 inline bool parse_book_ticker(simdjson::ondemand::parser &parser,
-                              const std::string &s, BookTicker &bt) {
+                              const std::string &s, BookTicker &bt,
+                              const SymbolIdMap *symbol_lookup = nullptr) {
   simdjson::padded_string padded(s);
   auto doc = parser.iterate(padded);
 
@@ -48,7 +50,16 @@ inline bool parse_book_ticker(simdjson::ondemand::parser &parser,
     return false;
   }
   bt.update_id = doc["u"].get_int64().value();
-  // std::string_view symbol = std::string(doc["s"].get_string().value());
+
+  if (symbol_lookup) {
+    std::string symbol = std::string(doc["s"].get_string().value());
+    auto it = symbol_lookup->find(symbol);
+    if (it != symbol_lookup->end())
+      bt.id = it->second;
+    else {
+      throw std::runtime_error("ticker " + symbol + " no in lookup table");
+    }
+  }
 
   bt.trade_time = doc["T"].get_int64().value();
 

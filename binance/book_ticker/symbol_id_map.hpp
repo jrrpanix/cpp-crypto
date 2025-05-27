@@ -3,11 +3,12 @@
 #include "robin_hood.h"
 #include <algorithm> // std::ranges::transform
 #include <cctype>    // std::toupperg
+#include <cstdint>
 #include <nlohmann/json.hpp>
 #include <string>
 
 /// Alias for a fast flat hash map from symbol name to integer ID
-using SymbolIdMap = robin_hood::unordered_flat_map<std::string, int>;
+using SymbolIdMap = robin_hood::unordered_flat_map<std::string, int32_t>;
 
 /**
  * @brief Convert a JSON object of string→int into a SymbolIdMap with uppercase
@@ -42,7 +43,7 @@ inline SymbolIdMap json_to_upper_flat_map(const nlohmann::json &j) {
 
   for (auto it = j.begin(); it != j.end(); ++it) {
     std::string upper_key = to_upper(it.key());
-    result[upper_key] = it.value().get<int>();
+    result[upper_key] = it.value().get<int32_t>();
   }
 
   return result;
