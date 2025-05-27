@@ -11,14 +11,19 @@
  * @param ws        Reference to an ix::WebSocket object.
  * @param endpoint  WebSocket URL to connect to (e.g.
  * "wss://stream.binance.com:9443/ws").
- * @param symbols   Vector of trading pairs to subscribe to (e.g. {"btcusdt",
- * "ethusdt"}).
+ * @param subs nlohmann::json object
+ * Expected input JSON format:
+ * {
+ *   "btcusdt": 0,
+ *   "ethusdt": 1
+ * }
+ *
  */
 inline void setup_websocket(ix::WebSocket &ws, const std::string &endpoint,
-                            const std::vector<std::string> &symbols) {
+                            const nlohmann::json &subs) {
   ws.setUrl(endpoint);
 
-  ws.setOnMessageCallback([&ws, symbols](const ix::WebSocketMessagePtr &msg) {
+  ws.setOnMessageCallback([&ws, subs](const ix::WebSocketMessagePtr &msg) {
     using ix::WebSocketMessageType;
 
     switch (msg->type) {
@@ -31,7 +36,8 @@ inline void setup_websocket(ix::WebSocket &ws, const std::string &endpoint,
                 << std::endl;
       {
         std::vector<std::string> streams;
-        for (const auto &sym : symbols) {
+        for (auto it = subs.begin(); it != subs.end(); ++it) {
+          const auto &sym = it.key();
           streams.push_back(sym + "@bookTicker");
         }
 

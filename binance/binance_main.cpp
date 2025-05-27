@@ -77,10 +77,8 @@ int main(int argc, char **argv) {
   for (const auto &[symbol, id] : symbol_lookup) {
     std::cout << symbol << " → " << id << '\n';
   }
-  if (1)
-    return 0;
   ix::WebSocket ws;
-  // setup_websocket(ws, cfg.endpoint, cfg.subs);
+  setup_websocket(ws, stream_config.endpoint, stream_config.subs);
   ws.start();
 
   std::cout << "🟢 WebSocket client running. Press Ctrl+C to exit.\n";
