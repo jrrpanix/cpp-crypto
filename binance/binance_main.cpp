@@ -1,9 +1,7 @@
 #include "endpoint_config.hpp"
 #include "setup_websocket.hpp"
 #include "stream_config.hpp"
-#include <algorithm> // std::ranges::transform
 #include <atomic>
-#include <cctype> // std::toupper
 #include <chrono>
 #include <csignal>
 #include <iostream>
@@ -14,46 +12,9 @@
 #include <thread>
 #include <vector>
 
-#include "robin_hood.h"
-
-/// Alias for a fast flat hash map from symbol name to integer ID
-using SymbolIdMap = robin_hood::unordered_flat_map<std::string, int>;
+#include "symbol_id_map.hpp"
 
 std::atomic<bool> running(true);
-
-inline std::string to_upper(const std::string &s) {
-  std::string result;
-  result.resize(s.size());
-
-  std::ranges::transform(s, result.begin(),
-                         [](unsigned char c) { return std::toupper(c); });
-
-  return result;
-}
-
-/**
- * @brief Convert a JSON object of string → int into a SymbolIdMap with
- * UPPERCASE keys.
- *
- * Expected input JSON format:
- * {
- *   "btcusdt": 0,
- *   "ethusdt": 1
- * }
- *
- * @param j nlohmann::json object
- * @return SymbolIdMap with uppercase keys
- */
-inline SymbolIdMap json_to_upper_flat_map(const nlohmann::json &j) {
-  SymbolIdMap result;
-
-  for (auto it = j.begin(); it != j.end(); ++it) {
-    std::string upper_key = to_upper(it.key());
-    result[upper_key] = it.value().get<int>();
-  }
-
-  return result;
-}
 
 void handle_sigint(int) {
   std::cout << "\n🛑 Caught SIGINT. Exiting gracefully...\n";
@@ -106,15 +67,13 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-
   // Setup signal handler for Ctrl+C
   std::signal(SIGINT, handle_sigint);
 
   // Setup and start WebSocket
-  const StreamConfig& stream_config = cfgmap[key];
+  const StreamConfig &stream_config = cfgmap[key];
   SymbolIdMap symbol_lookup = json_to_upper_flat_map(stream_config.subs);
 
-  
   for (const auto &[symbol, id] : symbol_lookup) {
     std::cout << symbol << " → " << id << '\n';
   }
