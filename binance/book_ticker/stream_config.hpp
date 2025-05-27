@@ -35,8 +35,25 @@ inline void from_json(const nlohmann::json& j, StreamConfig& config) {
     j.at("subs").get_to(config.subs);
 }
 
+/// JSON serialization for StreamConfig
+inline void to_json(nlohmann::json& j, const StreamConfig& config) {
+    j = nlohmann::json{
+        {"endpoint", config.endpoint},
+        {"subs", config.subs}
+    };
+}
+
 /// A mapping from "spot" / "fut" → StreamConfig
 using StreamConfigMap = std::unordered_map<std::string, StreamConfig>;
+
+inline void to_json(nlohmann::json& j, const StreamConfigMap& config_map) {
+    j = nlohmann::json::object();
+    for (const auto& [key, val] : config_map) {
+        j[key] = val;  // relies on to_json(StreamConfig) above
+    }
+}
+
+
 
 /**
  * @brief Parses a JSON input stream into a StreamConfigMap.
@@ -94,3 +111,27 @@ inline bool load_stream_config_file(const std::string& file_name, StreamConfigMa
     return parse_stream_config(file, config_map);
 }
 
+/**
+ * @brief Serializes a StreamConfigMap to JSON and writes it to an output stream.
+ *
+ * This function converts a map of StreamConfig objects into JSON and writes it to
+ * the given output stream (e.g., a file or stdout).
+ *
+ * @param os Output stream to write to (e.g., std::ofstream or std::cout)
+ * @param config_map Map of stream keys (e.g., "spot", "fut") to StreamConfig
+ *
+ * Example output JSON:
+ * {
+ *   "spot": {
+ *     "endpoint": "wss://stream.binance.com:9443/ws",
+ *     "subs": {
+ *       "btcusdt": 290,
+ *       "ethusdt": 476
+ *     }
+ *   }
+ * }
+ */
+inline void write_stream_config(std::ostream& os, const StreamConfigMap& config_map) {
+    nlohmann::json j = config_map;
+    os << std::setw(2) << j << std::endl;
+}
