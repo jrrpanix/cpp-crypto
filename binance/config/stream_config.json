@@ -1,0 +1,48 @@
+{
+  "spot": {
+    "endpoint": "wss://stream.binance.com:9443/ws",
+    "subs": {
+      "adausdt": 50,
+      "avaxusdt": 170,
+      "bnbusdt": 258,
+      "btcusdt": 290,
+      "dogeusdt": 388,
+      "ethfiusdt": 469,
+      "ethusdt": 476,
+      "hyperusdt": 604,
+      "linkusdt": 721,
+      "shibusdt": 1101,
+      "solusdt": 1132,
+      "solvusdt": 1136,
+      "suiusdt": 1178,
+      "trxusdt": 1258,
+      "usdcusdt": 1288,
+      "wbtcusdt": 1341,
+      "xlmusdt": 1380,
+      "xrpusdt": 1394
+    }
+  },
+  "fut": {
+    "endpoint": "wss://fstream.binance.com/ws",
+    "subs": {
+      "adausdt": 50,
+      "avaxusdt": 170,
+      "bnbusdt": 258,
+      "btcusdt": 290,
+      "dogeusdt": 388,
+      "ethfiusdt": 469,
+      "ethusdt": 476,
+      "hyperusdt": 604,
+      "linkusdt": 721,
+      "shibusdt": 1101,
+      "solusdt": 1132,
+      "solvusdt": 1136,
+      "suiusdt": 1178,
+      "trxusdt": 1258,
+      "usdcusdt": 1288,
+      "wbtcusdt": 1341,
+      "xlmusdt": 1380,
+      "xrpusdt": 1394
+    }
+  }
+}
