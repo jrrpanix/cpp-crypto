@@ -2,6 +2,7 @@
 #pragma once
 #include "book_ticker.hpp"
 #include "symbol_id_map.hpp"
+#include "time_utils.hpp"
 #include <fast_float/fast_float.h>
 #include <simdjson.h>
 
@@ -62,7 +63,7 @@ inline bool parse_book_ticker(simdjson::ondemand::parser &parser,
   }
 
   bt.trade_time = doc["T"].get_int64().value();
-
-  // bt.event_time = doc["E"].get_int64().value();
+  int64_t event_time = doc["E"].get_int64().value();
+  bt.event_time_ms_midnight = epoch_ms_to_midnight_ms_utc(event_time);
   return true;
 }
