@@ -1,4 +1,4 @@
-.PHONY: build-cpp build-full run-cpp run-full setup deps help
+.PHONY: build_cpp build_full run_cpp run_full setup deps help
 
 # Default help target
 help:
@@ -6,29 +6,35 @@ help:
 	@echo "Usage: make <target>"
 	@echo ""
 	@echo "Targets:"
-	@echo "  build-cpp      Build the C++-only Docker image"
-	@echo "  build-full     Build the full (C++ + Python) Docker image"
-	@echo "  run-cpp        Launch cpp-dev Docker container"
-	@echo "  run-full       Launch full-dev Docker container"
+	@echo "  build_cpp      Build the C++-only Docker image"
+	@echo "  build_full     Build the full (C++ + Python) Docker image"
+	@echo "  run_cpp        Launch cpp-dev Docker container"
+	@echo "  run_full       Launch full-dev Docker container"
 	@echo "  setup          Run full setup (build + launch + deps)"
 	@echo "  deps           Install dependencies in container"
 	@echo ""
 
-build-cpp:
-	./scripts/build_docker.sh cpp
+# Build C++ Docker image
+build_cpp:
+	./scripts/build/docker_build.sh cpp
 
-build-full:
-	./scripts/build_docker.sh full
+# Build full C++ + Python Docker image
+build_full:
+	./scripts/build/docker_build.sh full
 
-run-cpp:
-	./scripts/launch-dev.sh cpp
+# Run C++ dev container
+run_cpp:
+	./scripts/run/run_image.sh cpp
 
-run-full:
-	./scripts/launch-dev.sh full
+# Run full C++ + Python dev container
+run_full:
+	./scripts/run/run_image.sh full
 
+# Full setup (build + run + deps)
 setup:
-	./scripts/setup_and_run.sh
+	./scripts/run/bootstrap.sh
 
+# Install dependencies
 deps:
-	./scripts/install_deps.sh
+	./scripts/install/deps_install.sh
 
