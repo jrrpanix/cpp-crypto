@@ -14,8 +14,6 @@ Most developers use laptops (e.g., macOS), which aren’t native Linux systems. 
 - Installing build dependencies like OpenSSL, IXWebSocket, etc.
 - Mounting your Mac filesystem for seamless development
 
-No need for cloud VMs or full Linux installs — just Docker.
-
 ---
 
 ## 🧰 Tech Stack
@@ -31,6 +29,29 @@ No need for cloud VMs or full Linux installs — just Docker.
 | **zlib**              | Compression library                                       | 📦 Installed in Docker                                                       |
 | **CMake**             | Cross-platform build system                               | 📦 Installed in Docker                                                       |
 | **g++ 11.4.0**        | C++23-compatible compiler                                 | 📦 Installed in Docker                                                       |
+
+---
+# Development Environment Makefile
+
+This repository provides a Makefile to streamline the setup, build, and execution of development environments using Docker. It supports both a C++-only and a combined C++ + Python setup.
+
+## Usage
+
+To use any of the predefined targets, run:
+
+`make <target>`
+
+## Available Targets
+
+| Target       | Description                                      |
+|--------------|--------------------------------------------------|
+| `build_cpp`  | Build the C++-only Docker image                  |
+| `build_full` | Build the full (C++ + Python) Docker image       |
+| `run_cpp`    | Launch the C++ dev Docker container              |
+| `run_full`   | Launch the full (C++ + Python) dev container     |
+| `setup`      | Run full setup (build + launch + install deps)   |
+| `deps`       | Install dependencies inside the container        |
+| `help`       | Display this help message                        |
 
 ---
 # 📊 JSON Parsing Benchmark: Binance `bookTicker` Messages
@@ -60,7 +81,7 @@ This benchmark compares the performance of several JSON parsers using real-time 
 
 ## ✅ Summary
 
-- `simdjson` is the fastest, offering ~10× better performance than `nlohmann::json`.
+s- `simdjson` is the fastest, offering ~10× better performance than `nlohmann::json`.
 - Python’s built-in `json` parser is surprisingly efficient and competitive.
 - `nlohmann::json` is a strong middle-ground for developer ergonomics in C++.
 
@@ -103,104 +124,6 @@ Use this to evaluate trade-offs between performance and ease of use when choosin
 
 ---
 
-## ⚙️ Development Workflow
-
-All scripts are now in the `scripts/` subdirectory. You can either run them directly or use the `Makefile` for convenience.
-
-### ✅ Option 1: One-Shot Setup (Recommended)
-
-If you're on a Mac with Docker installed:
-
-```sh
-./scripts/setup_and_run.sh
-```
-
-This will:
-
-1. Build the Docker container (`cpp-dev` or `full-dev`)
-2. Launch the Linux development environment
-3. Install C++ dependencies
-4. Build and run the Binance app:
-
-```sh
-./build/binance_main --config_file config.json --key spot
-```
-
----
-
-### 🛠 Option 2: Manual Steps (or via `make`)
-
-#### Build Docker image:
-
-```sh
-./scripts/build_docker.sh cpp    # or full
-```
-
-Or using `make`:
-
-```sh
-make build-cpp
-make build-full
-```
-
-#### Launch Docker container:
-
-```sh
-./scripts/launch-dev.sh cpp    # or full
-```
-
-Or using `make`:
-
-```sh
-make run-cpp
-make run-full
-```
-
-#### Install dependencies (inside container):
-
-```sh
-./scripts/install_deps.sh
-```
-
-Or:
-
-```sh
-make deps
-```
-
-#### Build the app:
-
-```sh
-cd binance
-./build_local.sh
-```
-
-#### Run the app:
-
-```sh
-./build/binance_main --config_file config.json --key spot
-```
-
-To run the **futures feed**:
-
-```sh
-./build/binance_main --config_file config.json --key fut
-```
-
----
-
-## 🧾 Makefile Targets
-
-Once in the project root, you can also use:
-
-```sh
-make help        # list commands
-make build-cpp   # build C++ Docker image
-make run-cpp     # launch cpp-dev environment
-make setup       # full setup (build, launch, install)
-```
-
----
 
 ## 📝 Notes
 
