@@ -37,6 +37,8 @@ This repository provides a Makefile to streamline the setup, build, and executio
 
 ## Usage
 
+**For fast start: `make setup`**
+
 To use any of the predefined targets, run:
 
 `make <target>`
