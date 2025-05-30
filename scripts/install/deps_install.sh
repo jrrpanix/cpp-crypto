@@ -61,3 +61,17 @@ else
       -O "$ROBIN_HOOD_HEADER"
 fi
 
+
+# Install moodycamel/concurrentqueue headers
+MOODYCAMEL_HEADER_DIR="$INSTALLDIR/include/moodycamel"
+if [ -f "$MOODYCAMEL_HEADER_DIR/concurrentqueue.h" ]; then
+  echo "✅ moodycamel/concurrentqueue.h already exists, skipping download."
+else
+  echo "📥 Downloading moodycamel concurrentqueue p..."
+  mkdir -p "$MOODYCAMEL_HEADER_DIR"
+  wget -q https://raw.githubusercontent.com/cameron314/concurrentqueue/master/concurrentqueue.h \
+      -O "$MOODYCAMEL_HEADER_DIR/concurrentqueue.h"
+  wget -q https://raw.githubusercontent.com/cameron314/concurrentqueue/master/lightweightsemaphore.h \
+      -O "$MOODYCAMEL_HEADER_DIR/lightweightsemaphore.h"
+fi
+
