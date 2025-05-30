@@ -15,6 +15,7 @@ RUN apt-get update && \
     pkg-config \
     libssl-dev \
     zlib1g-dev \
+    libzmq3-dev \
     libspdlog-dev \
     emacs-nox \
     clang-format \

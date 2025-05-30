@@ -75,3 +75,14 @@ else
       -O "$MOODYCAMEL_HEADER_DIR/lightweightsemaphore.h"
 fi
 
+# Install cppzmq (header-only C++ bindings for ZeroMQ)
+CPPZMQ_HEADER="$INSTALLDIR/include/zmq.hpp"
+if [ -f "$CPPZMQ_HEADER" ]; then
+  echo "✅ cppzmq (zmq.hpp) already exists, skipping download."
+else
+  echo "📥 Downloading cppzmq (zmq.hpp)..."
+  mkdir -p "$INSTALLDIR/include"
+  wget -q https://raw.githubusercontent.com/zeromq/cppzmq/master/zmq.hpp \
+      -O "$CPPZMQ_HEADER"
+fi
+

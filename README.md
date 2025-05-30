@@ -17,6 +17,7 @@ Most developers use laptops (e.g., macOS), which aren’t native Linux systems. 
 ---
 ## 🧰 Tech Stack
 
+
 | Library               | Purpose                                                   | Installation                                                                 |
 |-----------------------|-----------------------------------------------------------|------------------------------------------------------------------------------|
 | **IXWebSocket**       | WebSocket client with TLS                                 | 🔧 Build from source ([GitHub](https://github.com/machinezone/IXWebSocket)) |
@@ -25,6 +26,8 @@ Most developers use laptops (e.g., macOS), which aren’t native Linux systems. 
 | **fast_float**        | High-performance float parsing                            | 📄 Header-only ([GitHub](https://github.com/fastfloat/fast_float))          |
 | **robin_hood**        | High-performance hash map (faster than `unordered_map`)   | 📄 Header-only ([GitHub](https://github.com/martinus/robin-hood-hashing))  |
 | **moodycamel**        | Lock-free concurrent queue for low-latency pipelines      | 📄 Header-only ([GitHub](https://github.com/cameron314/concurrentqueue))    |
+| **ZeroMQ (libzmq)**   | High-performance messaging library for inter-process comm | 📦 Installed in Docker (`apt-get install libzmq3-dev`)                      |
+| **cppzmq**            | Header-only C++ bindings for ZeroMQ                       | 📄 Header-only ([GitHub](https://github.com/zeromq/cppzmq))                 |
 | **OpenSSL**           | TLS support (`libssl`, `libcrypto`)                       | 📦 Installed in Docker                                                       |
 | **zlib**              | Compression library                                       | 📦 Installed in Docker                                                       |
 | **CMake**             | Cross-platform build system                               | 📦 Installed in Docker                                                       |
