@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "symbol_id_map.hpp"
+#include "book_ticker_queue.hpp"
 
 std::atomic<bool> running(true);
 
@@ -27,6 +28,7 @@ void handle_sigint(int) {
  *   ./program --config_file <config_file.json> --key <section_key>
  */
 int main(int argc, char **argv) {
+  BookTickerQueue q;
   std::string config_file;
   std::string key;
 
