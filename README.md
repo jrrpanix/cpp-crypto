@@ -15,7 +15,6 @@ Most developers use laptops (e.g., macOS), which aren’t native Linux systems. 
 - Mounting your Mac filesystem for seamless development
 
 ---
-
 ## 🧰 Tech Stack
 
 | Library               | Purpose                                                   | Installation                                                                 |
@@ -25,6 +24,7 @@ Most developers use laptops (e.g., macOS), which aren’t native Linux systems. 
 | **nlohmann::json**    | Friendly JSON API for C++                                 | 📄 Header-only ([GitHub](https://github.com/nlohmann/json))                 |
 | **fast_float**        | High-performance float parsing                            | 📄 Header-only ([GitHub](https://github.com/fastfloat/fast_float))          |
 | **robin_hood**        | High-performance hash map (faster than `unordered_map`)   | 📄 Header-only ([GitHub](https://github.com/martinus/robin-hood-hashing))  |
+| **moodycamel**        | Lock-free concurrent queue for low-latency pipelines      | 📄 Header-only ([GitHub](https://github.com/cameron314/concurrentqueue))    |
 | **OpenSSL**           | TLS support (`libssl`, `libcrypto`)                       | 📦 Installed in Docker                                                       |
 | **zlib**              | Compression library                                       | 📦 Installed in Docker                                                       |
 | **CMake**             | Cross-platform build system                               | 📦 Installed in Docker                                                       |
