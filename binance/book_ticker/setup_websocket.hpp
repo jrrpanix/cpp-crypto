@@ -1,4 +1,7 @@
 #include "stream_config.hpp"
+#include "book_ticker_queue.hpp"
+#include "book_ticker_parser.hpp"
+#include "symbol_id_map.hpp"
 #include <iostream>
 #include <ixwebsocket/IXWebSocket.h>
 #include <nlohmann/json.hpp>
@@ -20,15 +23,22 @@
  * }
  *
  */
-inline void setup_websocket(ix::WebSocket &ws, const StreamConfig &cfg) {
+inline void setup_websocket(ix::WebSocket &ws, const StreamConfig &cfg, const SymbolIdMap &filtered_map, BookTickerQueue *queue) {
   ws.setUrl(cfg.endpoint);
 
-  ws.setOnMessageCallback([&ws, cfg](const ix::WebSocketMessagePtr &msg) {
+  ws.setOnMessageCallback([&ws, cfg, &filtered_map, queue](const ix::WebSocketMessagePtr &msg) {
+    thread_local simdjson::ondemand::parser parser;
+    thread_local BookTicker ticker;
     using ix::WebSocketMessageType;
 
     switch (msg->type) {
     case WebSocketMessageType::Message:
-      std::cout << "Received: " << msg->str << std::endl;
+      std::cerr << "Received: " << msg->str << std::endl;
+      try {
+	parse_book_ticker(parser, msg->str, ticker, &filtered_map);
+      } catch(simdjson::simdjson_error &err) {
+	std::cerr << err.what() << std::endl;
+      }
       break;
 
     case WebSocketMessageType::Open:

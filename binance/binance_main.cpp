@@ -93,10 +93,11 @@ int main(int argc, char **argv) {
   SymbolIdMap complete_map = load_symbol_map(args.symbol_file);
   SymbolIdMap filtered_map = filter_symbol_map(complete_map, stream_config.subs);
 
-  
+  BookTickerQueue queue;
   //if (true) return 0;
   ix::WebSocket ws;
-  setup_websocket(ws, stream_config);
+  setup_websocket(ws, stream_config, filtered_map, &queue);
+  //if (1) return 0;
   ws.start();
 
   std::cout << "🟢 WebSocket client running. Press Ctrl+C to exit.\n";
