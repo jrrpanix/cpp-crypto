@@ -84,12 +84,7 @@ make run_spot
 | **g++ 11.4.0**        | C++23-compatible compiler                                 | 📦 Installed in Docker                                                       |
 
 ---
-# Development Environment Makefile
 
-This repository provides a Makefile to streamline the setup, build, and execution of development environments using Docker. It supports both a C++-only and a combined C++ + Python setup.
-
-
----
 # 📊 JSON Parsing Benchmark: Binance `bookTicker` Messages
 
 This benchmark compares the performance of several JSON parsers using real-time market data from Binance's perpetual futures `bookTicker` stream.
