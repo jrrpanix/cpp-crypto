@@ -1,6 +1,6 @@
-#include "stream_config.hpp"
-#include "book_ticker_queue.hpp"
 #include "book_ticker_parser.hpp"
+#include "book_ticker_queue.hpp"
+#include "stream_config.hpp"
 #include "symbol_id_map.hpp"
 #include <iostream>
 #include <ixwebsocket/IXWebSocket.h>
@@ -23,10 +23,13 @@
  * }
  *
  */
-inline void setup_websocket(ix::WebSocket &ws, const StreamConfig &cfg, const SymbolIdMap &filtered_map, BookTickerQueue *queue) {
+inline void setup_websocket(ix::WebSocket &ws, const StreamConfig &cfg,
+                            const SymbolIdMap &filtered_map,
+                            BookTickerQueue *queue) {
   ws.setUrl(cfg.endpoint);
 
-  ws.setOnMessageCallback([&ws, cfg, &filtered_map, queue](const ix::WebSocketMessagePtr &msg) {
+  ws.setOnMessageCallback([&ws, cfg, &filtered_map,
+                           queue](const ix::WebSocketMessagePtr &msg) {
     thread_local simdjson::ondemand::parser parser;
     thread_local BookTicker ticker;
     using ix::WebSocketMessageType;
@@ -35,9 +38,9 @@ inline void setup_websocket(ix::WebSocket &ws, const StreamConfig &cfg, const Sy
     case WebSocketMessageType::Message:
       std::cerr << "Received: " << msg->str << std::endl;
       try {
-	parse_book_ticker(parser, msg->str, ticker, &filtered_map);
-      } catch(simdjson::simdjson_error &err) {
-	std::cerr << err.what() << std::endl;
+        parse_book_ticker(parser, msg->str, ticker, &filtered_map);
+      } catch (simdjson::simdjson_error &err) {
+        std::cerr << err.what() << std::endl;
       }
       break;
 

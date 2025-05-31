@@ -11,8 +11,8 @@
 #include <thread>
 #include <vector>
 
-#include "symbol_id_map.hpp"
 #include "book_ticker_queue.hpp"
+#include "symbol_id_map.hpp"
 
 std::atomic<bool> running(true);
 
@@ -48,7 +48,8 @@ Args parse_args(int argc, char **argv) {
   }
 
   // Validate arguments
-  if (args.config_file.empty() || args.key.empty() || args.symbol_file.empty()) {
+  if (args.config_file.empty() || args.key.empty() ||
+      args.symbol_file.empty()) {
     std::cerr << "❌ Missing required arguments.\n";
     std::cerr << "✅ Usage: " << argv[0]
               << " --config_file <file> --key <key> --symbol_file <file>\n";
@@ -91,13 +92,14 @@ int main(int argc, char **argv) {
   const StreamConfig &stream_config = cfgmap[args.key];
 
   SymbolIdMap complete_map = load_symbol_map(args.symbol_file);
-  SymbolIdMap filtered_map = filter_symbol_map(complete_map, stream_config.subs);
+  SymbolIdMap filtered_map =
+      filter_symbol_map(complete_map, stream_config.subs);
 
   BookTickerQueue queue;
-  //if (true) return 0;
+  // if (true) return 0;
   ix::WebSocket ws;
   setup_websocket(ws, stream_config, filtered_map, &queue);
-  //if (1) return 0;
+  // if (1) return 0;
   ws.start();
 
   std::cout << "🟢 WebSocket client running. Press Ctrl+C to exit.\n";

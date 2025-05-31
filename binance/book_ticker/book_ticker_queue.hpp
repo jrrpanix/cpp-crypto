@@ -4,4 +4,3 @@
 #include <moodycamel/concurrentqueue.h>
 
 using BookTickerQueue = moodycamel::ConcurrentQueue<BookTicker>;
-

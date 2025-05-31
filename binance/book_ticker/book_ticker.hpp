@@ -51,4 +51,5 @@ struct alignas(64) BookTicker {
 };
 
 static_assert(sizeof(BookTicker) == 64, "BookTicker must be 64 bytes");
-static_assert(std::is_trivially_copyable<BookTicker>::value, "BookTicker must be trivially copyable");
+static_assert(std::is_trivially_copyable<BookTicker>::value,
+              "BookTicker must be trivially copyable");
