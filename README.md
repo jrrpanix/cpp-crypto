@@ -46,6 +46,7 @@ make run_fut
 
 make run_spot
 
+---
 
 ## 🛠️ Makefile Targets
 
