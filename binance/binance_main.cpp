@@ -20,6 +20,43 @@ void handle_sigint(int) {
   std::cout << "\n🛑 Caught SIGINT. Exiting gracefully...\n";
   running = false;
 }
+struct Args {
+  std::string config_file;
+  std::string key;
+  std::string symbol_file;
+  bool valid;
+};
+
+Args parse_args(int argc, char **argv) {
+  Args args;
+  args.valid = false;
+  // Parse command-line arguments
+  for (int i = 1; i < argc; ++i) {
+    std::string arg = argv[i];
+    if (arg == "--config_file" && i + 1 < argc) {
+      args.config_file = argv[++i];
+    } else if (arg == "--key" && i + 1 < argc) {
+      args.key = argv[++i];
+    } else if (arg == "--symbol_file" && i + 1 < argc) {
+      args.symbol_file = argv[++i];
+    } else {
+      std::cerr << "❌ Unknown or malformed argument: " << arg << "\n";
+      std::cerr << "✅ Usage: " << argv[0]
+                << " --config_file <file> --key <key> --symbol_file <file>\n";
+      return args;
+    }
+  }
+
+  // Validate arguments
+  if (args.config_file.empty() || args.key.empty() || args.symbol_file.empty()) {
+    std::cerr << "❌ Missing required arguments.\n";
+    std::cerr << "✅ Usage: " << argv[0]
+              << " --config_file <file> --key <key> --symbol_file <file>\n";
+    return args;
+  }
+  args.valid = true;
+  return args;
+}
 
 /**
  * @brief Entry point for the WebSocket client.
@@ -29,41 +66,21 @@ void handle_sigint(int) {
  */
 int main(int argc, char **argv) {
   BookTickerQueue q;
-  std::string config_file;
-  std::string key;
-
-  // Parse command-line arguments
-  for (int i = 1; i < argc; ++i) {
-    std::string arg = argv[i];
-    if (arg == "--config_file" && i + 1 < argc) {
-      config_file = argv[++i];
-    } else if (arg == "--key" && i + 1 < argc) {
-      key = argv[++i];
-    } else {
-      std::cerr << "❌ Unknown or malformed argument: " << arg << "\n";
-      std::cerr << "✅ Usage: " << argv[0]
-                << " --config_file <file> --key <key>\n";
-      return 1;
-    }
-  }
-
-  // Validate arguments
-  if (config_file.empty() || key.empty()) {
-    std::cerr << "❌ Missing required arguments.\n";
-    std::cerr << "✅ Usage: " << argv[0]
-              << " --config_file <file> --key <key>\n";
+  Args args = parse_args(argc, argv);
+  if (!args.valid)
     return 1;
-  }
 
   // Parse config file
   StreamConfigMap cfgmap;
-  if (!load_stream_config_file(config_file, cfgmap)) {
+  if (!load_stream_config_file(args.config_file, cfgmap)) {
     return 1;
   }
+
   write_stream_config(std::cout, cfgmap);
+
   // Validate key
-  if (cfgmap.find(key) == cfgmap.end()) {
-    std::cerr << "❌ Key not found in config: " << key << "\n";
+  if (cfgmap.find(args.key) == cfgmap.end()) {
+    std::cerr << "❌ Key not found in config: " << args.key << "\n";
     return 1;
   }
 
@@ -71,15 +88,13 @@ int main(int argc, char **argv) {
   std::signal(SIGINT, handle_sigint);
 
   // Setup and start WebSocket
-  const StreamConfig &stream_config = cfgmap[key];
-  // SymbolIdMap symbol_lookup = json_to_upper_flat_map(stream_config.subs);
-  // std::cerr << "2xxx" << std::endl;
+  const StreamConfig &stream_config = cfgmap[args.key];
 
-  // for (const auto &[symbol, id] : symbol_lookup) {
-  //   std::cout << symbol << " → " << id << '\n';
-  // }
-  // std::cerr << "3xxx" << std::endl;
+  SymbolIdMap complete_map = load_symbol_map(args.symbol_file);
+  SymbolIdMap filtered_map = filter_symbol_map(complete_map, stream_config.subs);
 
+  
+  //if (true) return 0;
   ix::WebSocket ws;
   setup_websocket(ws, stream_config);
   ws.start();
