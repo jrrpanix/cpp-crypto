@@ -15,6 +15,53 @@ Most developers use laptops (e.g., macOS), which aren’t native Linux systems. 
 - Mounting your Mac filesystem for seamless development
 
 ---
+## 🚀 Getting Started
+
+This project runs inside a Docker container. Follow the steps below to build the environment, install dependencies, compile the C++ code, and run the application.
+
+<details>
+<summary>📦 Setup and Run Steps (click to expand)</summary>
+
+```sh
+# 1. Build Docker Image (choose one)
+make build_full
+# OR (if make is not available)
+./scripts/build/docker_build.sh full
+
+# 2. Run Docker Container (choose one)
+make run_full
+# OR (if make is not available)
+./scripts/run/run_image.sh full
+
+# 3. Install Dependencies (inside the container)
+make deps
+
+# 4. Build C++ Code
+make build_code
+
+# 5. Run the Application (choose one mode)
+make run_fut
+
+# OR
+
+make run_spot
+
+
+## 🛠️ Makefile Targets
+
+| Target         | Description                                 | Command                                                              |
+|----------------|---------------------------------------------|----------------------------------------------------------------------|
+| `build_cpp`    | Build the C++-only Docker image             | `./scripts/build/docker_build.sh cpp`                               |
+| `build_full`   | Build the full (C++ + Python) Docker image  | `./scripts/build/docker_build.sh full`                              |
+| `run_cpp`      | Launch C++-only Docker container            | `./scripts/run/run_image.sh cpp`                                    |
+| `run_full`     | Launch full (C++ + Python) Docker container | `./scripts/run/run_image.sh full`                                   |
+| `deps`         | Install dependencies in container           | `./scripts/install/deps_install.sh`                                 |
+| `build_code`   | Build Binance C++ code                      | `./scripts/build/binance_build.sh`                                  |
+| `run_fut`      | Run Binance in futures mode                 | `./binance/build/binance_main --config_file ./binance/config/config.json --key fut` |
+| `run_spot`     | Run Binance in spot mode                    | `./binance/build/binance_main --config_file ./binance/config/config.json --key spot` |
+
+
+---
 ## 🧰 Tech Stack
 
 
@@ -38,25 +85,6 @@ Most developers use laptops (e.g., macOS), which aren’t native Linux systems. 
 
 This repository provides a Makefile to streamline the setup, build, and execution of development environments using Docker. It supports both a C++-only and a combined C++ + Python setup.
 
-## Usage
-
-**For fast start: `make setup`**
-
-To use any of the predefined targets, run:
-
-`make <target>`
-
-## Available Targets
-
-| Target       | Description                                      |
-|--------------|--------------------------------------------------|
-| `build_cpp`  | Build the C++-only Docker image                  |
-| `build_full` | Build the full (C++ + Python) Docker image       |
-| `run_cpp`    | Launch the C++ dev Docker container              |
-| `run_full`   | Launch the full (C++ + Python) dev container     |
-| `setup`      | Run full setup (build + launch + install deps)   |
-| `deps`       | Install dependencies inside the container        |
-| `help`       | Display this help message                        |
 
 ---
 # 📊 JSON Parsing Benchmark: Binance `bookTicker` Messages

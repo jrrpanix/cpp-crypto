@@ -1,4 +1,4 @@
-.PHONY: build_cpp build_full run_cpp run_full setup deps help
+.PHONY: build_cpp build_full run_cpp run_full deps build_code run_fut run_spot help
 
 # Default help target
 help:
@@ -10,8 +10,10 @@ help:
 	@echo "  build_full     Build the full (C++ + Python) Docker image"
 	@echo "  run_cpp        Launch cpp-dev Docker container"
 	@echo "  run_full       Launch full-dev Docker container"
-	@echo "  setup          Run full setup (build + launch + deps)"
 	@echo "  deps           Install dependencies in container"
+	@echo "  build_code     Build Binance C++ Code"
+	@echo "  run_fut        run Binance futures"
+	@echo "  run_spot       run Binance spot"
 	@echo ""
 
 # Build C++ Docker image
@@ -30,11 +32,16 @@ run_cpp:
 run_full:
 	./scripts/run/run_image.sh full
 
-# Full setup (build + run + deps)
-setup:
-	./scripts/run/bootstrap.sh
-
 # Install dependencies
 deps:
 	./scripts/install/deps_install.sh
 
+# Build C++ code
+build_code:
+	./scripts/build/binance_build.sh
+
+run_fut:
+	./binance/build/binance_main --config_file ./binance/config/config.json --key fut
+
+run_spot:
+	./binance/build/binance_main --config_file ./binance/config/config.json --key spot
