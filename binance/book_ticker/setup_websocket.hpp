@@ -10,19 +10,24 @@
 
 /**
  * @brief Sets up a WebSocket connection to Binance and subscribes to bookTicker
- * streams. Also handles Ping/Pong and logs errors or connection closure.
+ * streams. Handles incoming messages, parses them using simdjson, and enqueues
+ * structured BookTicker messages into a concurrent queue for downstream consumption.
  *
- * @param ws        Reference to an ix::WebSocket object.
- * @param endpoint  WebSocket URL to connect to (e.g.
- * "wss://stream.binance.com:9443/ws").
- * @param subs nlohmann::json object
- * Expected input JSON format:
- * {
- *   "btcusdt": 0,
- *   "ethusdt": 1
- * }
+ * Also manages ping/pong frames and logs connection events or message drops.
  *
+ * @param ws           Reference to the ix::WebSocket instance to configure and start.
+ * @param cfg          Stream configuration including the WebSocket endpoint and symbol subscriptions.
+ * @param filtered_map Map of symbol strings to integer IDs used for efficient symbol lookup.
+ * @param queue        Optional pointer to a BookTickerQueue. If provided, parsed BookTicker messages
+ *                     will be enqueued; otherwise, messages are parsed but discarded.
+ *
+ * Notes:
+ * - Uses thread-local simdjson parser for high-throughput, thread-safe JSON parsing.
+ * - Drops are counted and logged if the queue is full or memory allocation fails.
+ * - Throws an exception if more than 500 messages are dropped.
+ * - Assumes messages are in Binance Perpetual Futures bookTicker format.
  */
+
 inline void setup_websocket(ix::WebSocket &ws, const StreamConfig &cfg,
                             const SymbolIdMap &filtered_map,
                             BookTickerQueue *queue) {
