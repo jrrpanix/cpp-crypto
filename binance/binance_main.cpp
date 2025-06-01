@@ -20,12 +20,38 @@ void handle_sigint(int) {
   std::cout << "\n🛑 Caught SIGINT. Exiting gracefully...\n";
   running = false;
 }
+/**
+ * @struct Args
+ * @brief Holds parsed command-line arguments for the WebSocket client.
+ *
+ * This struct stores:
+ * - The path to the stream configuration file (`config_file`)
+ * - The section key in the config to select a specific stream (`key`)
+ * - The path to the symbol map file (`symbol_file`)
+ * - A flag indicating whether all required arguments were successfully parsed (`valid`)
+ */
 struct Args {
   std::string config_file;
   std::string key;
   std::string symbol_file;
   bool valid;
 };
+
+/**
+ * @brief Parses command-line arguments for the WebSocket client.
+ *
+ * Expects three named arguments:
+ * - `--config_file <file>`: Path to the stream configuration JSON file.
+ * - `--key <key>`: Identifier within the config to select the desired stream configuration.
+ * - `--symbol_file <file>`: Path to the symbol-to-ID mapping JSON file.
+ *
+ * If any arguments are missing or malformed, the function prints usage help
+ * and returns an `Args` object with `valid = false`.
+ *
+ * @param argc Number of arguments passed to the program.
+ * @param argv Array of C-style strings representing arguments.
+ * @return An `Args` struct with parsed values and a `valid` flag.
+ */
 
 Args parse_args(int argc, char **argv) {
   Args args;
