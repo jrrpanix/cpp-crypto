@@ -29,11 +29,9 @@ void time_loop(const std::vector<std::string> &data, bool upd_time,
   int N = 0;
   int BAD = 0;
   for (auto it : data) {
-    bool rv = parse_book_ticker(parser, it, bt, symbol_lookup);
+    bool rv = parse_book_ticker(parser, it, bt, upd_time, symbol_lookup);
     if (rv) {
       ++N;
-      if (upd_time)
-        bt.my_receive_time_ns = now_ns_since_epoch();
     } else
       ++BAD;
   }

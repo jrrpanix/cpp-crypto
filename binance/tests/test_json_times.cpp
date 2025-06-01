@@ -48,7 +48,7 @@ void time_simd(const std::vector<std::string> &lines) {
     simdjson::ondemand::parser parser;
     auto start = std::chrono::high_resolution_clock::now();
     for (const auto &l : lines) {
-      parse_book_ticker(parser, l, bt);
+      parse_book_ticker(parser, l, bt, false, nullptr);
     }
     auto end = std::chrono::high_resolution_clock::now();
     auto duration_ns =

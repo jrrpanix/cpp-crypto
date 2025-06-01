@@ -36,3 +36,30 @@ inline int32_t epoch_ms_to_midnight_ms_utc(int64_t epoch_ms) {
   return static_cast<int32_t>(
       duration_cast<milliseconds>(since_midnight).count());
 }
+
+/**
+ * @brief Convert nanoseconds since Unix epoch (UTC) to nanoseconds since
+ * midnight (UTC).
+ *
+ * This is useful for computing intra-day timestamps or latencies with respect
+ * to the start of the UTC day.
+ *
+ * @param epoch_ns Nanoseconds since Unix epoch (UTC)
+ * @return int64_t Nanoseconds since UTC midnight
+ */
+inline int64_t epoch_ns_to_midnight_ns_utc(int64_t epoch_ns) {
+  using namespace std::chrono;
+
+  // Convert to time_point in nanoseconds
+  system_clock::time_point tp =
+      time_point<system_clock, nanoseconds>(nanoseconds{epoch_ns});
+
+  // Truncate to UTC midnight (00:00:00)
+  auto day_start = floor<days>(tp);
+
+  // Duration since midnight
+  auto since_midnight = tp - day_start;
+
+  // Convert to nanoseconds
+  return duration_cast<nanoseconds>(since_midnight).count();
+}

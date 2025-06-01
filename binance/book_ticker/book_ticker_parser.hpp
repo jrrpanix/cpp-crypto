@@ -24,7 +24,8 @@ inline bool field_exists(simdjson::ondemand::object obj,
 
 inline bool parse_book_ticker(simdjson::ondemand::parser &parser,
                               const std::string &s, BookTicker &bt,
-                              const SymbolIdMap *symbol_lookup = nullptr) {
+                              bool set_recv_time,
+                              const SymbolIdMap *symbol_lookup) {
   simdjson::padded_string padded(s);
   auto doc = parser.iterate(padded);
 
@@ -65,5 +66,9 @@ inline bool parse_book_ticker(simdjson::ondemand::parser &parser,
   bt.trade_time = doc["T"].get_int64().value();
   int64_t event_time = doc["E"].get_int64().value();
   bt.event_time_ms_midnight = epoch_ms_to_midnight_ms_utc(event_time);
+
+  if (set_recv_time) {
+    bt.my_receive_time_ns = now_ns_since_epoch();
+  }
   return true;
 }
