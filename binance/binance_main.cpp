@@ -59,6 +59,39 @@ Args parse_args(int argc, char **argv) {
   return args;
 }
 
+void consume_and_monitor(BookTickerQueue &queue, std::atomic<bool> &running) {
+  using clock = std::chrono::steady_clock;
+  BookTicker msg;
+
+  int count = 0;
+  const int batch_size = 1000;
+  auto start = clock::now();
+
+  while (running) {
+    if (queue.try_dequeue(msg)) {
+      ++count;
+
+      if (count >= batch_size) {
+        auto end = clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+
+        double total = elapsed.count();
+        double rate = batch_size / total;
+        std::cout << "📈 Rate: " << rate << " msgs/sec: " << total
+                  << " total_time sec\n";
+
+        count = 0;
+        start = clock::now();
+      }
+    } else {
+      // Sleep briefly to avoid spinning too hot
+      std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+  }
+
+  std::cout << "🛑 Consumer thread exiting...\n";
+}
+
 /**
  * @brief Entry point for the WebSocket client.
  *
@@ -96,10 +129,10 @@ int main(int argc, char **argv) {
       filter_symbol_map(complete_map, stream_config.subs);
 
   BookTickerQueue queue;
-  // if (true) return 0;
   ix::WebSocket ws;
   setup_websocket(ws, stream_config, filtered_map, &queue);
-  // if (1) return 0;
+  std::thread consumer_thread(consume_and_monitor, std::ref(queue),
+                              std::ref(running));
   ws.start();
 
   std::cout << "🟢 WebSocket client running. Press Ctrl+C to exit.\n";
@@ -111,6 +144,6 @@ int main(int argc, char **argv) {
 
   std::cout << "🔻 Stopping WebSocket...\n";
   ws.stop();
-
+  consumer_thread.join();
   return 0;
 }

@@ -36,9 +36,19 @@ inline void setup_websocket(ix::WebSocket &ws, const StreamConfig &cfg,
 
     switch (msg->type) {
     case WebSocketMessageType::Message:
-      std::cerr << "Received: " << msg->str << std::endl;
+      // std::cerr << "Received: " << msg->str << std::endl;
       try {
         parse_book_ticker(parser, msg->str, ticker, &filtered_map);
+        if (queue && !queue->try_enqueue(ticker)) {
+          static std::atomic<int> drop_count = 0;
+          drop_count++;
+          std::cerr << "⚠️ Queue full or memory error. Drop count: "
+                    << drop_count.load() << "\n";
+          if (drop_count.load() > 500) {
+            throw std::runtime_error("drop count exceeded");
+          }
+        }
+
       } catch (simdjson::simdjson_error &err) {
         std::cerr << err.what() << std::endl;
       }
