@@ -91,12 +91,35 @@ void consume_and_monitor(BookTickerQueue &queue, std::atomic<bool> &running) {
 
   std::cout << "🛑 Consumer thread exiting...\n";
 }
-
 /**
- * @brief Entry point for the WebSocket client.
+ * @brief Entry point for the Binance WebSocket client application.
  *
- * Usage:
- *   ./program --config_file <config_file.json> --key <section_key>
+ * This function sets up and runs a real-time data pipeline using Binance's
+ * `bookTicker` WebSocket stream. It parses a configuration file and a symbol
+ * reference file, establishes a WebSocket connection, filters the subscribed
+ * symbols, and starts a consumer thread that monitors and processes incoming
+ * order book updates.
+ *
+ * The WebSocket callback parses each message using a thread-local simdjson parser
+ * and enqueues structured `BookTicker` messages into a lock-free concurrent queue.
+ * The consumer thread dequeues these messages and prints the message rate every
+ * 1000 updates.
+ *
+ * The application exits cleanly when interrupted via Ctrl+C.
+ *
+ * @param argc Command-line argument count.
+ * @param argv Command-line argument vector.
+ * @return 0 on successful execution, 1 on error (e.g., invalid args or config).
+ *
+ * @usage
+ *   ./program --config_file <config_file.json> --key <section_key> --symbol_file <symbol_map.json>
+ *
+ * @details
+ * - `--config_file`: Path to the JSON config file containing stream configuration.
+ * - `--key`: Section key in the config file specifying which stream to subscribe to.
+ * - `--symbol_file`: Path to the JSON file mapping Binance symbols to integer IDs.
+ *   The file contains a complete reference of all Binance symbols. The program uses this
+ *   to construct a smaller `filtered_map` consisting only of the symbols defined in the stream config.
  */
 int main(int argc, char **argv) {
   BookTickerQueue q;
