@@ -84,8 +84,78 @@ Args parse_args(int argc, char **argv) {
   args.valid = true;
   return args;
 }
+#include <unordered_map>
+#include <iomanip>  // for std::setprecision
+
+struct Stats {
+  int64_t count = 0;
+  double bid_price_sum = 0;
+  double bid_qty_sum = 0;
+  double ask_price_sum = 0;
+  double ask_qty_sum = 0;
+  double latency_sum_ms = 0;
+};
 
 void consume_and_monitor(BookTickerQueue &queue, std::atomic<bool> &running) {
+  using clock = std::chrono::steady_clock;
+  using namespace std::chrono;
+
+  std::unordered_map<int32_t, Stats> stats_by_id;
+  BookTicker msg;
+
+  auto last_report = clock::now();
+
+  while (running) {
+    if (queue.try_dequeue(msg)) {
+      auto &stats = stats_by_id[msg.id];
+
+      stats.count++;
+      stats.bid_price_sum += msg.bid_price;
+      stats.bid_qty_sum += msg.bid_qty;
+      stats.ask_price_sum += msg.ask_price;
+      stats.ask_qty_sum += msg.ask_qty;
+
+      // Convert event_time_ms_midnight to nanoseconds
+      int64_t event_time_ns = static_cast<int64_t>(msg.event_time_ms_midnight) * 1'000'000;
+      double latency_ms = static_cast<double>(msg.my_receive_time_ns - event_time_ns) / 1'000'000.0;
+      stats.latency_sum_ms += latency_ms;
+    } else {
+      std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+
+    // Time-based flush every 30 seconds
+    auto now = clock::now();
+    if (duration_cast<seconds>(now - last_report).count() >= 30) {
+      std::cout << "\n📊 ---- 30-Second Summary ----\n";
+      for (const auto &[id, stats] : stats_by_id) {
+        if (stats.count == 0) continue;
+
+        double avg_bid_price = stats.bid_price_sum / stats.count;
+        double avg_bid_qty = stats.bid_qty_sum / stats.count;
+        double avg_ask_price = stats.ask_price_sum / stats.count;
+        double avg_ask_qty = stats.ask_qty_sum / stats.count;
+        double avg_latency = stats.latency_sum_ms / stats.count;
+
+        std::cout << std::fixed << std::setprecision(3)
+                  << "ID " << id
+                  << " | Count: " << stats.count
+                  << " | Avg Bid: " << avg_bid_price
+                  << " (Qty: " << avg_bid_qty << ")"
+                  << " | Avg Ask: " << avg_ask_price
+                  << " (Qty: " << avg_ask_qty << ")"
+                  << " | Avg Latency: " << avg_latency << " ms\n";
+      }
+      std::cout << "------------------------------\n";
+
+      stats_by_id.clear();
+      last_report = now;
+    }
+  }
+
+  std::cout << "🛑 Consumer thread exiting...\n";
+}
+
+void xxconsume_and_monitor(BookTickerQueue &queue, std::atomic<bool> &running) {
   using clock = std::chrono::steady_clock;
   BookTicker msg;
 
