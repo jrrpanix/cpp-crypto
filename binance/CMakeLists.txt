@@ -48,3 +48,12 @@ foreach(TEST_SRC ${TEST_SOURCES})
     )
 endforeach()
 
+# Install the main binary
+install(TARGETS binance_main DESTINATION bin)
+
+# Install all test binaries
+foreach(TEST_SRC ${TEST_SOURCES})
+    get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
+    install(TARGETS ${TEST_NAME} DESTINATION bin/tests)
+endforeach()
+
