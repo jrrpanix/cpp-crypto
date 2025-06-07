@@ -7,6 +7,9 @@ if [ "$1" = "cpp" ]; then
 elif [ "$1" = "full" ]; then
     echo "🔨 Building full Python+C++ dev image..."
     docker build -t full-dev -f docker/full-dev/Dockerfile .
+elif [ "$1" = "runtime" ]; then
+    echo "🔨 Building runtime image..."
+    docker build -f docker/runtime/Dockerfile -t binance-runtime .
 else
     echo "Usage: $0 [cpp|full]"
     exit 1
