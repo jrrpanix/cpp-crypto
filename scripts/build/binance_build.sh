@@ -1,4 +1,4 @@
 #!/bin/sh
-cd binance
+cd src/binance
 ./build_local.sh
 
