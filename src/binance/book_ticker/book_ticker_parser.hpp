@@ -1,8 +1,8 @@
 // BookTickerParser.hpp
 #pragma once
 #include "book_ticker.hpp"
-#include "symbol_id_map.hpp"
 #include "common/time_utils.hpp"
+#include "symbol_id_map.hpp"
 #include <fast_float/fast_float.h>
 #include <simdjson.h>
 
