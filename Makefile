@@ -1,4 +1,4 @@
-.PHONY: build_image_cpp build_image_full launch_docker_cpp launch_docker_full install_deps build_code help
+.PHONY: build_image_cpp build_image_full launch_docker_cpp launch_docker_full install_deps build_code run_producer help
 
 # Default help target
 help:
@@ -14,6 +14,7 @@ help:
 	@echo "  launch_docker_runtime run runtime docker image"
 	@echo "  install_deps          Install dependencies in container"
 	@echo "  build_code            build Binance C++ Code"
+	@echo "  run_producer          run binance_main with default args"
 	@echo ""
 
 # Build C++ Docker image
@@ -47,3 +48,8 @@ install_deps:
 # Build C++ code
 build_code:
 	./scripts/build/binance_build.sh
+
+# Run producer
+run_producer:
+	./scripts/run/run_producer.sh
+
