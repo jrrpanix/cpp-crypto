@@ -37,18 +37,19 @@
 
 inline void setup_websocket(ix::WebSocket &ws, const StreamConfig &cfg,
                             const SymbolIdMap &filtered_map,
-                            BookTickerQueue *queue) {
+                            BookTickerQueue *queue, bool debug) {
   ws.setUrl(cfg.endpoint);
 
-  ws.setOnMessageCallback([&ws, cfg, &filtered_map,
-                           queue](const ix::WebSocketMessagePtr &msg) {
+  ws.setOnMessageCallback([&ws, cfg, &filtered_map, queue,
+                           debug](const ix::WebSocketMessagePtr &msg) {
     thread_local simdjson::ondemand::parser parser;
     thread_local BookTicker ticker;
     using ix::WebSocketMessageType;
 
     switch (msg->type) {
     case WebSocketMessageType::Message:
-      std::cerr << "Received: " << msg->str << std::endl;
+      if (debug)
+        std::cerr << "Received: " << msg->str << std::endl;
       try {
         parse_book_ticker(parser, msg->str, ticker, true, &filtered_map);
         if (queue && !queue->try_enqueue(ticker)) {

@@ -41,7 +41,8 @@ struct Args {
   std::string config_file;
   std::string key;
   std::string symbol_file;
-  bool valid;
+  bool debug = false;
+  bool valid = false;
 };
 
 /**
@@ -60,7 +61,6 @@ struct Args {
  * @param argv Array of C-style strings representing arguments.
  * @return An `Args` struct with parsed values and a `valid` flag.
  */
-
 Args parse_args(int argc, char **argv) {
   Args args;
   args.valid = false;
@@ -73,10 +73,13 @@ Args parse_args(int argc, char **argv) {
       args.key = argv[++i];
     } else if (arg == "--symbol_file" && i + 1 < argc) {
       args.symbol_file = argv[++i];
+    } else if (arg == "--debug") {
+      args.debug = true;
     } else {
       std::cerr << "❌ Unknown or malformed argument: " << arg << "\n";
       std::cerr << "✅ Usage: " << argv[0]
-                << " --config_file <file> --key <key> --symbol_file <file>\n";
+                << " --config_file <file> --key <key> --symbol_file <file> "
+                   "[--debug]\n";
       return args;
     }
   }
@@ -86,7 +89,8 @@ Args parse_args(int argc, char **argv) {
       args.symbol_file.empty()) {
     std::cerr << "❌ Missing required arguments.\n";
     std::cerr << "✅ Usage: " << argv[0]
-              << " --config_file <file> --key <key> --symbol_file <file>\n";
+              << " --config_file <file> --key <key> --symbol_file <file> "
+                 "[--debug]\n";
     return args;
   }
   args.valid = true;
@@ -259,7 +263,7 @@ int main(int argc, char **argv) {
 
   BookTickerQueue queue;
   ix::WebSocket ws;
-  setup_websocket(ws, stream_config, filtered_map, &queue);
+  setup_websocket(ws, stream_config, filtered_map, &queue, args.debug);
   std::thread consumer_thread(consume_and_monitor, std::ref(queue),
                               std::ref(running), filtered_map);
   ws.start();
