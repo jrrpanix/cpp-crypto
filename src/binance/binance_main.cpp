@@ -1,7 +1,7 @@
-#include "bar_aggregator_impl.hpp"
-#include "bar_report_printer.hpp"
-#include "ohlc_bar.hpp"
-#include "price_calc.hpp"
+#include "bars/bar_aggregator_impl.hpp"
+#include "bars/bar_report_printer.hpp"
+#include "bars/ohlc_bar.hpp"
+#include "common/price_calc.hpp"
 #include "setup_websocket.hpp"
 #include "stream_config.hpp"
 #include <atomic>

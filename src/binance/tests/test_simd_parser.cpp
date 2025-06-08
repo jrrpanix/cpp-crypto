@@ -3,7 +3,7 @@
 #include "book_ticker_parser.hpp"
 #include "book_ticker_parser_nl.hpp"
 #include "stream_config.hpp"
-#include "time_utils.hpp"
+#include "common/time_utils.hpp"
 #include <fstream>
 #include <iostream>
 

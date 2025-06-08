@@ -48,7 +48,7 @@ inline void setup_websocket(ix::WebSocket &ws, const StreamConfig &cfg,
 
     switch (msg->type) {
     case WebSocketMessageType::Message:
-      // std::cerr << "Received: " << msg->str << std::endl;
+      std::cerr << "Received: " << msg->str << std::endl;
       try {
         parse_book_ticker(parser, msg->str, ticker, true, &filtered_map);
         if (queue && !queue->try_enqueue(ticker)) {
