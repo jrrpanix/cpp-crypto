@@ -23,7 +23,8 @@ fi
 CFGDIR="/workspace/apps/config/binance"
 
 # Command-line args for binance_main
-CMD_ARGS="--config_file $CFGDIR/config.json --key fut --symbol_file $CFGDIR/symbols.json --debug"
+CMD_ARGS="--config_file $CFGDIR/config.json --key fut --symbol_file $CFGDIR/symbols.json"
+CMD_ARGS="$CMD_ARGS $@"
 
 # Launch docker container
 echo "✅ Launching image: $IMAGE"
