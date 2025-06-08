@@ -39,6 +39,11 @@ target_link_libraries(binance_main
 
 # Install the main binary
 install(TARGETS binance_main DESTINATION bin)
+# Install config files
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/config/
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/config/binance
+        FILES_MATCHING PATTERN "*.json")
+
 
 # ================================
 # Add and configure test targets
