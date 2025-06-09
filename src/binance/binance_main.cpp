@@ -42,6 +42,7 @@ struct Args {
   std::string config_file;
   std::string key;
   std::string symbol_file;
+  bool zmqon = false;
   bool debug = false;
   bool valid = false;
 };
@@ -74,6 +75,8 @@ Args parse_args(int argc, char **argv) {
       args.key = argv[++i];
     } else if (arg == "--symbol_file" && i + 1 < argc) {
       args.symbol_file = argv[++i];
+    } else if (arg == "--zmqon") {
+      args.zmqon = true;
     } else if (arg == "--debug") {
       args.debug = true;
     } else {
@@ -91,7 +94,7 @@ Args parse_args(int argc, char **argv) {
     std::cerr << "❌ Missing required arguments.\n";
     std::cerr << "✅ Usage: " << argv[0]
               << " --config_file <file> --key <key> --symbol_file <file> "
-                 "[--debug]\n";
+                 "[--debug] [--zmqon]\n";
     return args;
   }
   args.valid = true;
@@ -108,7 +111,7 @@ make_reverse_map(const SymbolIdMap &symbol_to_id) {
 }
 
 void consume_and_monitor(BookTickerQueue &queue, std::atomic<bool> &running,
-                         const SymbolIdMap &filtered_map, zmq::socket_t &zmq_socket) {
+                         const SymbolIdMap &filtered_map, zmq::socket_t *zmq_socket) {
   using clock = std::chrono::steady_clock;
   using namespace std::chrono;
 
@@ -130,10 +133,11 @@ void consume_and_monitor(BookTickerQueue &queue, std::atomic<bool> &running,
     if (queue.try_dequeue(msg)) {
       auto &stats = stats_by_id[msg.id];
 
-      zmq::message_t zmq_msg(sizeof(msg));
-      memcpy(zmq_msg.data(), &msg, sizeof(msg));
-      zmq_socket.send(zmq_msg, zmq::send_flags::none);
-      
+      if (zmq_socket) {
+	zmq::message_t zmq_msg(sizeof(msg));
+	memcpy(zmq_msg.data(), &msg, sizeof(msg));
+	zmq_socket->send(zmq_msg, zmq::send_flags::none);
+      }
       stats.count++;
       stats.bid_price_sum += msg.bid_price;
       stats.bid_qty_sum += msg.bid_qty;
@@ -258,11 +262,12 @@ int main(int argc, char **argv) {
 
   // Setup signal handler for Ctrl+C
   std::signal(SIGINT, handle_sigint);
-
-  zmq::context_t context(1);
-  zmq::socket_t zmq_socket(context, zmq::socket_type::push);
-  zmq_socket.connect("tcp://consumer:5555");  // Docker network address
-
+  zmq::socket_t *zmq_socket = nullptr;
+  if (args.zmqon) {
+    zmq::context_t context(1);
+    zmq_socket = new zmq::socket_t(context, zmq::socket_type::push);
+    zmq_socket->connect("tcp://consumer:5555");  // Docker network address
+  }
   
   // Setup and start WebSocket
   const StreamConfig &stream_config = cfgmap[args.key];
@@ -275,7 +280,7 @@ int main(int argc, char **argv) {
   ix::WebSocket ws;
   setup_websocket(ws, stream_config, filtered_map, &queue, args.debug);
   std::thread consumer_thread(consume_and_monitor, std::ref(queue),
-                              std::ref(running), filtered_map, std::ref(zmq_socket));
+                              std::ref(running), filtered_map, zmq_socket);
   ws.start();
 
   std::cout << "🟢 WebSocket client running. Press Ctrl+C to exit.\n";
