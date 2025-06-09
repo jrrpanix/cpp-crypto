@@ -35,6 +35,7 @@ target_link_libraries(binance_main
     crypto
     z
     pthread
+    zmq
 )
 
 # Install the main binary

@@ -16,6 +16,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <zmq.hpp>
 
 #include "book_ticker_queue.hpp"
 #include "symbol_id_map.hpp"
@@ -107,7 +108,7 @@ make_reverse_map(const SymbolIdMap &symbol_to_id) {
 }
 
 void consume_and_monitor(BookTickerQueue &queue, std::atomic<bool> &running,
-                         const SymbolIdMap &filtered_map) {
+                         const SymbolIdMap &filtered_map, zmq::socket_t &zmq_socket) {
   using clock = std::chrono::steady_clock;
   using namespace std::chrono;
 
@@ -129,6 +130,10 @@ void consume_and_monitor(BookTickerQueue &queue, std::atomic<bool> &running,
     if (queue.try_dequeue(msg)) {
       auto &stats = stats_by_id[msg.id];
 
+      zmq::message_t zmq_msg(sizeof(msg));
+      memcpy(zmq_msg.data(), &msg, sizeof(msg));
+      zmq_socket.send(zmq_msg, zmq::send_flags::none);
+      
       stats.count++;
       stats.bid_price_sum += msg.bid_price;
       stats.bid_qty_sum += msg.bid_qty;
@@ -254,6 +259,11 @@ int main(int argc, char **argv) {
   // Setup signal handler for Ctrl+C
   std::signal(SIGINT, handle_sigint);
 
+  zmq::context_t context(1);
+  zmq::socket_t zmq_socket(context, zmq::socket_type::push);
+  zmq_socket.connect("tcp://consumer:5555");  // Docker network address
+
+  
   // Setup and start WebSocket
   const StreamConfig &stream_config = cfgmap[args.key];
 
@@ -265,7 +275,7 @@ int main(int argc, char **argv) {
   ix::WebSocket ws;
   setup_websocket(ws, stream_config, filtered_map, &queue, args.debug);
   std::thread consumer_thread(consume_and_monitor, std::ref(queue),
-                              std::ref(running), filtered_map);
+                              std::ref(running), filtered_map, std::ref(zmq_socket));
   ws.start();
 
   std::cout << "🟢 WebSocket client running. Press Ctrl+C to exit.\n";
