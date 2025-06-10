@@ -21,15 +21,9 @@ services:
       - consumer
     networks:
       - market-net
-    working_dir: /workspace/apps/bin
     volumes:
       - .:/workspace
-    command: >
-      ./binance_main
-      --config_file /workspace/apps/config/binance/config.json
-      --key fut
-      --symbol_file /workspace/apps/config/binance/symbols.json
-      --zmqon
+    command: /workspace/apps/bin/mock_producer_main
 
 networks:
   market-net:

@@ -40,6 +40,29 @@ target_link_libraries(binance_main
 
 # Install the main binary
 install(TARGETS binance_main DESTINATION bin)
+
+# mock_producer
+add_executable(mock_producer_main mock_producer_main.cpp)
+
+target_include_directories(mock_producer_main
+  PRIVATE
+    ${PROJECT_SRC_DIR}/src
+    ${LOCAL_INCLUDE_DIR}
+)
+
+target_compile_options(mock_producer_main PRIVATE -O3 -march=native)
+
+target_link_libraries(mock_producer_main
+  PRIVATE
+    zmq
+    pthread
+)
+
+# Install the test producer binary
+install(TARGETS mock_producer_main DESTINATION bin)
+
+
+
 # Install config files
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/config/
         DESTINATION ${CMAKE_INSTALL_PREFIX}/config/binance
