@@ -134,6 +134,10 @@ void consume_and_monitor(BookTickerQueue &queue, std::atomic<bool> &running,
       auto &stats = stats_by_id[msg.id];
 
       if (zmq_socket) {
+	static long cnt = 0;
+	if (++cnt < 20) {
+	  std::cerr << "sening message " << msg.id << " " << msg.bid_price << " " << msg.ask_price << std::endl;
+	}
 	zmq::message_t zmq_msg(sizeof(msg));
 	memcpy(zmq_msg.data(), &msg, sizeof(msg));
 	zmq_socket->send(zmq_msg, zmq::send_flags::none);
@@ -264,6 +268,7 @@ int main(int argc, char **argv) {
   std::signal(SIGINT, handle_sigint);
   zmq::socket_t *zmq_socket = nullptr;
   if (args.zmqon) {
+    std::cerr << "building zmq_socket" << std::endl;
     zmq::context_t context(1);
     zmq_socket = new zmq::socket_t(context, zmq::socket_type::push);
     zmq_socket->connect("tcp://consumer:5555");  // Docker network address
