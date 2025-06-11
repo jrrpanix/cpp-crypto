@@ -127,86 +127,31 @@ void consume_and_monitor(BookTickerQueue &queue, std::atomic<bool> &running,
   std::unordered_map<int32_t, Stats> stats_by_id;
   BookTicker msg;
 
+  if (zmq_socket)
+    std::cerr << "zmq enabled" << std::endl;
+  else
+    std::cerr << "zmq off" << std::endl;
+  std::cerr << std::flush << std::endl;
   auto last_report = clock::now();
   auto id_to_symbol = make_reverse_map(filtered_map);
+  uint32_t cnt = 0;
+  uint32_t send = 0;
   while (running) {
     if (queue.try_dequeue(msg)) {
-      auto &stats = stats_by_id[msg.id];
-
       if (zmq_socket) {
-	static long cnt = 0;
-	if (++cnt < 20) {
-	  std::cerr << "sening message " << msg.id << " " << msg.bid_price << " " << msg.ask_price << std::endl;
-	}
 	zmq::message_t zmq_msg(sizeof(msg));
 	memcpy(zmq_msg.data(), &msg, sizeof(msg));
 	zmq_socket->send(zmq_msg, zmq::send_flags::none);
+	if (++send < 10)
+	  std::cerr << "sending msg " << msg.id << " " << msg.bid_price << std::endl;
       }
-      stats.count++;
-      stats.bid_price_sum += msg.bid_price;
-      stats.bid_qty_sum += msg.bid_qty;
-      stats.ask_price_sum += msg.ask_price;
-      stats.ask_qty_sum += msg.ask_qty;
-
-      int64_t event_time_ns =
-          static_cast<int64_t>(msg.event_time_ms_midnight) * 1'000'000;
-      int64_t recv_time_ns =
-          epoch_ns_to_midnight_ns_utc(msg.my_receive_time_ns);
-      double latency_ms =
-          static_cast<double>(recv_time_ns - event_time_ns) / 1'000'000.0;
-      stats.latency_sum_ms += latency_ms;
+      if (++cnt % 5000 == 0 || cnt < 10) {
+	std::cerr << "msg cnt = " << cnt << std::endl;
+      }
     } else {
-      std::this_thread::sleep_for(std::chrono::microseconds(100));
-    }
-
-    // Print every 30 seconds
-    auto now = clock::now();
-    if (duration_cast<seconds>(now - last_report).count() >= 30) {
-      std::vector<std::pair<std::string, Stats>> ordered_stats;
-
-      for (const auto &[id, stats] : stats_by_id) {
-        auto it = id_to_symbol.find(id);
-        std::string symbol =
-            (it != id_to_symbol.end()) ? it->second : "<unknown>";
-        ordered_stats.emplace_back(symbol, stats);
-      }
-
-      std::sort(ordered_stats.begin(), ordered_stats.end(),
-                [](const auto &a, const auto &b) { return a.first < b.first; });
-
-      // Print as dataframe
-      std::cout << "\n📊 ---- 30-Second Summary ----\n";
-      std::cout << std::left << std::setw(12) << "Symbol" << std::right
-                << std::setw(10) << "Count" << std::setw(15) << "Avg Bid"
-                << std::setw(15) << "Bid Qty" << std::setw(15) << "Avg Ask"
-                << std::setw(15) << "Ask Qty" << std::setw(15) << "Latency (ms)"
-                << "\n";
-
-      for (const auto &[symbol, stats] : ordered_stats) {
-        if (stats.count == 0)
-          continue;
-
-        double avg_bid_price = stats.bid_price_sum / stats.count;
-        double avg_bid_qty = stats.bid_qty_sum / stats.count;
-        double avg_ask_price = stats.ask_price_sum / stats.count;
-        double avg_ask_qty = stats.ask_qty_sum / stats.count;
-        double avg_latency = stats.latency_sum_ms / stats.count;
-
-        std::cout << std::left << std::setw(12) << symbol << std::right
-                  << std::setw(10) << stats.count << std::setw(15) << std::fixed
-                  << std::setprecision(3) << avg_bid_price << std::setw(15)
-                  << avg_bid_qty << std::setw(15) << avg_ask_price
-                  << std::setw(15) << avg_ask_qty << std::setw(15)
-                  << avg_latency << "\n";
-      }
-
-      std::cout << "------------------------------\n";
-
-      stats_by_id.clear();
-      last_report = now;
+      std::this_thread::sleep_for(std::chrono::microseconds(5));
     }
   }
-
   std::cout << "🛑 Consumer thread exiting...\n";
 }
 
@@ -266,14 +211,21 @@ int main(int argc, char **argv) {
 
   // Setup signal handler for Ctrl+C
   std::signal(SIGINT, handle_sigint);
-  zmq::socket_t *zmq_socket = nullptr;
+
+  std::unique_ptr<zmq::context_t> zmq_context;
+  std::unique_ptr<zmq::socket_t> zmq_socket;
+
   if (args.zmqon) {
-    std::cerr << "building zmq_socket" << std::endl;
-    zmq::context_t context(1);
-    zmq_socket = new zmq::socket_t(context, zmq::socket_type::push);
-    zmq_socket->connect("tcp://consumer:5555");  // Docker network address
+    try {
+      zmq_context = std::make_unique<zmq::context_t>(1);
+      zmq_socket = std::make_unique<zmq::socket_t>(*zmq_context, zmq::socket_type::push);
+      zmq_socket->connect("tcp://consumer:5555");
+    } catch (const zmq::error_t &e) {
+      std::cerr << "ZMQ error: " << e.what() << "\n";
+      return 1;
+    }
   }
-  
+
   // Setup and start WebSocket
   const StreamConfig &stream_config = cfgmap[args.key];
 
@@ -285,7 +237,7 @@ int main(int argc, char **argv) {
   ix::WebSocket ws;
   setup_websocket(ws, stream_config, filtered_map, &queue, args.debug);
   std::thread consumer_thread(consume_and_monitor, std::ref(queue),
-                              std::ref(running), filtered_map, zmq_socket);
+                              std::ref(running), filtered_map, zmq_socket.get());
   ws.start();
 
   std::cout << "🟢 WebSocket client running. Press Ctrl+C to exit.\n";
