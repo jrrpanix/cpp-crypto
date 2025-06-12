@@ -10,7 +10,6 @@ This project is a **C++23-based framework** for consuming real-time market data 
 * ⚡ Optional ZeroMQ integration
 * 🐳 Docker-first development and deployment
 * 🧱 Modular CMake + Make build system
-* 📈 JSON parsing benchmarks with real data
 
 ---
 
@@ -24,25 +23,19 @@ make run
 # Inside the container
 make deps           # Install C++ dependencies
 make build_code     # Compile Binance engine
-make run_fut        # Run with Futures config
-# OR
-make run_spot       # Run with Spot config
 ```
 
 ---
 
 ## 🛠️ Makefile Targets
 
-| Target          | Description                           |
-| --------------- | ------------------------------------- |
-| `build`         | Build Docker container for full stack |
-| `run`           | Run the Docker container              |
-| `deps`          | Install dependencies inside container |
-| `build_code`    | Build the Binance C++ engine          |
-| `run_fut`       | Run Futures stream                    |
-| `run_spot`      | Run Spot stream                       |
-| `benchmark_cpp` | Run C++ JSON benchmark                |
-| `benchmark_py`  | Run Python JSON benchmark             |
+| Target       | Description                           |
+| ------------ | ------------------------------------- |
+| `help`       | Show list of available commands       |
+| `build`      | Build Docker container for full stack |
+| `run`        | Run the Docker container              |
+| `deps`       | Install dependencies inside container |
+| `build_code` | Build the Binance C++ engine          |
 
 ---
 
@@ -54,25 +47,7 @@ Edit:
 apps/config/binance/config.json
 ```
 
-Use the `key` field as `fut` or `spot` in run commands.
-
----
-
-## 🧪 Benchmarks: JSON Parsing
-
-**Dataset**: 128,398 Binance `bookTicker` messages
-**File**: `test_data/binance_perp_btc.json`
-
-| Parser           | Avg Time (ns/msg) | Language |
-| ---------------- | ----------------- | -------- |
-| `simdjson`       | 144 ns            | C++      |
-| `nlohmann::json` | 1408 ns           | C++      |
-| Python `json`    | 1083 ns           | Python   |
-
-```sh
-make benchmark_cpp
-make benchmark_py
-```
+Use the `key` field to select the stream configuration (`fut`, `spot`, etc.).
 
 ---
 
@@ -108,7 +83,7 @@ make benchmark_py
 ├── src/binance/            # Binance logic
 ├── src/common/             # Shared headers
 ├── scripts/                # Build/run scripts
-├── test_data/              # Benchmark data
+├── test_data/              # (Optional) for benchmarks
 ├── Makefile
 └── Dockerfile
 ```
@@ -117,9 +92,9 @@ make benchmark_py
 
 ## 🔁 Notes
 
-* C++23 features enabled (via `g++ 11.4+`)
-* Designed for Dockerized development
-* Focused on low-latency and clean modularity
+* Written in **C++23**, compiled with `g++ 11.4+`
+* Dockerized for reproducible environments
+* Focused on low-latency, high-throughput streaming use cases
 
 ---
 
