@@ -31,9 +31,6 @@ echo "✅ Launching image: $IMAGE"
 echo "📂 Mounting: $WORKDIR → /workspace"
 echo "🚀 Args: $CMD_ARGS"
 
-docker run --rm \
-    -v "$WORKDIR:/workspace" \
-    -w /workspace/apps/bin \
-    "$IMAGE" \
-    ./binance_main $CMD_ARGS
+
+/workspace/apps/bin/binance_main $CMD_ARGS
 
