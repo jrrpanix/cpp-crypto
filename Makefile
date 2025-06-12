@@ -1,3 +1,13 @@
+# Help: list all available make targets
+help:
+	@echo ""
+	@echo "📦 Makefile Commands:"
+	@echo "  build        Build Docker image for development"
+	@echo "  run          Run the Docker development container"
+	@echo "  deps         Install C++ dependencies inside the container"
+	@echo "  build_code   Compile the Binance C++ engine"
+	@echo ""
+
 # Build Docker image for full development environment (C++ + Python)
 build:
 	./scripts/build/docker_build.sh full
