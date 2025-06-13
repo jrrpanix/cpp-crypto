@@ -1,0 +1,45 @@
+
+services:
+  producer:
+    build:
+      context: .
+      dockerfile: docker/runtime/Dockerfile
+    container_name: producer
+    depends_on:
+      - consumer1
+      - consumer2
+    networks:
+      - market-net
+    volumes:
+      - .:/workspace
+    working_dir: /workspace/apps/bin
+    command: >
+      ./binance_main
+      --config_file /workspace/apps/config/binance/config.json
+      --key fut
+      --symbol_file /workspace/apps/config/binance/symbols.json
+      --zmqon
+
+  consumer1:
+    build:
+      context: .
+      dockerfile: docker/runtime/Dockerfile
+    networks:
+      - market-net
+    volumes:
+      - .:/workspace
+    command: /workspace/apps/bin/consumer_main
+
+  consumer2:
+    build:
+      context: .
+      dockerfile: docker/runtime/Dockerfile
+    networks:
+      - market-net
+    volumes:
+      - .:/workspace
+    command: /workspace/apps/bin/consumer_main
+
+networks:
+  market-net:
+
