@@ -1,17 +1,21 @@
-#include "binance/book_ticker/book_ticker.hpp" // Include your actual BookTicker
+#include "binance/book_ticker/book_ticker.hpp"
 #include <cstring>
 #include <iostream>
 #include <zmq.hpp>
 
+
 int main() {
   zmq::context_t context(1);
-  zmq::socket_t socket(context, zmq::socket_type::pull);
-  socket.bind("tcp://*:5555");
+  zmq::socket_t socket(context, zmq::socket_type::sub);  // 🔁 CHANGE: PULL → SUB
 
-  std::cout << "🟢 Consumer ready. Listening on port 5555...\n";
+  socket.connect("tcp://producer:5555");  // 🔁 CHANGE: bind → connect
+
+  // 🔁 NEW: Subscribe to all messages ("" = no topic filter)
+  socket.set(zmq::sockopt::subscribe, "");
+
+  std::cout << "🟢 Consumer ready. Subscribed to tcp://producer:5555\n";
 
   while (true) {
-    BookTicker msg;
     zmq::message_t zmq_msg;
     auto result = socket.recv(zmq_msg, zmq::recv_flags::none);
 
@@ -28,3 +32,4 @@ int main() {
     }
   }
 }
+

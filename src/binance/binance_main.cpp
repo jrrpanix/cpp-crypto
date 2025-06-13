@@ -111,7 +111,8 @@ make_reverse_map(const SymbolIdMap &symbol_to_id) {
 }
 
 void consume_and_monitor(BookTickerQueue &queue, std::atomic<bool> &running,
-                         const SymbolIdMap &filtered_map, zmq::socket_t *zmq_socket) {
+                         const SymbolIdMap &filtered_map,
+                         zmq::socket_t *zmq_socket) {
   using clock = std::chrono::steady_clock;
   using namespace std::chrono;
 
@@ -139,14 +140,15 @@ void consume_and_monitor(BookTickerQueue &queue, std::atomic<bool> &running,
   while (running) {
     if (queue.try_dequeue(msg)) {
       if (zmq_socket) {
-	zmq::message_t zmq_msg(sizeof(msg));
-	memcpy(zmq_msg.data(), &msg, sizeof(msg));
-	zmq_socket->send(zmq_msg, zmq::send_flags::none);
-	if (++send < 10)
-	  std::cerr << "sending msg " << msg.id << " " << msg.bid_price << std::endl;
+        zmq::message_t zmq_msg(sizeof(msg));
+        memcpy(zmq_msg.data(), &msg, sizeof(msg));
+        zmq_socket->send(zmq_msg, zmq::send_flags::none);
+        if (++send < 10)
+          std::cerr << "sending msg " << msg.id << " " << msg.bid_price
+                    << std::endl;
       }
       if (++cnt % 5000 == 0 || cnt < 10) {
-	std::cerr << "msg cnt = " << cnt << std::endl;
+        std::cerr << "msg cnt = " << cnt << std::endl;
       }
     } else {
       std::this_thread::sleep_for(std::chrono::microseconds(5));
@@ -218,8 +220,20 @@ int main(int argc, char **argv) {
   if (args.zmqon) {
     try {
       zmq_context = std::make_unique<zmq::context_t>(1);
-      zmq_socket = std::make_unique<zmq::socket_t>(*zmq_context, zmq::socket_type::push);
-      zmq_socket->connect("tcp://consumer:5555");
+      zmq_socket =
+          std::make_unique<zmq::socket_t>(*zmq_context, zmq::socket_type::pub);
+
+      // Set send high-water mark before binding
+      int hwm = 10000;
+      zmq_socket->set(zmq::sockopt::sndhwm, 10000);
+
+      // Bind to all interfaces so subscribers can connect
+      zmq_socket->bind("tcp://0.0.0.0:5555");
+
+      // Optional: wait 1 sec to allow subscribers to connect
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+
+      std::cerr << "✅ ZMQ PUB socket bound to tcp://0.0.0.0:5555\n";
     } catch (const zmq::error_t &e) {
       std::cerr << "ZMQ error: " << e.what() << "\n";
       return 1;
@@ -237,7 +251,8 @@ int main(int argc, char **argv) {
   ix::WebSocket ws;
   setup_websocket(ws, stream_config, filtered_map, &queue, args.debug);
   std::thread consumer_thread(consume_and_monitor, std::ref(queue),
-                              std::ref(running), filtered_map, zmq_socket.get());
+                              std::ref(running), filtered_map,
+                              zmq_socket.get());
   ws.start();
 
   std::cout << "🟢 WebSocket client running. Press Ctrl+C to exit.\n";
