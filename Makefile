@@ -23,4 +23,5 @@ deps:
 # Build C++ engine
 build_code:
 	./scripts/build/binance_build.sh
+	./scripts/build/consumer_build.sh
 
