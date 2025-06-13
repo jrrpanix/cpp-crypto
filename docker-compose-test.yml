@@ -1,0 +1,29 @@
+
+services:
+  consumer:
+    build:
+      context: .
+      dockerfile: docker/runtime/Dockerfile
+    container_name: consumer
+    networks:
+      - market-net
+    command: /workspace/apps/bin/consumer_main
+    volumes:
+       - .:/workspace
+
+  producer:
+    build:
+      context: .
+      dockerfile: docker/runtime/Dockerfile  # your existing producer Dockerfile
+    container_name: producer
+    depends_on:
+      - consumer
+    networks:
+      - market-net
+    volumes:
+      - .:/workspace
+    command: /workspace/apps/bin/mock_producer_main
+
+networks:
+  market-net:
+
