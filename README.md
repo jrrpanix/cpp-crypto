@@ -6,10 +6,11 @@ This project is a **C++23-based framework** for consuming real-time market data 
 
 ## 📦 Features
 
-* ✅ Binance Spot and Futures `bookTicker` stream support  
-* ⚡ Optional ZeroMQ integration  
-* 🐳 Docker-first development and deployment  
-* 🧱 Modular CMake + Make build system  
+* ✅ Binance Spot and Futures `bookTicker` stream support
+* ⚡ Optional ZeroMQ integration
+* 🐳 Docker-first development and deployment
+* 🧱 Modular CMake + Make build system
+* 📡 FastAPI webserver for receiving consumer metrics
 
 ---
 
@@ -29,13 +30,13 @@ make build_code     # Compile Binance engine
 
 ## 🛠️ Makefile Targets
 
-| Target         | Description                           |
-|----------------|---------------------------------------|
-| `help`         | Show list of available commands       |
-| `build`        | Build Docker container for full stack |
-| `run`          | Run the Docker container              |
-| `deps`         | Install dependencies inside container |
-| `build_code`   | Build the Binance C++ engine          |
+| Target       | Description                           |
+| ------------ | ------------------------------------- |
+| `help`       | Show list of available commands       |
+| `build`      | Build Docker container for full stack |
+| `run`        | Run the Docker container              |
+| `deps`       | Install dependencies inside container |
+| `build_code` | Build the Binance C++ engine          |
 
 ---
 
@@ -53,13 +54,15 @@ Use the `key` field to select the stream configuration (`fut`, `spot`, etc.).
 
 ## 📚 Dependencies
 
+### C++
+
 | Library             | Purpose                                                   | Installation                                                                |
-|---------------------|-----------------------------------------------------------|-----------------------------------------------------------------------------|
+| ------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------- |
 | **IXWebSocket**     | WebSocket client with TLS                                 | 🔧 Build from source ([GitHub](https://github.com/machinezone/IXWebSocket)) |
 | **simdjson**        | Ultra-fast SIMD JSON parsing                              | 🔧 Build from source ([GitHub](https://github.com/simdjson/simdjson))       |
-| **fast_float**      | High-performance float parsing                            | 📄 Header-only ([GitHub](https://github.com/fastfloat/fast_float))          |
+| **fast\_float**     | High-performance float parsing                            | 📄 Header-only ([GitHub](https://github.com/fastfloat/fast_float))          |
 | **nlohmann::json**  | Friendly JSON API for C++                                 | 📄 Header-only ([GitHub](https://github.com/nlohmann/json))                 |
-| **robin_hood**      | High-performance hash map (faster than `unordered_map`)   | 📄 Header-only ([GitHub](https://github.com/martinus/robin-hood-hashing))   |
+| **robin\_hood**     | High-performance hash map (faster than `unordered_map`)   | 📄 Header-only ([GitHub](https://github.com/martinus/robin-hood-hashing))   |
 | **moodycamel**      | Lock-free concurrent queue for low-latency pipelines      | 📄 Header-only ([GitHub](https://github.com/cameron314/concurrentqueue))    |
 | **ZeroMQ (libzmq)** | High-performance messaging library for inter-process comm | 📦 Installed in Docker (`apt-get install libzmq3-dev`)                      |
 | **cppzmq**          | Header-only C++ bindings for ZeroMQ                       | 📄 Header-only ([GitHub](https://github.com/zeromq/cppzmq))                 |
@@ -69,6 +72,47 @@ Use the `key` field to select the stream configuration (`fut`, `spot`, etc.).
 | **zlib**            | Compression library                                       | 📦 Installed in Docker                                                      |
 | **CMake**           | Cross-platform build system                               | 📦 Installed in Docker                                                      |
 | **g++ 11.4.0**      | C++23-compatible compiler                                 | 📦 Installed in Docker                                                      |
+
+### Python (FastAPI Webserver)
+
+| Package      | Purpose                          | Installation                                |
+| ------------ | -------------------------------- | ------------------------------------------- |
+| **FastAPI**  | Web framework for REST endpoints | Via `uv` and `pyproject.toml`               |
+| **Uvicorn**  | ASGI server for FastAPI          | `uv pip install --system uvicorn[standard]` |
+| **pydantic** | Data validation and parsing      | Included with FastAPI                       |
+
+---
+
+## 🧩 Architecture
+
+```text
++------------------+                    
+|  binance_main    |                    
+|------------------|                    
+| - WebSocket      |                    
+| - Parses bookTicker                  
+| - Push to queue  |                    
++--------+---------+                    
+         |                              
+         v                              
++--------------------------+     ZMQ PUB
+|  ZMQ Publisher Thread     |------------------------+
+|--------------------------|                        |
+| - Pull from queue        |                        v
+| - Send BookTicker structs|              +-------------------+
++--------------------------+              |   Consumer(s)     |
+                                          |-------------------|
+                                          | - ZMQ SUB         |
+                                          | - POST to FastAPI |
+                                          +---------+---------+
+                                                    |
+                                                    v
+                                          +--------------------+
+                                          |     FastAPI        |
+                                          |--------------------|
+                                          | - Receives /status |
+                                          +--------------------+
+```
 
 ---
 
@@ -83,6 +127,7 @@ Use the `key` field to select the stream configuration (`fut`, `spot`, etc.).
 │   ├── binance/              # Binance logic
 │   └── common/               # Shared headers/utilities
 ├── scripts/                  # Build and run scripts
+├── server/                   # FastAPI app and pyproject.toml
 ├── test_data/                # (Optional) for benchmarks or fixtures
 ├── Makefile
 └── Dockerfile
@@ -90,18 +135,11 @@ Use the `key` field to select the stream configuration (`fut`, `spot`, etc.).
 
 ---
 
-## 🔁 Notes
-
-* Written in **C++23**, compiled with `g++ 11.4+`
-* Dockerized for reproducible environments
-* Focused on low-latency, high-throughput streaming use cases
-
----
-
 ## ✅ TODO
 
-* [ ] Prometheus metrics support  
-* [ ] Auto-reconnect logic  
-* [ ] Redis or DuckDB symbol mapping option  
-* [ ] YAML or TOML configuration migration  
+* [ ] Prometheus metrics support
+* [ ] Auto-reconnect logic
+* [ ] Redis or DuckDB symbol mapping option
+* [ ] YAML or TOML configuration migration
+* [ ] Web dashboard view of consumer status
 
