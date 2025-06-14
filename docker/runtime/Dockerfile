@@ -5,6 +5,7 @@ RUN apt-get update && \
     libzmq5 \
     libssl3 \
     libssl-dev \
+    libcurl4 \
     ca-certificates \
     zlib1g \
     && apt-get clean && rm -rf /var/lib/apt/lists/*

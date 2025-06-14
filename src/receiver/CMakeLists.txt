@@ -30,8 +30,12 @@ target_compile_options(consumer_main PRIVATE -O3 -march=native)
 # Link with ZeroMQ and other relevant libraries
 target_link_libraries(consumer_main
   PRIVATE
+    cpr
     zmq
     pthread
+    curl
+    ssl
+    crypto
 )
 
 # Optional: install the consumer binary (like binance_main)
