@@ -15,6 +15,7 @@ help:
 	@echo "  build_local    Rebuild docker images only (no run)"
 	@echo "  reset_local    Stop and remove all containers/networks"
 	@echo "  full_reset     Full clean: down + remove volumes + rebuild"
+	@echo "  run_test       run mock_server"
 	@echo ""
 
 # Build Docker image for full development environment (C++ + Python)
@@ -50,4 +51,8 @@ reset_local:
 full_reset:
 	docker-compose down --volumes --remove-orphans
 	docker-compose up --build
+
+run_test:
+	docker-compose -f docker-compose-test.yml up --build
+
 
