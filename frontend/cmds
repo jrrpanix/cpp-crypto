@@ -1,0 +1,13 @@
+cd frontend
+
+brew install node
+
+# Bootstrap with Vite + React + TypeScript
+npm create vite@latest . -- --template react-ts
+
+# Then install dependencies
+npm install
+
+# Run locally to test
+npm run dev
+
