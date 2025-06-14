@@ -128,9 +128,14 @@ Use the `key` field to select the stream configuration (`fut`, `spot`, etc.).
 │   └── common/               # Shared headers/utilities
 ├── scripts/                  # Build and run scripts
 ├── server/                   # FastAPI app and pyproject.toml
+├── docker/                   # Dockerfiles for each service
+│   ├── cpp-dev/
+│   ├── full-dev/
+│   ├── runtime/
+│   └── webserver/
 ├── test_data/                # (Optional) for benchmarks or fixtures
 ├── Makefile
-└── Dockerfile
+└── docker-compose.yml
 ```
 
 ---
