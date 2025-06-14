@@ -1,12 +1,9 @@
-# docker/Dockerfile
-
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install C++ build tools and common libraries
-RUN apt-get update && \
-    apt-get install -y \
+# Install essential build tools and dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     time \
@@ -18,14 +15,17 @@ RUN apt-get update && \
     zlib1g-dev \
     libzmq3-dev \
     libspdlog-dev \
+    libcurl4-openssl-dev \
+    ca-certificates \
     emacs-nox \
-    clang-format \
-    clang-tidy \	
     vim \
+    clang-format \
+    clang-tidy \
     && rm -rf /var/lib/apt/lists/*
 
-# Working directory where you’ll mount your project
+# Set working directory
 WORKDIR /workspace
 
+# Default command
 CMD ["/bin/bash"]
 

@@ -40,6 +40,9 @@ build_project "fast_float" "https://github.com/fastfloat/fast_float.git" ""
 # Build simdjson
 build_project "simdjson" "https://github.com/simdjson/simdjson.git" ""
 
+# Build CPR (HTTP client, depends on libcurl)
+build_project "cpr" "https://github.com/libcpr/cpr.git" "-DCPR_USE_SYSTEM_CURL=ON"
+
 # Install nlohmann/json single-header
 NLOHMANN_HEADER="$INSTALLDIR/include/nlohmann/json.hpp"
 if [ -f "$NLOHMANN_HEADER" ]; then
@@ -61,13 +64,12 @@ else
       -O "$ROBIN_HOOD_HEADER"
 fi
 
-
 # Install moodycamel/concurrentqueue headers
 MOODYCAMEL_HEADER_DIR="$INSTALLDIR/include/moodycamel"
 if [ -f "$MOODYCAMEL_HEADER_DIR/concurrentqueue.h" ]; then
   echo "✅ moodycamel/concurrentqueue.h already exists, skipping download."
 else
-  echo "📥 Downloading moodycamel concurrentqueue p..."
+  echo "📥 Downloading moodycamel concurrentqueue..."
   mkdir -p "$MOODYCAMEL_HEADER_DIR"
   wget -q https://raw.githubusercontent.com/cameron314/concurrentqueue/master/concurrentqueue.h \
       -O "$MOODYCAMEL_HEADER_DIR/concurrentqueue.h"
