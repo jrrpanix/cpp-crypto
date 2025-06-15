@@ -35,6 +35,8 @@ void handle_sigint(int) {
  * - The path to the stream configuration file (`config_file`)
  * - The section key in the config to select a specific stream (`key`)
  * - The path to the symbol map file (`symbol_file`)
+ * - A flag if true pub to zmq (`zmqon`)
+ * - A flag if true that dumps raw json from exchange (`debug`)
  * - A flag indicating whether all required arguments were successfully parsed
  * (`valid`)
  */
@@ -83,7 +85,7 @@ Args parse_args(int argc, char **argv) {
       std::cerr << "❌ Unknown or malformed argument: " << arg << "\n";
       std::cerr << "✅ Usage: " << argv[0]
                 << " --config_file <file> --key <key> --symbol_file <file> "
-                   "[--debug]\n";
+                   "[--debug] [--zmqon]\n";
       return args;
     }
   }

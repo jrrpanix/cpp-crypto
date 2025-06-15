@@ -15,18 +15,14 @@ set(LOCAL_LIB_DIR "${CMAKE_SOURCE_DIR}/../../install/lib" CACHE PATH "Local lib 
 
 # Add binance_main executable
 add_executable(binance_main binance_main.cpp)
-
-# Proper include paths
 target_include_directories(binance_main
   PRIVATE
   ${PROJECT_SRC_DIR}/src  
   ${CMAKE_CURRENT_SOURCE_DIR}/book_ticker
   ${LOCAL_INCLUDE_DIR}
 )
-
 target_link_directories(binance_main PRIVATE ${LOCAL_LIB_DIR})
 target_compile_options(binance_main PRIVATE -O3 -march=native)
-
 target_link_libraries(binance_main
   PRIVATE
     simdjson
@@ -37,13 +33,34 @@ target_link_libraries(binance_main
     pthread
     zmq
 )
-
-# Install the main binary
 install(TARGETS binance_main DESTINATION bin)
+
+# Add mock_binance_main executable
+add_executable(mock_binance_main mock_binance_main.cpp)
+target_include_directories(mock_binance_main
+  PRIVATE
+  ${PROJECT_SRC_DIR}/src  
+  ${CMAKE_CURRENT_SOURCE_DIR}/book_ticker
+  ${LOCAL_INCLUDE_DIR}
+)
+target_link_directories(mock_binance_main PRIVATE ${LOCAL_LIB_DIR})
+target_compile_options(mock_binance_main PRIVATE -O3 -march=native)
+target_link_libraries(mock_binance_main
+  PRIVATE
+    simdjson
+    ixwebsocket
+    ssl
+    crypto
+    z
+    pthread
+    zmq
+)
+install(TARGETS mock_binance_main DESTINATION bin)
+
 
 # mock_producer
 add_executable(mock_producer_main mock_producer_main.cpp)
-
+target_link_directories(mock_producer_main PRIVATE ${LOCAL_LIB_DIR})
 target_include_directories(mock_producer_main
   PRIVATE
     ${PROJECT_SRC_DIR}/src
@@ -54,6 +71,7 @@ target_compile_options(mock_producer_main PRIVATE -O3 -march=native)
 
 target_link_libraries(mock_producer_main
   PRIVATE
+    simdjson
     zmq
     pthread
 )

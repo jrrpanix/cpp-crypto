@@ -21,7 +21,7 @@ services:
       - market-net
     volumes:
       - .:/workspace
-    command: /workspace/apps/bin/mock_producer_main
+    command: /workspace/apps/bin/mock_binance_main
 
   webserver:
     build:
