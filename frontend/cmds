@@ -11,3 +11,10 @@ npm install
 # Run locally to test
 npm run dev
 
+
+npm install -D tailwindcss postcss autoprefixer
+npx tailwindcss init -p
+i
+
+npm install -D tailwindcss postcss autoprefixer
+
