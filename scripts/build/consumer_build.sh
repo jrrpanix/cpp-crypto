@@ -1,4 +1,4 @@
 #!/bin/sh
-cd src/receiver
+cd src/consumer
 ./build_local.sh
 
