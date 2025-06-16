@@ -10,6 +10,7 @@
 
 /// Alias for a fast flat hash map from symbol name to integer ID
 using SymbolIdMap = robin_hood::unordered_flat_map<std::string, int32_t>;
+using ReverseSymbolIdMap = robin_hood::unordered_flat_map<int32_t, std::string>;
 
 /**
  * @brief Convert a JSON object of string→int into a SymbolIdMap with uppercase
@@ -80,7 +81,7 @@ SymbolIdMap load_symbol_map(const std::string &filename) {
     throw std::runtime_error("❌ JSON root must be an object.");
   }
 
-  robin_hood::unordered_flat_map<std::string, int32_t> symbol_map;
+  SymbolIdMap symbol_map;
 
   for (const auto &[key, value] : j.items()) {
     if (!value.is_number_integer()) {
@@ -114,4 +115,30 @@ SymbolIdMap filter_symbol_map(const SymbolIdMap &full_map,
     }
   }
   return filtered_map;
+}
+
+
+ReverseSymbolIdMap make_reverse_symbol_map(const std::string &filename) {
+    std::ifstream in_file(filename);
+    if (!in_file) {
+      throw std::runtime_error("❌ Failed to open file: " + filename);
+    }
+
+    nlohmann::json j;
+    in_file >> j;
+
+    if (!j.is_object()) {
+      throw std::runtime_error("❌ JSON root must be an object.");
+    }
+
+    ReverseSymbolIdMap rsymbol_map;
+    for (const auto &[symbol, value] : j.items()) {
+      if (!value.is_number_integer()) {
+	throw std::runtime_error("❌ Invalid value type for key: " + symbol);
+      }
+      int32_t ikey = value.get<int32_t>();
+      rsymbol_map[ikey] = to_upper(symbol);
+    }
+
+    return rsymbol_map;
 }

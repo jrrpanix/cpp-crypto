@@ -1,4 +1,5 @@
 #include "binance/book_ticker/book_ticker.hpp"
+#include "binance/book_ticker/symbol_id_map.hpp"
 #include <cpr/cpr.h> // C++ Requests (https://github.com/libcpr/cpr)
 #include <cstring>
 #include <iostream>
@@ -8,6 +9,7 @@
 struct Args {
   bool sendweb = false;
   std::string endpoint_url = "http://webserver:8000/status";
+  std::string symbol_file = "/workspace/apps/config/binance/symbols.json";
 };
 
 Args parse_args(int argc, char **argv) {
@@ -18,10 +20,13 @@ Args parse_args(int argc, char **argv) {
       args.sendweb = true;
     } else if (arg == "--endpoint" && i + 1 < argc) {
       args.endpoint_url = argv[++i];
-    } else {
+    } else if (arg == "--symbol_file" && i + 1 < argc) {
+      args.symbol_file = argv[++i];
+    }
+    else {
       std::cerr << "❌ Unknown or malformed argument: " << arg << "\n";
       std::cerr << "✅ Usage: " << argv[0]
-                << " [--sendweb] [--endpoint http://host:port/status]\n";
+                << " [--sendweb] [--endpoint http://host:port/status] [--symbol_file /workspace/apps/config/binance/symbol_file.json]\n";
       exit(1);
     }
   }
@@ -55,7 +60,7 @@ void run_consumer(Args args) {
   socket.set(zmq::sockopt::subscribe, "");
 
   std::cout << "🟢 Consumer ready. Subscribed to tcp://producer:5555\n";
-
+  ReverseSymbolIdMap rmap = make_reverse_symbol_map(args.symbol_file);
   while (true) {
     zmq::message_t zmq_msg;
     auto result = socket.recv(zmq_msg, zmq::recv_flags::none);
@@ -63,8 +68,8 @@ void run_consumer(Args args) {
     if (result && *result == sizeof(BookTicker)) {
       BookTicker msg;
       memcpy(&msg, zmq_msg.data(), sizeof(BookTicker));
-
-      std::cout << "Symbol ID: " << msg.id << " | Bid: " << msg.bid_price
+      auto symbol = rmap[msg.id];
+      std::cout << "Symbol: " << symbol << "Symbol ID: " << msg.id << " | Bid: " << msg.bid_price
                 << " | Ask: " << msg.ask_price
                 << " | ts_recv: " << msg.my_receive_time_ns << std::endl;
       if (args.sendweb) {
