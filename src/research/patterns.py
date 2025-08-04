@@ -1,24 +1,45 @@
-def count_intervals(df, price_col='close', threshold=0.01, window=10):
+def count_intervals(df, price_col='close', threshold=0.01, window=10, non_overlapping=False, follow_window=1):
     """
     Counts the number of intervals where the price moves up or down by at least 'threshold' (as a fraction, e.g. 0.01 for 1%)
-    over a rolling window of N rows.
-    Returns: (up_count, down_count)
+    over a rolling window of N rows using Polars vectorized operations.
+    If non_overlapping=True, only non-overlapping intervals are counted.
+    Additionally, counts the number of times a positive interval is followed by another positive, and negative by another negative (follow_window).
+    Returns: (up_count, down_count, up_follow_count, down_follow_count)
     """
     if price_col not in df.columns:
         print(f"Column {price_col} not found in DataFrame.")
-        return 0, 0
-    prices = df[price_col].to_numpy()
-    up_count = 0
-    down_count = 0
-    for i in range(len(prices) - window):
-        start = prices[i]
-        end = prices[i + window]
-        change = (end - start) / start if start != 0 else 0
-        if change >= threshold:
-            up_count += 1
-        elif change <= -threshold:
-            down_count += 1
-    return up_count, down_count
+        return 0, 0, 0, 0
+    prices = df[price_col]
+    if non_overlapping:
+        # Only check every window-th row
+        idx = range(0, len(prices) - window, window)
+        start_prices = prices.take(idx)
+        end_prices = prices.shift(-window).take(idx)
+        pct_change = (end_prices - start_prices) / start_prices
+    else:
+        shifted = prices.shift(-window)
+        pct_change = (shifted - prices) / prices
+    up_mask = pct_change >= threshold
+    down_mask = pct_change <= -threshold
+    up_count = up_mask.sum()
+    down_count = down_mask.sum()
+    # For follow counts, check next interval after a positive/negative
+    up_follow_count = 0
+    down_follow_count = 0
+    up_idx = up_mask.to_numpy().nonzero()[0]
+    down_idx = down_mask.to_numpy().nonzero()[0]
+    # Convert indices to Python int for Polars indexing
+    for i in up_idx:
+        idx = int(i + follow_window)
+        if idx < len(pct_change):
+            if pct_change[idx] >= threshold:
+                up_follow_count += 1
+    for i in down_idx:
+        idx = int(i + follow_window)
+        if idx < len(pct_change):
+            if pct_change[idx] <= -threshold:
+                down_follow_count += 1
+    return up_count, down_count, up_follow_count, down_follow_count
 
 def summary(df):
     """
