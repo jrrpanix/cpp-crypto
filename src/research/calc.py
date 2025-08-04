@@ -2,18 +2,26 @@ from pl_loaders import load_all_parquet_files
 import polars as pl
 from datetime import datetime
 from patterns import count_intervals, summary
+import os
 
 def main():
     import sys
-    if len(sys.argv) < 2:
-        print("Usage: python calc.py <parquet_directory> [window] [threshold]")
+    if len(sys.argv) < 5:
+        print("Usage: python calc.py <parquet_directory> <symbol> <window> <threshold>")
         return
     parquet_dir = sys.argv[1]
-    window = int(sys.argv[2]) if len(sys.argv) > 2 else 5
-    threshold = float(sys.argv[3]) if len(sys.argv) > 3 else 0.05
-    df = load_all_parquet_files(parquet_dir)
+    symbol = sys.argv[2]
+    window = int(sys.argv[3])
+    threshold = float(sys.argv[4])
+    # Find the file for the symbol
+    files = [f for f in os.listdir(parquet_dir) if f.startswith(symbol) and f.endswith('.parquet')]
+    if not files:
+        print(f"No parquet file found for symbol {symbol} in {parquet_dir}")
+        return
+    parquet_file = os.path.join(parquet_dir, files[0])
+    df = pl.read_parquet(parquet_file)
     if df is None or df.height == 0:
-        print("No parquet files loaded.")
+        print("No parquet data loaded.")
         return
     stats = summary(df)
     up_count, down_count, up_follow_count, down_follow_count = count_intervals(df, "close", window=window, threshold=threshold)
