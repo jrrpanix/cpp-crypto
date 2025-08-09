@@ -67,6 +67,8 @@ def main():
         num_losers = (trade_df['profit'] < 0).sum()
         win_loss_ratio = num_winners / num_losers if num_losers > 0 else float('inf')
         avg_profit = total_profit_before_fees / num_trades if num_trades > 0 else 0.0
+        avg_profit_before_fees = total_profit_before_fees / num_trades if num_trades > 0 else 0.0
+        avg_profit_after_fees = total_profit_after_fees / num_trades if num_trades > 0 else 0.0
         def human_readable(n):
             if abs(n) >= 1e9:
                 return f"{n/1e9:.2f}B"
@@ -87,7 +89,8 @@ def main():
         print(f"Number of winners (profit > 0): {num_winners}")
         print(f"Number of losers (profit < 0): {num_losers}")
         print(f"Win/Loss ratio: {win_loss_ratio:.2f}")
-        print(f"Average profit per trade: {human_readable(avg_profit)}")
+        print(f"Average profit per trade before fees: {human_readable(avg_profit_before_fees)}")
+        print(f"Average profit per trade after fees: {human_readable(avg_profit_after_fees)}")
 
 if __name__ == "__main__":
     main()
