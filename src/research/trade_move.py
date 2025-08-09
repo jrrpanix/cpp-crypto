@@ -24,6 +24,33 @@ def symbol_trade_move(parquet_dir, symbol, window, threshold, holding_horizon, p
         trade_type=trade_type,
         dollar_amount=1000.0
     )
+    # If no trades, create empty summary with zeros
+    if trade_df.height == 0 or 'profit' not in trade_df.columns:
+        summary_dict = {
+            "summary_stats": stats,
+            "num_triggers": start_df.height,
+            "total_profit_before_fees": 0.0,
+            "total_transaction_fees": 0.0,
+            "total_profit_after_fees": 0.0,
+            "total_dollar_entry": 0.0,
+            "total_dollar_exit": 0.0,
+            "total_dollar_volume": 0.0,
+            "num_trades": 0,
+            "num_winners": 0,
+            "num_losers": 0,
+            "win_loss_ratio": 0.0,
+            "avg_profit_before_fees": 0.0,
+            "avg_profit_after_fees": 0.0,
+        }
+        # Ensure returned DataFrame has expected columns
+        expected_cols = [
+            'trigger_time', 'open_trade_time', 'entry_price', 'close_trade_time', 'close_trade_price',
+            'profit', 'direction', 'quantity', 'holding_horizon', 'entry_transaction_fee',
+            'exit_transaction_fee', 'dollar_amount_entry', 'dollar_amount_exit'
+        ]
+        trade_df = pl.DataFrame({col: [] for col in expected_cols})
+        return trade_df, summary_dict
+
     # Compute summary stats (raw numbers)
     total_profit_before_fees = trade_df['profit'].sum() if 'profit' in trade_df.columns else 0.0
     total_entry_fees = trade_df['entry_transaction_fee'].sum() if 'entry_transaction_fee' in trade_df.columns else 0.0
