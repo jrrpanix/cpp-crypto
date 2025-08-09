@@ -10,11 +10,12 @@ def trade_move(
     exit_price_type: str = "close",
     trade_type: str = "buy",
     dollar_amount: float = 1000.0,
+    transaction_cost: float = 0.005,
 ):
     """
     Simulate trades after each ending time in end_df, using the original kline df.
     Returns a clean DataFrame with columns:
-      ['trigger_time', 'open_trade_time', 'entry_price', 'close_trade_time', 'close_trade_price', 'profit', 'direction', 'quantity', 'holding_horizon']
+      ['trigger_time', 'open_trade_time', 'entry_price', 'close_trade_time', 'close_trade_price', 'profit', 'direction', 'quantity', 'holding_horizon', 'transaction_fee']
     """
     results = []
     n = len(df)
@@ -64,6 +65,12 @@ def trade_move(
         else:
             profit = dollar_amount * (entry_price - exit_price) / entry_price
             quantity = dollar_amount / entry_price
+        # Transaction fees
+        entry_transaction_fee = dollar_amount * transaction_cost
+        exit_transaction_fee = quantity * exit_price * transaction_cost
+        # Dollar amounts
+        dollar_amount_entry = dollar_amount
+        dollar_amount_exit = quantity * exit_price
         # Fix open_trade_time and close_trade_time to extract scalar if Series
         open_trade_time = entry_row['open_time']
         if hasattr(open_trade_time, 'item'):
@@ -80,6 +87,10 @@ def trade_move(
             'profit': float(profit),
             'direction': trade_type,
             'quantity': float(quantity),
-            'holding_horizon': holding_horizon
+            'holding_horizon': holding_horizon,
+            'entry_transaction_fee': float(entry_transaction_fee),
+            'exit_transaction_fee': float(exit_transaction_fee),
+            'dollar_amount_entry': float(dollar_amount_entry),
+            'dollar_amount_exit': float(dollar_amount_exit)
         })
     return pl.DataFrame(results)
