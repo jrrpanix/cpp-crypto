@@ -1,5 +1,61 @@
 import polars as pl
-from typing import List
+import os
+from moves import trigger
+from patterns import summary
+
+def symbol_trade_move(parquet_dir, symbol, window, threshold, holding_horizon, price_type):
+    files = [f for f in os.listdir(parquet_dir) if f.startswith(symbol) and f.endswith('.parquet')]
+    if not files:
+        raise FileNotFoundError(f"No parquet file found for symbol {symbol} in {parquet_dir}")
+    parquet_file = os.path.join(parquet_dir, files[0])
+    df = pl.read_parquet(parquet_file)
+    if df is None or df.height == 0:
+        raise ValueError("No parquet data loaded.")
+    stats = summary(df)
+    start_df, end_df = trigger(df, window, threshold)
+    from trade_move import trade_move
+    trade_type = "buy" if threshold > 0 else "sell"
+    trade_df = trade_move(
+        df, end_df,
+        window=window,
+        holding_horizon=holding_horizon,
+        entry_price_type=price_type,
+        exit_price_type=price_type,
+        trade_type=trade_type,
+        dollar_amount=1000.0
+    )
+    # Compute summary stats (raw numbers)
+    total_profit_before_fees = trade_df['profit'].sum() if 'profit' in trade_df.columns else 0.0
+    total_entry_fees = trade_df['entry_transaction_fee'].sum() if 'entry_transaction_fee' in trade_df.columns else 0.0
+    total_exit_fees = trade_df['exit_transaction_fee'].sum() if 'exit_transaction_fee' in trade_df.columns else 0.0
+    total_fees = total_entry_fees + total_exit_fees
+    total_profit_after_fees = total_profit_before_fees - total_fees
+    total_dollar_entry = trade_df['dollar_amount_entry'].sum() if 'dollar_amount_entry' in trade_df.columns else 0.0
+    total_dollar_exit = trade_df['dollar_amount_exit'].sum() if 'dollar_amount_exit' in trade_df.columns else 0.0
+    num_trades = trade_df.height
+    num_winners = (trade_df['profit'] > 0).sum()
+    num_losers = (trade_df['profit'] < 0).sum()
+    win_loss_ratio = num_winners / num_losers if num_losers > 0 else float('inf')
+    avg_profit_before_fees = total_profit_before_fees / num_trades if num_trades > 0 else 0.0
+    avg_profit_after_fees = total_profit_after_fees / num_trades if num_trades > 0 else 0.0
+    total_dollar_volume = total_dollar_entry + total_dollar_exit
+    summary_dict = {
+        "summary_stats": stats,
+        "num_triggers": start_df.height,
+        "total_profit_before_fees": total_profit_before_fees,
+        "total_transaction_fees": total_fees,
+        "total_profit_after_fees": total_profit_after_fees,
+        "total_dollar_entry": total_dollar_entry,
+        "total_dollar_exit": total_dollar_exit,
+        "total_dollar_volume": total_dollar_volume,
+        "num_trades": num_trades,
+        "num_winners": num_winners,
+        "num_losers": num_losers,
+        "win_loss_ratio": win_loss_ratio,
+        "avg_profit_before_fees": avg_profit_before_fees,
+        "avg_profit_after_fees": avg_profit_after_fees,
+    }
+    return trade_df, summary_dict
 
 def trade_move(
     df: pl.DataFrame,
@@ -10,7 +66,7 @@ def trade_move(
     exit_price_type: str = "close",
     trade_type: str = "buy",
     dollar_amount: float = 1000.0,
-    transaction_cost: float = 0.005,
+    transaction_cost: float = 0.0002,  # Binance maker fee as of Aug 2025
 ):
     """
     Simulate trades after each ending time in end_df, using the original kline df.
