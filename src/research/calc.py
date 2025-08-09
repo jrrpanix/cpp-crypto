@@ -1,7 +1,7 @@
 from pl_loaders import load_all_parquet_files
 import polars as pl
 from datetime import datetime
-from patterns import count_intervals, summary
+from patterns import count_intervals, summary, profit_from_pattern
 import os
 
 def main():
@@ -40,6 +40,10 @@ def main():
     print(f"Min price (low): {stats.get('min_price')} occurs on date {stats.get('min_price_date')}")
     print(f"Max price (high): {stats.get('max_price')} occurs on date {stats.get('max_price_date')}")
     print(f"Ending price: {stats.get('close_price')} occurs on date {stats.get('close_price_date')}")
+    # Calculate profit from pattern
+    profit, n_trades = profit_from_pattern(df, price_col="close", window=window, threshold=threshold, up_prob_threshold=0.7, investment=1000)
+    print(f"\nProfit simulation:")
+    print(f"Total profit from {n_trades} trades (window={window}, threshold={threshold*100:.2f}%, up_prob>0.7): ${profit:.2f}")
 
 if __name__ == "__main__":
     main()
