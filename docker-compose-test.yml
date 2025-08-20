@@ -23,17 +23,18 @@ services:
       - .:/workspace
     command: /workspace/apps/bin/mock_binance_main
 
+
   webserver:
     build:
-      context: ./server
-      dockerfile: ../docker/webserver/Dockerfile
+      context: .                          # repo root
+      dockerfile: docker/webserver/Dockerfile
     container_name: fastapi-server
     networks:
       - market-net
     volumes:
-      - ./server:/app
+      - ./server:/app                     # mount code where the Dockerfile expects it
     ports:
-      - "8000:8000"  # Expose FastAPI to host for testing (optional)
+      - "8000:8000"
 
 networks:
   market-net:

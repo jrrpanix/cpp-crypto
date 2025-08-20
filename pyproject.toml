@@ -9,7 +9,9 @@ dependencies = [
     "pandas",
     "matplotlib",
     "requests",
-    "rich"
+    "rich",
+    "fastapi",
+    "uvicorn[standard]"
 ]
 
 
