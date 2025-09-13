@@ -11,7 +11,11 @@ dependencies = [
     "requests",
     "rich",
     "fastapi",
-    "uvicorn[standard]"
+    "uvicorn[standard]",
+    "plotly>=6.3.0",
+    "kaleido>=1.0.0",
+    "mplfinance>=0.12.10b0",
+    "pyarrow>=21.0.0",
 ]
 
 
