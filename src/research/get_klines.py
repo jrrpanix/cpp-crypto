@@ -1,30 +1,8 @@
 import requests
 import os
-from datetime import datetime
 import time
+from datetime import datetime
 
-def download_kline_zip(symbol: str, interval: str, year: int, month: int, out_dir: str):
-    base_url = "https://data.binance.vision/data/futures/um/monthly/klines"
-    filename = f"{symbol}-{interval}-{year}-{month:02d}.zip"
-    url = f"{base_url}/{symbol}/{interval}/{filename}"
-    local_path = os.path.join(out_dir, filename)
-
-    os.makedirs(out_dir, exist_ok=True)
-    if os.path.exists(local_path):
-        print(f"✅ Already downloaded: {filename}")
-        return
-
-    print(f"⬇️ Downloading {filename}...")
-    try:
-        resp = requests.get(url, timeout=20)
-        if resp.status_code == 200:
-            with open(local_path, "wb") as f:
-                f.write(resp.content)
-            print(f"✅ Saved to {local_path}")
-        else:
-            print(f"❌ {filename}: HTTP {resp.status_code}")
-    except Exception as e:
-        print(f"⚠️ {filename}: {e}")
 
 def download_last_year(symbol="BTCUSDT", interval="1m", last="2025-07-01", N=3):
     now = datetime.strptime(last, "%Y-%m-%d")
@@ -64,6 +42,7 @@ def download_last_year(symbol="BTCUSDT", interval="1m", last="2025-07-01", N=3):
         except Exception as e:
             print(f"⚠️ {filename}: {e}")
 
+
 def download_all_last_year(symbols, interval="1m", last="2025-07-01", N=3, delay=1.5):
     """
     Download klines for all symbols, rate limiting requests to avoid Binance cutoff.
@@ -72,6 +51,7 @@ def download_all_last_year(symbols, interval="1m", last="2025-07-01", N=3, delay
         print(f"\n=== Downloading for {symbol} ===")
         download_last_year(symbol, interval, last, N)
         time.sleep(delay)  # Rate limit between requests
+
 
 def get_all_perpetual_symbols():
     """
@@ -83,11 +63,14 @@ def get_all_perpetual_symbols():
         resp = requests.get(url, timeout=20)
         resp.raise_for_status()
         data = resp.json()
-        symbols = [s['symbol'] for s in data['symbols'] if s.get('contractType') == 'PERPETUAL']
+        symbols = [
+            s["symbol"] for s in data["symbols"] if s.get("contractType") == "PERPETUAL"
+        ]
         return sorted(symbols)
     except Exception as e:
         print(f"⚠️ Error fetching perpetual symbols: {e}")
         return []
+
 
 if __name__ == "__main__":
     if os.path.exists("symbols.csv"):
@@ -99,8 +82,7 @@ if __name__ == "__main__":
             for symbol in symbols:
                 f.write(f"{symbol}\n")
     print(symbols)
-    #symbols = symbols[:4]  # Limit to first 10 for testing
-    #breakpoint()
+    # symbols = symbols[:4]  # Limit to first 10 for testing
+    # breakpoint()
     # Download klines for all perpetual symbols with rate limiting
     download_all_last_year(symbols, interval="1m", last="2025-07-01", N=13, delay=1.5)
-
