@@ -3,10 +3,19 @@ import os
 from moves import trigger
 from patterns import summary
 
-def symbol_trade_move(parquet_dir, symbol, window, threshold, holding_horizon, price_type):
-    files = [f for f in os.listdir(parquet_dir) if f.startswith(symbol) and f.endswith('.parquet')]
+
+def symbol_trade_move(
+    parquet_dir, symbol, window, threshold, holding_horizon, price_type
+):
+    files = [
+        f
+        for f in os.listdir(parquet_dir)
+        if f.startswith(symbol) and f.endswith(".parquet")
+    ]
     if not files:
-        raise FileNotFoundError(f"No parquet file found for symbol {symbol} in {parquet_dir}")
+        raise FileNotFoundError(
+            f"No parquet file found for symbol {symbol} in {parquet_dir}"
+        )
     parquet_file = os.path.join(parquet_dir, files[0])
     df = pl.read_parquet(parquet_file)
     if df is None or df.height == 0:
@@ -14,18 +23,20 @@ def symbol_trade_move(parquet_dir, symbol, window, threshold, holding_horizon, p
     stats = summary(df)
     start_df, end_df = trigger(df, window, threshold)
     from trade_move import trade_move
+
     trade_type = "buy" if threshold > 0 else "sell"
     trade_df = trade_move(
-        df, end_df,
+        df,
+        end_df,
         window=window,
         holding_horizon=holding_horizon,
         entry_price_type=price_type,
         exit_price_type=price_type,
         trade_type=trade_type,
-        dollar_amount=1000.0
+        dollar_amount=1000.0,
     )
     # If no trades, create empty summary with zeros
-    if trade_df.height == 0 or 'profit' not in trade_df.columns:
+    if trade_df.height == 0 or "profit" not in trade_df.columns:
         summary_dict = {
             "summary_stats": stats,
             "num_triggers": start_df.height,
@@ -44,27 +55,59 @@ def symbol_trade_move(parquet_dir, symbol, window, threshold, holding_horizon, p
         }
         # Ensure returned DataFrame has expected columns
         expected_cols = [
-            'trigger_time', 'open_trade_time', 'entry_price', 'close_trade_time', 'close_trade_price',
-            'profit', 'direction', 'quantity', 'holding_horizon', 'entry_transaction_fee',
-            'exit_transaction_fee', 'dollar_amount_entry', 'dollar_amount_exit'
+            "trigger_time",
+            "open_trade_time",
+            "entry_price",
+            "close_trade_time",
+            "close_trade_price",
+            "profit",
+            "direction",
+            "quantity",
+            "holding_horizon",
+            "entry_transaction_fee",
+            "exit_transaction_fee",
+            "dollar_amount_entry",
+            "dollar_amount_exit",
         ]
         trade_df = pl.DataFrame({col: [] for col in expected_cols})
         return trade_df, summary_dict
 
     # Compute summary stats (raw numbers)
-    total_profit_before_fees = trade_df['profit'].sum() if 'profit' in trade_df.columns else 0.0
-    total_entry_fees = trade_df['entry_transaction_fee'].sum() if 'entry_transaction_fee' in trade_df.columns else 0.0
-    total_exit_fees = trade_df['exit_transaction_fee'].sum() if 'exit_transaction_fee' in trade_df.columns else 0.0
+    total_profit_before_fees = (
+        trade_df["profit"].sum() if "profit" in trade_df.columns else 0.0
+    )
+    total_entry_fees = (
+        trade_df["entry_transaction_fee"].sum()
+        if "entry_transaction_fee" in trade_df.columns
+        else 0.0
+    )
+    total_exit_fees = (
+        trade_df["exit_transaction_fee"].sum()
+        if "exit_transaction_fee" in trade_df.columns
+        else 0.0
+    )
     total_fees = total_entry_fees + total_exit_fees
     total_profit_after_fees = total_profit_before_fees - total_fees
-    total_dollar_entry = trade_df['dollar_amount_entry'].sum() if 'dollar_amount_entry' in trade_df.columns else 0.0
-    total_dollar_exit = trade_df['dollar_amount_exit'].sum() if 'dollar_amount_exit' in trade_df.columns else 0.0
+    total_dollar_entry = (
+        trade_df["dollar_amount_entry"].sum()
+        if "dollar_amount_entry" in trade_df.columns
+        else 0.0
+    )
+    total_dollar_exit = (
+        trade_df["dollar_amount_exit"].sum()
+        if "dollar_amount_exit" in trade_df.columns
+        else 0.0
+    )
     num_trades = trade_df.height
-    num_winners = (trade_df['profit'] > 0).sum()
-    num_losers = (trade_df['profit'] < 0).sum()
-    win_loss_ratio = num_winners / num_losers if num_losers > 0 else float('inf')
-    avg_profit_before_fees = total_profit_before_fees / num_trades if num_trades > 0 else 0.0
-    avg_profit_after_fees = total_profit_after_fees / num_trades if num_trades > 0 else 0.0
+    num_winners = (trade_df["profit"] > 0).sum()
+    num_losers = (trade_df["profit"] < 0).sum()
+    win_loss_ratio = num_winners / num_losers if num_losers > 0 else float("inf")
+    avg_profit_before_fees = (
+        total_profit_before_fees / num_trades if num_trades > 0 else 0.0
+    )
+    avg_profit_after_fees = (
+        total_profit_after_fees / num_trades if num_trades > 0 else 0.0
+    )
     total_dollar_volume = total_dollar_entry + total_dollar_exit
     summary_dict = {
         "summary_stats": stats,
@@ -83,6 +126,7 @@ def symbol_trade_move(parquet_dir, symbol, window, threshold, holding_horizon, p
         "avg_profit_after_fees": avg_profit_after_fees,
     }
     return trade_df, summary_dict
+
 
 def trade_move(
     df: pl.DataFrame,
@@ -104,9 +148,9 @@ def trade_move(
     n = len(df)
     for i in range(end_df.height):
         # Find the index in df that matches the end_df row
-        if 'open_time' in df.columns and 'open_time' in end_df.columns:
-            end_time = end_df['open_time'][i]
-            entry_idx = int((df['open_time'] > end_time).arg_max())
+        if "open_time" in df.columns and "open_time" in end_df.columns:
+            end_time = end_df["open_time"][i]
+            entry_idx = int((df["open_time"] > end_time).arg_max())
         else:
             entry_idx = i + 1
         entry_idx_w = entry_idx + window - 1
@@ -117,30 +161,38 @@ def trade_move(
         exit_row = df[exit_idx]
         # Entry price
         if entry_price_type == "open":
-            entry_price = entry_row['open'].item()
+            entry_price = entry_row["open"].item()
         elif entry_price_type == "close":
-            entry_price = entry_row['close'].item()
+            entry_price = entry_row["close"].item()
         elif entry_price_type == "high":
-            entry_price = entry_row['high'].item()
+            entry_price = entry_row["high"].item()
         elif entry_price_type == "low":
-            entry_price = entry_row['low'].item()
+            entry_price = entry_row["low"].item()
         elif entry_price_type == "worst":
-            entry_price = entry_row['high'].item() if trade_type == "buy" else entry_row['low'].item()
+            entry_price = (
+                entry_row["high"].item()
+                if trade_type == "buy"
+                else entry_row["low"].item()
+            )
         else:
-            entry_price = entry_row['close'].item()
+            entry_price = entry_row["close"].item()
         # Exit price
         if exit_price_type == "open":
-            exit_price = exit_row['open'].item()
+            exit_price = exit_row["open"].item()
         elif exit_price_type == "close":
-            exit_price = exit_row['close'].item()
+            exit_price = exit_row["close"].item()
         elif exit_price_type == "high":
-            exit_price = exit_row['high'].item()
+            exit_price = exit_row["high"].item()
         elif exit_price_type == "low":
-            exit_price = exit_row['low'].item()
+            exit_price = exit_row["low"].item()
         elif exit_price_type == "worst":
-            exit_price = exit_row['low'].item() if trade_type == "buy" else exit_row['high'].item()
+            exit_price = (
+                exit_row["low"].item()
+                if trade_type == "buy"
+                else exit_row["high"].item()
+            )
         else:
-            exit_price = exit_row['close'].item()
+            exit_price = exit_row["close"].item()
         # Compute profit
         if trade_type == "buy":
             profit = dollar_amount * (exit_price - entry_price) / entry_price
@@ -155,25 +207,31 @@ def trade_move(
         dollar_amount_entry = dollar_amount
         dollar_amount_exit = quantity * exit_price
         # Fix open_trade_time and close_trade_time to extract scalar if Series
-        open_trade_time = entry_row['open_time']
-        if hasattr(open_trade_time, 'item'):
+        open_trade_time = entry_row["open_time"]
+        if hasattr(open_trade_time, "item"):
             open_trade_time = open_trade_time.item()
-        close_trade_time = exit_row['open_time']
-        if hasattr(close_trade_time, 'item'):
+        close_trade_time = exit_row["open_time"]
+        if hasattr(close_trade_time, "item"):
             close_trade_time = close_trade_time.item()
-        results.append({
-            'trigger_time': end_df['open_time'][i] if 'open_time' in end_df.columns else int(entry_idx),
-            'open_trade_time': open_trade_time,
-            'entry_price': float(entry_price),
-            'close_trade_time': close_trade_time,
-            'close_trade_price': float(exit_price),
-            'profit': float(profit),
-            'direction': trade_type,
-            'quantity': float(quantity),
-            'holding_horizon': holding_horizon,
-            'entry_transaction_fee': float(entry_transaction_fee),
-            'exit_transaction_fee': float(exit_transaction_fee),
-            'dollar_amount_entry': float(dollar_amount_entry),
-            'dollar_amount_exit': float(dollar_amount_exit)
-        })
+        results.append(
+            {
+                "trigger_time": (
+                    end_df["open_time"][i]
+                    if "open_time" in end_df.columns
+                    else int(entry_idx)
+                ),
+                "open_trade_time": open_trade_time,
+                "entry_price": float(entry_price),
+                "close_trade_time": close_trade_time,
+                "close_trade_price": float(exit_price),
+                "profit": float(profit),
+                "direction": trade_type,
+                "quantity": float(quantity),
+                "holding_horizon": holding_horizon,
+                "entry_transaction_fee": float(entry_transaction_fee),
+                "exit_transaction_fee": float(exit_transaction_fee),
+                "dollar_amount_entry": float(dollar_amount_entry),
+                "dollar_amount_exit": float(dollar_amount_exit),
+            }
+        )
     return pl.DataFrame(results)

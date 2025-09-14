@@ -1,5 +1,6 @@
 import polars as pl
 
+
 def trigger(df: pl.DataFrame, window: int, threshold: float, overlap: bool = False):
     """
     For each possible window in the kline DataFrame, find all places where
@@ -10,9 +11,9 @@ def trigger(df: pl.DataFrame, window: int, threshold: float, overlap: bool = Fal
       - start_df: rows where the window starts and the condition is met
       - end_df: rows where the window ends and the condition is met
     """
-    if 'close' not in df.columns:
+    if "close" not in df.columns:
         raise ValueError("DataFrame must have a 'close' column")
-    prices = df['close']
+    prices = df["close"]
     # Compute windowed returns
     begin_prices = prices[:-window]
     end_prices = prices[window:]

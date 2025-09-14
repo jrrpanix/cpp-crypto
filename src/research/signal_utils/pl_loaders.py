@@ -2,6 +2,7 @@ import polars as pl
 import os
 import sys
 
+
 def load_all_parquet_files(parquet_dir: str) -> pl.DataFrame:
     """
     Loads and concatenates all Parquet files from the given directory into a single Polars DataFrame.
@@ -26,10 +27,10 @@ def load_all_parquet_files(parquet_dir: str) -> pl.DataFrame:
     print(f"✅ Combined DataFrame shape: {df.shape}")
     return df
 
+
 if __name__ == "__main__":
     directory = sys.argv[1] if len(sys.argv) > 1 else "parquet"
     df = load_all_parquet_files(directory)
 
     # Preview
     print(df.head())
-
