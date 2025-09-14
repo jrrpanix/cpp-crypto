@@ -2,6 +2,7 @@ import zipfile
 import os
 import sys
 
+
 def print_zip_lines(zip_path: str, n: int = 10):
     """
     Opens a Binance .zip Kline file and prints the first `n` lines from the enclosed CSV.
@@ -11,7 +12,7 @@ def print_zip_lines(zip_path: str, n: int = 10):
         return
 
     try:
-        with zipfile.ZipFile(zip_path, 'r') as z:
+        with zipfile.ZipFile(zip_path, "r") as z:
             csv_name = z.namelist()[0]
             with z.open(csv_name) as f:
                 print(f"📄 Contents of {csv_name} in {os.path.basename(zip_path)}:")
@@ -21,6 +22,7 @@ def print_zip_lines(zip_path: str, n: int = 10):
                         break
     except Exception as e:
         print(f"⚠️ Error reading {zip_path}: {e}")
+
 
 if __name__ == "__main__":
     # Default values
@@ -36,4 +38,3 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print_zip_lines(zip_file, n_lines)
-

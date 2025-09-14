@@ -3,6 +3,7 @@ import os
 import sys
 import polars as pl
 
+
 def parse_kline_zip_to_parquet(zip_path: str, output_dir: str = "parquet"):
     if not os.path.exists(zip_path):
         print(f"❌ File not found: {zip_path}")
@@ -17,23 +18,27 @@ def parse_kline_zip_to_parquet(zip_path: str, output_dir: str = "parquet"):
         return
 
     try:
-        with zipfile.ZipFile(zip_path, 'r') as z:
+        with zipfile.ZipFile(zip_path, "r") as z:
             csv_name = z.namelist()[0]
             print(f"📄 Extracting {csv_name} from {os.path.basename(zip_path)}...")
             with z.open(csv_name) as f:
                 df = pl.read_csv(f, has_header=True)
-                df = df.with_columns([
-                    pl.col("open_time").cast(pl.Datetime("ms")),
-                    pl.col("close_time").cast(pl.Datetime("ms")),
-                ])
+                df = df.with_columns(
+                    [
+                        pl.col("open_time").cast(pl.Datetime("ms")),
+                        pl.col("close_time").cast(pl.Datetime("ms")),
+                    ]
+                )
         df.write_parquet(output_path)
         print(f"✅ Saved to {output_path}")
     except Exception as e:
         print(f"⚠️ Error processing {zip_path}: {e}")
 
+
 def parse_all_symbol_intervals(download_dir: str, output_dir: str = "parquet"):
     # Traverse download_dir/symbol/interval/*.zip
     import re
+
     os.makedirs(output_dir, exist_ok=True)
     for symbol in os.listdir(download_dir):
         symbol_path = os.path.join(download_dir, symbol)
@@ -43,7 +48,7 @@ def parse_all_symbol_intervals(download_dir: str, output_dir: str = "parquet"):
             interval_path = os.path.join(symbol_path, interval)
             if not os.path.isdir(interval_path):
                 continue
-            files = [f for f in os.listdir(interval_path) if f.endswith('.zip')]
+            files = [f for f in os.listdir(interval_path) if f.endswith(".zip")]
             if not files:
                 continue
             # Parse year/month from filename
@@ -60,18 +65,28 @@ def parse_all_symbol_intervals(download_dir: str, output_dir: str = "parquet"):
             for fname, year, month in fileinfos:
                 zip_path = os.path.join(interval_path, fname)
                 try:
-                    with zipfile.ZipFile(zip_path, 'r') as z:
+                    with zipfile.ZipFile(zip_path, "r") as z:
                         csv_name = z.namelist()[0]
                         print(f"📄 Extracting {csv_name} from {fname}...")
                         with z.open(csv_name) as f:
                             df = pl.read_csv(f, has_header=True)
-                            df = df.with_columns([
-                                pl.col("open_time").cast(pl.Datetime("ms")),
-                                pl.col("close_time").cast(pl.Datetime("ms")),
-                            ])
+                            df = df.with_columns(
+                                [
+                                    pl.col("open_time").cast(pl.Datetime("ms")),
+                                    pl.col("close_time").cast(pl.Datetime("ms")),
+                                ]
+                            )
                             # Cast all numeric columns except time columns to Float64
                             for col in df.columns:
-                                if col not in ["open_time", "close_time"] and df[col].dtype in [pl.Int64, pl.UInt64, pl.Float32, pl.Int32, pl.UInt32]:
+                                if col not in ["open_time", "close_time"] and df[
+                                    col
+                                ].dtype in [
+                                    pl.Int64,
+                                    pl.UInt64,
+                                    pl.Float32,
+                                    pl.Int32,
+                                    pl.UInt32,
+                                ]:
                                     df = df.with_columns([pl.col(col).cast(pl.Float64)])
                             dfs.append(df)
                 except Exception as e:
@@ -87,7 +102,8 @@ def parse_all_symbol_intervals(download_dir: str, output_dir: str = "parquet"):
                 else:
                     big_df.write_parquet(out_path)
                     print(f"✅ Saved {out_path} ({big_df.height} rows)")
-                #breakpoint()  # Optional: pause after each symbol/interval for debugging
+                # breakpoint()  # Optional: pause after each symbol/interval for debugging
+
 
 if __name__ == "__main__":
     # Usage: python parse_kline.py <download_dir> [parsed_dir]
@@ -100,4 +116,3 @@ if __name__ == "__main__":
         print(f"❌ Download directory not found: {download_dir}")
         sys.exit(1)
     parse_all_symbol_intervals(download_dir, parsed_dir)
-
