@@ -75,14 +75,16 @@ If you already have a historical dataset, use `get_latest_klines.py` to download
 
 ### Step 2: Process ZIPs and Update Parquet Files
 
-After downloading the raw `.zip` files (either via bootstrapping or incremental update), you must process them into the final Parquet format.
+After downloading the raw `.zip` files (either via bootstrapping or incremental update), you must process them into the final Parquet format. This script intelligently scans the download directory and updates any corresponding kline files with new monthly data.
 
 1.  **Run the update script:**
     ```sh
-    # Example: Process all downloaded ZIPs for BTCUSDT and append to its Parquet file
-    python src/research/data_utils/update_klines.py --symbol BTCUSDT
+    # Example: Process all downloaded ZIPs and append to their respective Parquet files
+    python src/research/data_utils/update_klines.py \
+        --kline-dir data/klines \
+        --download-dir data/downloads
     ```
-2.  **What it does:** The `update_klines.py` script scans the `data/downloads/<SYMBOL>/` directory for any `.zip` files, extracts the kline data, and efficiently appends it to the consolidated Parquet file located at `data/klines/<SYMBOL>/<INTERVAL>/<SYMBOL>.parquet`. You must run this for each symbol you have updated.
+2.  **What it does:** The script scans the `download-dir` for any `.zip` files, extracts the kline data, and efficiently appends it to the corresponding consolidated Parquet file in the `kline-dir`. It automatically handles file renaming to reflect the new date range.
 
 ---
 
