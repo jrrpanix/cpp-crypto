@@ -44,7 +44,7 @@ All development is done inside a Docker container. The `Makefile` provides a sim
 
 ## 📈 Data Workflow: Bootstrapping and Updating Kline Data
 
-The data workflow is a three-step process designed to efficiently build and maintain a local dataset of Binance kline data in Parquet format.
+This workflow details the process for building and maintaining a local dataset of **Binance Perpetual Futures** kline data in the efficient Parquet format. It does not handle spot data.
 
 ### Step 1 (Option A): Initial Data Bootstrap
 
@@ -52,11 +52,13 @@ If you are starting with an empty database, use the `bootstrap_klines.py` script
 
 1.  **Run the bootstrap script:**
     ```sh
-    # This will download the last 13 months of 1-minute kline data
-    # for all symbols found in symbols.csv (or all perpetuals if it doesn't exist).
+    # This will download the last 13 months of 1-minute kline data.
     python src/research/data_utils/bootstrap_klines.py
     ```
-2.  **What it does:** The script iterates through each symbol and downloads monthly kline data as `.zip` files into the `data/downloads/` directory. This can take a very long time and consume significant disk space.
+2.  **What it does:** The script downloads monthly kline data as `.zip` files into the `data/downloads/` directory.
+    - If a `symbols.csv` file exists in the root directory, it will download data for the symbols listed in that file.
+    - If `symbols.csv` does **not** exist, the script will automatically create it by querying the Binance API for a list of all currently tradeable perpetual futures contracts.
+    - This initial download can take a very long time and consume significant disk space.
 
 ### Step 1 (Option B): Incremental Monthly Update
 
