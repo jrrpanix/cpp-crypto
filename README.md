@@ -4,7 +4,7 @@ A high-performance C++/Python platform for real-time crypto data processing and 
 
 ---
 
-## 核心组件
+## Core Components
 
 - **Real-time Engine (C++):** A C++23-based application for consuming and processing high-frequency data from Binance. It uses a lock-free, multi-threaded design to minimize latency.
 - **Research & Data Utilities (Python):** A suite of Python scripts using libraries like Polars and Pandas for data acquisition, analysis, and signal generation.
