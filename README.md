@@ -1,141 +1,97 @@
-# 🚀 C++ Market Data Processor for Binance
+# 🚀 Crypto Trading & Research Platform
 
-This project is a **C++23-based framework** for consuming real-time market data from Binance (`bookTicker` stream). It's designed for **Linux environments via Docker**, with support for local development on macOS or cloud deployment.
-
----
-
-## 📦 Features
-
-* ✅ Binance Spot and Futures `bookTicker` stream support
-* ⚡ Optional ZeroMQ integration
-* 🐳 Docker-first development and deployment
-* 🧱 Modular CMake + Make build system
-* 📡 FastAPI webserver for receiving consumer metrics
+A high-performance C++/Python platform for real-time crypto data processing and quantitative research. This project is architected for a clean separation between a low-latency C++ core and a flexible Python research environment, all managed with Docker.
 
 ---
 
-## 🧰 Quick Start
+## 核心组件
+
+- **Real-time Engine (C++):** A C++23-based application for consuming and processing high-frequency data from Binance. It uses a lock-free, multi-threaded design to minimize latency.
+- **Research & Data Utilities (Python):** A suite of Python scripts using libraries like Polars and Pandas for data acquisition, analysis, and signal generation.
+
+---
+
+## 🛠️ Development Workflow
+
+All development is done inside a Docker container. The `Makefile` provides a simple interface for managing the environment.
+
+1.  **Build the development image:**
+    ```sh
+    make build-dev
+    ```
+
+2.  **Start the container in the background:**
+    ```sh
+    make run-dev
+    ```
+
+3.  **Get a shell inside the running container:**
+    ```sh
+    make shell-dev
+    ```
+
+4.  **Compile all C++ applications (inside the container):**
+    ```sh
+    make build-code
+    ```
+
+5.  **Stop the development container when finished:**
+    ```sh
+    make stop-dev
+    ```
+
+---
+
+## 📈 Data Workflow: Updating Monthly Klines
+
+The primary data workflow involves downloading monthly futures kline data from Binance and converting it into an efficient Parquet format.
+
+### Step 1: Download Monthly ZIP Files
+
+Use the `update_klines.py` script to download new data. Run this command from inside the development container.
 
 ```sh
-# Build and run the container
-make build
-make run
-
-# Inside the container
-make deps           # Install C++ dependencies
-make build_code     # Compile Binance engine
+# Example: Download BTC-USDT 1-minute data for August & September 2025
+python src/research/data_utils/update_klines.py --symbol BTCUSDT --year 2025 --months 8 9
 ```
 
----
+- The script downloads ZIP archives into the `data/downloads/` directory.
+- It automatically skips files that already exist.
 
-## 🛠️ Makefile Targets
+### Step 2: Update Parquet Files
 
-| Target       | Description                           |
-| ------------ | ------------------------------------- |
-| `help`       | Show list of available commands       |
-| `build`      | Build Docker container for full stack |
-| `run`        | Run the Docker container              |
-| `deps`       | Install dependencies inside container |
-| `build_code` | Build the Binance C++ engine          |
+After downloading the raw data, run the same script **without the `--months` argument** to process all downloaded ZIPs into consolidated Parquet files.
 
----
-
-## ⚙️ Configuration
-
-Edit the following file to control stream selection and symbols:
-
-```
-apps/config/binance/config.json
+```sh
+# Example: Process all downloaded files for BTC-USDT
+python src/research/data_utils/update_klines.py --symbol BTCUSDT --year 2025
 ```
 
-Use the `key` field to select the stream configuration (`fut`, `spot`, etc.).
-
----
-
-## 📚 Dependencies
-
-### C++
-
-| Library             | Purpose                                                   | Installation                                                                |
-| ------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------- |
-| **IXWebSocket**     | WebSocket client with TLS                                 | 🔧 Build from source ([GitHub](https://github.com/machinezone/IXWebSocket)) |
-| **simdjson**        | Ultra-fast SIMD JSON parsing                              | 🔧 Build from source ([GitHub](https://github.com/simdjson/simdjson))       |
-| **fast\_float**     | High-performance float parsing                            | 📄 Header-only ([GitHub](https://github.com/fastfloat/fast_float))          |
-| **nlohmann::json**  | Friendly JSON API for C++                                 | 📄 Header-only ([GitHub](https://github.com/nlohmann/json))                 |
-| **robin\_hood**     | High-performance hash map (faster than `unordered_map`)   | 📄 Header-only ([GitHub](https://github.com/martinus/robin-hood-hashing))   |
-| **moodycamel**      | Lock-free concurrent queue for low-latency pipelines      | 📄 Header-only ([GitHub](https://github.com/cameron314/concurrentqueue))    |
-| **ZeroMQ (libzmq)** | High-performance messaging library for inter-process comm | 📦 Installed in Docker (`apt-get install libzmq3-dev`)                      |
-| **cppzmq**          | Header-only C++ bindings for ZeroMQ                       | 📄 Header-only ([GitHub](https://github.com/zeromq/cppzmq))                 |
-| **CPR**             | Simple HTTP requests (C++ wrapper over libcurl)           | 🔧 Build from source ([GitHub](https://github.com/libcpr/cpr))              |
-| **libcurl**         | HTTP client backend used by CPR                           | 📦 Installed in Docker (`apt-get install libcurl4-openssl-dev`)             |
-| **OpenSSL**         | TLS support (`libssl`, `libcrypto`)                       | 📦 Installed in Docker                                                      |
-| **zlib**            | Compression library                                       | 📦 Installed in Docker                                                      |
-| **CMake**           | Cross-platform build system                               | 📦 Installed in Docker                                                      |
-| **g++ 11.4.0**      | C++23-compatible compiler                                 | 📦 Installed in Docker                                                      |
-
-### Python (FastAPI Webserver)
-
-| Package      | Purpose                          | Installation                                |
-| ------------ | -------------------------------- | ------------------------------------------- |
-| **FastAPI**  | Web framework for REST endpoints | Via `uv` and `pyproject.toml`               |
-| **Uvicorn**  | ASGI server for FastAPI          | `uv pip install --system uvicorn[standard]` |
-| **pydantic** | Data validation and parsing      | Included with FastAPI                       |
-
----
-
-## 🧩 Architecture
-
-```text
-+------------------+                    
-|  binance_main    |                    
-|------------------|                    
-| - WebSocket      |                    
-| - Parses bookTicker                  
-| - Push to queue  |                    
-+--------+---------+                    
-         |                              
-         v                              
-+--------------------------+     ZMQ PUB
-|  ZMQ Publisher Thread     |------------------------+
-|--------------------------|                        |
-| - Pull from queue        |                        v
-| - Send BookTicker structs|              +-------------------+
-+--------------------------+              |   Consumer(s)     |
-                                          |-------------------|
-                                          | - ZMQ SUB         |
-                                          | - POST to FastAPI |
-                                          +---------+---------+
-                                                    |
-                                                    v
-                                          +--------------------+
-                                          |     FastAPI        |
-                                          |--------------------|
-                                          | - Receives /status |
-                                          +--------------------+
-```
+- The script reads the ZIP files from `data/downloads/`, extracts the CSVs, and appends the data to the corresponding Parquet file in `data/klines/`.
 
 ---
 
 ## 📁 Project Layout
 
+The project is organized into distinct `realtime` and `research` components.
+
 ```plaintext
-/workspace
-├── apps/
-│   ├── bin/                  # Installed binaries (e.g., consumer_main)
-│   └── config/binance/       # JSON configs
+/
+├── Makefile                  # Main entrypoint for all build/run commands
+├── docker/                   # Dockerfiles and docker-compose configurations
+│   ├── Dockerfile.dev
+│   ├── Dockerfile.runtime
+│   └── docker-compose.yml
 ├── src/
-│   ├── binance/              # Binance logic
-│   └── common/               # Shared headers/utilities
-├── scripts/                  # Build and run scripts
-├── server/                   # FastAPI app and pyproject.toml
-├── docker/                   # Dockerfiles for each service
-│   ├── cpp-dev/
-│   ├── full-dev/
-│   ├── runtime/
-│   └── webserver/
-├── test_data/                # (Optional) for benchmarks or fixtures
-├── Makefile
-└── docker-compose.yml
+│   ├── realtime/             # C++ source for low-latency applications
+│   │   ├── binance/
+│   │   └── consumer/
+│   └── research/             # Python source for data analysis and utilities
+│       ├── data_utils/
+│       └── signal_utils/
+├── data/                     # (Git-ignored) Kline data, downloads, etc.
+├── apps/                     # (Git-ignored) Compiled C++ binaries
+└── pyproject.toml            # Python dependencies
 ```
 
 ---
