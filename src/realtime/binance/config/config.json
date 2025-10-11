@@ -1,0 +1,48 @@
+{
+  "spot": {
+    "endpoint": "wss://stream.binance.com:9443/ws",
+    "subs": [
+      "adausdt",
+      "avaxusdt",
+      "bnbusdt",
+      "btcusdt",
+      "dogeusdt",
+      "ethfiusdt",
+      "ethusdt",
+      "hyperusdt",
+      "linkusdt",
+      "shibusdt",
+      "solusdt",
+      "solvusdt",
+      "suiusdt",
+      "trxusdt",
+      "usdcusdt",
+      "wbtcusdt",
+      "xlmusdt",
+      "xrpusdt"
+    ]
+  },
+  "fut": {
+    "endpoint": "wss://fstream.binance.com/ws",
+    "subs": [
+      "adausdt",
+      "avaxusdt",
+      "bnbusdt",
+      "btcusdt",
+      "dogeusdt",
+      "ethfiusdt",
+      "ethusdt",
+      "hyperusdt",
+      "linkusdt",
+      "shibusdt",
+      "solusdt",
+      "solvusdt",
+      "suiusdt",
+      "trxusdt",
+      "usdcusdt",
+      "wbtcusdt",
+      "xlmusdt",
+      "xrpusdt"
+    ]
+  }
+}

@@ -1,58 +1,122 @@
-# Help: list all available make targets
+# ==============================================================================
+# Variables
+# ==============================================================================
+SHELL := /bin/bash
+
+# Docker image and container names
+DEV_IMAGE_NAME := cpp-crypto-dev
+DEV_CONTAINER_NAME := cpp-crypto-dev-container
+
+# Docker Compose file paths
+COMPOSE_DIR := docker
+COMPOSE_FILE := $(COMPOSE_DIR)/docker-compose.yml
+COMPOSE_FILE_TEST := $(COMPOSE_DIR)/docker-compose-test.yml
+COMPOSE_FILE_2C := $(COMPOSE_DIR)/docker-compose-2-consumers.yml
+
+# Use this to run commands inside the running dev container
+DOCKER_EXEC := docker exec -it $(DEV_CONTAINER_NAME)
+
+.PHONY: help build-dev run-dev shell-dev stop-dev deps build-code run-live rebuild-live stop-live run-test rebuild-test stop-test
+
+# ==============================================================================
+# Help Target
+# ==============================================================================
 help:
 	@echo ""
-	@echo "📦 Makefile Commands:"
+	@echo "📦 cpp-crypto Makefile"
+	@echo "------------------------------------------------------------------------------"
 	@echo ""
-	@echo "🛠️  Build + Run:"
-	@echo "  build          Build Docker image for development"
-	@echo "  run            Run the Docker development container"
-	@echo "  deps           Install C++ dependencies inside the container"
-	@echo "  build_code     Compile the Binance C++ engine"
+	@echo "--- Development Environment ---"
+	@echo "  make build-dev      Build the main development Docker image ($(DEV_IMAGE_NAME))"
+	@echo "  make run-dev        Run the development container in the background"
+	@echo "  make shell-dev      Get a shell inside the running development container"
+	@echo "  make stop-dev       Stop and remove the development container"
 	@echo ""
-	@echo "🐳 Docker Compose:"
-	@echo "  run_local      Start all services using docker-compose"
-	@echo "  rebuild_local  Rebuild and start all services"
-	@echo "  build_local    Rebuild docker images only (no run)"
-	@echo "  reset_local    Stop and remove all containers/networks"
-	@echo "  full_reset     Full clean: down + remove volumes + rebuild"
-	@echo "  run_test       run mock_server"
+	@echo "--- In-Container Build Commands ---"
+	@echo "  make deps           Install C++ third-party dependencies inside the dev container"
+	@echo "  make build-code     Compile all C++ applications inside the dev container"
+	@echo ""
+	@echo "--- Application Services (Live) ---"
+	@echo "  make run-live       Start all live services using docker-compose"
+	@echo "  make rebuild-live   Rebuild and start all live services"
+	@echo "  make stop-live      Stop all live services"
+	@echo ""
+	@echo "--- Application Services (Test) ---"
+	@echo "  make run-test       Start the mock/test services using docker-compose"
+	@echo "  make rebuild-test   Rebuild and start the mock/test services"
+	@echo "  make stop-test      Stop the mock/test services"
 	@echo ""
 
-# Build Docker image for full development environment (C++ + Python)
-build:
-	./scripts/build/docker_build.sh full
 
-# Run the full development container
-run:
-	./scripts/run/run_image.sh full
+# ==============================================================================
+# Development Environment
+# ==============================================================================
 
-# Install dependencies inside container
+# Build the main development image from our new Dockerfile.dev
+build-dev:
+	docker build -t $(DEV_IMAGE_NAME) -f $(COMPOSE_DIR)/Dockerfile.dev .
+
+# Run the development container, mounting the current directory
+run-dev:
+	docker run -d --rm \
+		-v .:/workspace \
+		--name $(DEV_CONTAINER_NAME) \
+		$(DEV_IMAGE_NAME) sleep infinity
+
+# Get a shell inside the running development container
+shell-dev:
+	$(DOCKER_EXEC) /bin/bash
+
+# Stop and remove the development container
+stop-dev:
+	docker stop $(DEV_CONTAINER_NAME)
+
+
+# ==============================================================================
+# In-Container Build Commands
+# ==============================================================================
+
+# Install C++ dependencies inside the container
 deps:
-	./scripts/install/deps_install.sh
+	$(DOCKER_EXEC) ./scripts/install/deps_install.sh
 
-# Build C++ engine
-build_code:
-	./scripts/build/binance_build.sh
-	./scripts/build/consumer_build.sh
+# Build all C++ applications inside the container
+build-code:
+	$(DOCKER_EXEC) ./scripts/build/binance_build.sh
+	$(DOCKER_EXEC) ./scripts/build/consumer_build.sh
 
-# Docker Compose Targets
-run_local:
-	docker-compose up
 
-rebuild_local:
-	docker-compose up --build
+# ==============================================================================
+# Application Services (Live)
+# ==============================================================================
 
-build_local:
-	docker-compose build
+# Run live services
+run-live:
+	docker-compose -f $(COMPOSE_FILE) up
 
-reset_local:
-	docker-compose down
+# Rebuild and run live services
+rebuild-live:
+	docker-compose -f $(COMPOSE_FILE) up --build
 
-full_reset:
-	docker-compose down --volumes --remove-orphans
-	docker-compose up --build
+# Stop live services
+stop-live:
+	docker-compose -f $(COMPOSE_FILE) down
 
-run_test:
-	docker-compose -f docker-compose-test.yml up --build
+
+# ==============================================================================
+# Application Services (Test)
+# ==============================================================================
+
+# Run test services (mock data)
+run-test:
+	docker-compose -f $(COMPOSE_FILE_TEST) up
+
+# Rebuild and run test services
+rebuild-test:
+	docker-compose -f $(COMPOSE_FILE_TEST) up --build
+
+# Stop test services
+stop-test:
+	docker-compose -f $(COMPOSE_FILE_TEST) down
 
 

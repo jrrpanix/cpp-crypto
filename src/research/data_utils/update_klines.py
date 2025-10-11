@@ -128,6 +128,8 @@ def update_klines(kline_dir: str, download_dir: str):
                         print(
                             f"  ✅ Successfully updated {kline_filename} -> {new_kline_filename}"
                         )
+                        # Update the map with the new filename for subsequent updates
+                        kline_files[download_symbol] = new_kline_filename
                         # --- END ---
 
                 except ValueError:

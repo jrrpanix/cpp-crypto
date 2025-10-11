@@ -30,3 +30,36 @@
 *.exe
 *.out
 *.app
+
+# Data files
+data/
+downloads/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# C++ build files
+/apps/bin/
+/apps/lib/
+/install/
+
+# Docker
+.dockerignore
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

@@ -16,6 +16,7 @@ dependencies = [
     "kaleido>=1.0.0",
     "mplfinance>=0.12.10b0",
     "pyarrow>=21.0.0",
+    "scipy>=1.16.2",
 ]
 
 

@@ -1,0 +1,47 @@
+# This is the production runtime Dockerfile for the cpp-crypto project.
+# It uses a multi-stage build to create a minimal final image.
+
+# --- Build Stage ---
+# We use the development Dockerfile as our builder to ensure a consistent
+# and reproducible build environment. This stage will contain all the
+# build tools, source code, and intermediate build artifacts.
+FROM cpp-crypto-dev:latest AS builder
+
+# Copy the entire project context into the builder
+COPY . /workspace
+WORKDIR /workspace
+
+# Install C++ dependencies (e.g., third_party libs) and build the C++ applications.
+# The final binaries will be installed to /workspace/install/
+RUN ./scripts/install/deps_install.sh
+RUN ./scripts/build/binance_build.sh
+RUN ./scripts/build/consumer_build.sh
+
+
+# --- Runtime Stage ---
+# This is the final, minimal image. It starts from a clean base and only
+# copies the necessary compiled binaries and runtime dependencies.
+FROM ubuntu:22.04
+
+# Install only essential runtime dependencies.
+# Note: libarrow and libparquet are not included here as we assume the
+# binaries that need them are statically linked or not used in this runtime.
+# If they are needed, they must be added here.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libssl3 \
+    libzmq3-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set a working directory for the application
+WORKDIR /app
+
+# Copy the compiled C++ binaries and any necessary configuration files
+# from the 'builder' stage to the final runtime image.
+COPY --from=builder /workspace/install/bin /app/bin
+COPY --from=builder /workspace/install/config /app/config
+
+# Example: Set a default command to run one of the consumers.
+# This should be adapted based on the desired runtime behavior.
+# CMD ["/app/bin/consumer_main"]
+CMD ["/bin/bash"]
