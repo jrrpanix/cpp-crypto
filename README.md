@@ -42,32 +42,47 @@ All development is done inside a Docker container. The `Makefile` provides a sim
 
 ---
 
-## 📈 Data Workflow: Updating Monthly Klines
+## 📈 Data Workflow: Bootstrapping and Updating Kline Data
 
-The primary data workflow involves downloading monthly futures kline data from Binance and converting it into an efficient Parquet format.
+The data workflow is a three-step process designed to efficiently build and maintain a local dataset of Binance kline data in Parquet format.
 
-### Step 1: Download Monthly ZIP Files
+### Step 1 (Option A): Initial Data Bootstrap
 
-Use the `update_klines.py` script to download new data. Run this command from inside the development container.
+If you are starting with an empty database, use the `bootstrap_klines.py` script to perform a large-scale historical data download.
 
-```sh
-# Example: Download BTC-USDT 1-minute data for August & September 2025
-python src/research/data_utils/update_klines.py --symbol BTCUSDT --year 2025 --months 8 9
-```
+1.  **Run the bootstrap script:**
+    ```sh
+    # This will download the last 13 months of 1-minute kline data
+    # for all symbols found in symbols.csv (or all perpetuals if it doesn't exist).
+    python src/research/data_utils/bootstrap_klines.py
+    ```
+2.  **What it does:** The script iterates through each symbol and downloads monthly kline data as `.zip` files into the `data/downloads/` directory. This can take a very long time and consume significant disk space.
 
-- The script downloads ZIP archives into the `data/downloads/` directory.
-- It automatically skips files that already exist.
+### Step 1 (Option B): Incremental Monthly Update
 
-### Step 2: Update Parquet Files
+If you already have a historical dataset, use `get_latest_klines.py` to download only the most recent monthly data.
 
-After downloading the raw data, run the same script **without the `--months` argument** to process all downloaded ZIPs into consolidated Parquet files.
+1.  **Run the download script:**
+    ```sh
+    # Example: Download October 2025 data for all symbols in symbols.csv
+    python src/research/data_utils/get_latest_klines.py \
+        --symbol-file symbols.csv \
+        --dest-dir data/downloads \
+        --year 2025 \
+        --month 10
+    ```
+2.  **What it does:** The script reads the specified symbol file and downloads the `.zip` archive for the given year and month into the destination directory, organized by symbol.
 
-```sh
-# Example: Process all downloaded files for BTC-USDT
-python src/research/data_utils/update_klines.py --symbol BTCUSDT --year 2025
-```
+### Step 2: Process ZIPs and Update Parquet Files
 
-- The script reads the ZIP files from `data/downloads/`, extracts the CSVs, and appends the data to the corresponding Parquet file in `data/klines/`.
+After downloading the raw `.zip` files (either via bootstrapping or incremental update), you must process them into the final Parquet format.
+
+1.  **Run the update script:**
+    ```sh
+    # Example: Process all downloaded ZIPs for BTCUSDT and append to its Parquet file
+    python src/research/data_utils/update_klines.py --symbol BTCUSDT
+    ```
+2.  **What it does:** The `update_klines.py` script scans the `data/downloads/<SYMBOL>/` directory for any `.zip` files, extracts the kline data, and efficiently appends it to the consolidated Parquet file located at `data/klines/<SYMBOL>/<INTERVAL>/<SYMBOL>.parquet`. You must run this for each symbol you have updated.
 
 ---
 
