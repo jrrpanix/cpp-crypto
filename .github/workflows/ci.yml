@@ -41,6 +41,13 @@ jobs:
     - name: Start development container
       run: make run-dev DEV_IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev:latest
 
+    - name: Verify Dependency Installation
+      run: |
+        echo "--- Verifying contents of /opt/cpp-crypto-deps/include ---"
+        docker exec cpp-crypto-dev-container ls -l /opt/cpp-crypto-deps/include
+        echo "--- Verifying contents of /opt/cpp-crypto-deps/lib ---"
+        docker exec cpp-crypto-dev-container ls -l /opt/cpp-crypto-deps/lib
+
     - name: Build code
       run: |
         docker exec cpp-crypto-dev-container bash -x ./scripts/build/binance_build.sh
