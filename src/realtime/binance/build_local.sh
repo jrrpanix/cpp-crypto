@@ -5,9 +5,10 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Create and enter build directory
-mkdir -p build
-cd build
+# Clean and create build directory
+rm -rf build_binance
+mkdir -p build_binance
+cd build_binance
 
 # Configure and build
 cmake .. \
