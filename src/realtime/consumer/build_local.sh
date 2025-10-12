@@ -11,7 +11,7 @@ mkdir -p build_consumer
 cd build_consumer
 
 # Configure and build
-cmake .. \
+cmake --trace-expand .. \
   -DCMAKE_PREFIX_PATH=/workspace/install \
   -DLOCAL_INCLUDE_DIR=/workspace/install/include \
   -DLOCAL_LIB_DIR=/workspace/install/lib \
