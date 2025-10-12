@@ -31,14 +31,14 @@ build_project() {
   cd "$THIRD_PARTY_DIR"
 }
 
+# Build simdjson
+build_project "simdjson" "https://github.com/simdjson/simdjson.git" ""
+
 # Build IXWebSocket (with TLS)
 build_project "IXWebSocket" "https://github.com/machinezone/IXWebSocket.git" "-DUSE_TLS=TRUE"
 
 # Build fast_float
 build_project "fast_float" "https://github.com/fastfloat/fast_float.git" ""
-
-# Build simdjson
-build_project "simdjson" "https://github.com/simdjson/simdjson.git" ""
 
 # Build CPR (HTTP client, depends on libcurl)
 build_project "cpr" "https://github.com/libcpr/cpr.git" "-DCPR_USE_SYSTEM_CURL=ON"
