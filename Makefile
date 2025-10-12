@@ -16,7 +16,7 @@ COMPOSE_FILE_2C := $(COMPOSE_DIR)/docker-compose-2-consumers.yml
 # Use this to run commands inside the running dev container
 DOCKER_EXEC := docker exec -it $(DEV_CONTAINER_NAME)
 
-.PHONY: help build-dev run-dev shell-dev stop-dev deps build-code run-live rebuild-live stop-live run-test rebuild-test stop-test
+.PHONY: help build-dev run-dev shell-dev stop-dev deps build-code run-live rebuild-live stop-live run-test rebuild-test stop-test test
 
 # ==============================================================================
 # Help Target
@@ -46,6 +46,8 @@ help:
 	@echo "  make rebuild-test   Rebuild and start the mock/test services"
 	@echo "  make stop-test      Stop the mock/test services"
 	@echo ""
+	@echo "--- Testing ---"
+	@echo "  make test           Run all C++ tests inside the container"
 
 
 # ==============================================================================
@@ -118,5 +120,13 @@ rebuild-test:
 # Stop test services
 stop-test:
 	docker-compose -f $(COMPOSE_FILE_TEST) down
+
+# ==============================================================================
+# Testing
+# ==============================================================================
+
+# Run all C++ tests inside the container
+test:
+	$(DOCKER_EXEC) ./scripts/run_tests.sh
 
 

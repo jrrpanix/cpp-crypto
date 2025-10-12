@@ -44,12 +44,14 @@ __pycache__/
 
 # Build artifacts
 build/
+**/build/
+**/build_binance/
+**/build_consumer/
 dist/
 *.egg-info/
 
 # C++ build files
-/apps/bin/
-/apps/lib/
+/apps/
 /install/
 
 # Docker
