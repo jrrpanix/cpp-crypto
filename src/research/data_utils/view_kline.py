@@ -1,6 +1,6 @@
-import zipfile
 import os
 import sys
+import zipfile
 
 
 def print_zip_lines(zip_path: str, n: int = 10):

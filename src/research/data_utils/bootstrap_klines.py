@@ -1,7 +1,8 @@
-import requests
 import os
 import time
 from datetime import datetime
+
+import requests
 
 
 def download_last_year(symbol="BTCUSDT", interval="1m", last="2025-07-01", N=3):
@@ -63,9 +64,7 @@ def get_all_perpetual_symbols():
         resp = requests.get(url, timeout=20)
         resp.raise_for_status()
         data = resp.json()
-        symbols = [
-            s["symbol"] for s in data["symbols"] if s.get("contractType") == "PERPETUAL"
-        ]
+        symbols = [s["symbol"] for s in data["symbols"] if s.get("contractType") == "PERPETUAL"]
         return sorted(symbols)
     except Exception as e:
         print(f"⚠️ Error fetching perpetual symbols: {e}")
@@ -74,7 +73,7 @@ def get_all_perpetual_symbols():
 
 if __name__ == "__main__":
     if os.path.exists("symbols.csv"):
-        with open("symbols.csv", "r") as f:
+        with open("symbols.csv") as f:
             symbols = [line.strip() for line in f if line.strip()]
     else:
         symbols = get_all_perpetual_symbols()

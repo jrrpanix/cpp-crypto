@@ -1,6 +1,8 @@
-import polars as pl
 import argparse
 import os
+
+import polars as pl
+
 
 def view_parquet_columns(file_path: str):
     """
@@ -24,6 +26,7 @@ def view_parquet_columns(file_path: str):
     except Exception as e:
         print(f"❌ An error occurred: {e}")
 
+
 def main():
     """
     Main function to parse arguments and run the viewer.
@@ -31,14 +34,11 @@ def main():
     parser = argparse.ArgumentParser(
         description="View the column names and types of a Parquet file."
     )
-    parser.add_argument(
-        "parquet_file",
-        type=str,
-        help="Path to the Parquet file."
-    )
+    parser.add_argument("parquet_file", type=str, help="Path to the Parquet file.")
     args = parser.parse_args()
 
     view_parquet_columns(args.parquet_file)
+
 
 if __name__ == "__main__":
     main()

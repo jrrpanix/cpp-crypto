@@ -1,6 +1,7 @@
-import polars as pl
 import os
 import sys
+
+import polars as pl
 
 
 def load_all_parquet_files(parquet_dir: str) -> pl.DataFrame:
@@ -11,9 +12,7 @@ def load_all_parquet_files(parquet_dir: str) -> pl.DataFrame:
         raise ValueError(f"❌ Not a valid directory: {parquet_dir}")
 
     files = [
-        os.path.join(parquet_dir, f)
-        for f in os.listdir(parquet_dir)
-        if f.endswith(".parquet")
+        os.path.join(parquet_dir, f) for f in os.listdir(parquet_dir) if f.endswith(".parquet")
     ]
 
     if not files:

@@ -1,6 +1,8 @@
-import polars as pl
 import argparse
 import os
+
+import polars as pl
+
 
 def demonstrate_patterns(file_path: str):
     """
@@ -26,25 +28,21 @@ def demonstrate_patterns(file_path: str):
             # 1. Simple Moving Average (SMA)
             # .rolling() creates a window over which to compute.
             pl.col("close").rolling_mean(window_size=10).alias("sma_10"),
-
             # 2. Exponential Moving Average (EMA / EWMA)
             # Polars has a built-in function for this.
             pl.col("close").ewm_mean(span=10).alias("ema_10"),
-
             # 3. Calculations depending on prior rows using .shift()
             # This calculates the daily change in price.
             (pl.col("close") - pl.col("close").shift(1)).alias("daily_change"),
-
             # 4. More complex custom rolling calculation
             # Example: Find the max "high" in a 5-day rolling window
             pl.col("high").rolling_max(window_size=5).alias("rolling_5d_high"),
-
             # 5. Conditional logic with pl.when().then().otherwise()
             # Flag rows where the close is above the 10-day SMA
             pl.when(pl.col("close") > pl.col("close").rolling_mean(window_size=10))
             .then(True)
             .otherwise(False)
-            .alias("is_above_sma_10")
+            .alias("is_above_sma_10"),
         )
 
         # --- Displaying Results ---
@@ -66,6 +64,7 @@ def demonstrate_patterns(file_path: str):
     except Exception as e:
         print(f"❌ An error occurred: {e}")
 
+
 def main():
     """
     Main function to parse arguments.
@@ -73,14 +72,11 @@ def main():
     parser = argparse.ArgumentParser(
         description="Demonstrate advanced pattern calculations in Polars."
     )
-    parser.add_argument(
-        "parquet_file",
-        type=str,
-        help="Path to the Parquet kline file."
-    )
+    parser.add_argument("parquet_file", type=str, help="Path to the Parquet kline file.")
     args = parser.parse_args()
 
     demonstrate_patterns(args.parquet_file)
+
 
 if __name__ == "__main__":
     main()

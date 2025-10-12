@@ -1,10 +1,10 @@
 import argparse
-import sys
-import os
-from datetime import datetime
-import polars as pl
-import zipfile
 import io
+import os
+import zipfile
+from datetime import datetime
+
+import polars as pl
 
 
 def update_klines(kline_dir: str, download_dir: str):
@@ -98,9 +98,7 @@ def update_klines(kline_dir: str, download_dir: str):
                             with z.open(csv_name) as f:
                                 # polars can't read directly from the zip stream, so read into bytes
                                 csv_bytes = f.read()
-                                new_df = pl.read_csv(
-                                    io.BytesIO(csv_bytes), has_header=True
-                                )
+                                new_df = pl.read_csv(io.BytesIO(csv_bytes), has_header=True)
 
                                 # Match the schema of new_df to existing_df before concatenating
                                 for col_name, col_type in existing_df.schema.items():
@@ -119,23 +117,17 @@ def update_klines(kline_dir: str, download_dir: str):
 
                         # --- SAVE NEW FILE AND DELETE OLD ONE ---
 
-                        new_kline_file_path = os.path.join(
-                            kline_dir, new_kline_filename
-                        )
+                        new_kline_file_path = os.path.join(kline_dir, new_kline_filename)
 
                         merged_df.write_parquet(new_kline_file_path)
                         os.remove(kline_file_path)
-                        print(
-                            f"  ✅ Successfully updated {kline_filename} -> {new_kline_filename}"
-                        )
+                        print(f"  ✅ Successfully updated {kline_filename} -> {new_kline_filename}")
                         # Update the map with the new filename for subsequent updates
                         kline_files[download_symbol] = new_kline_filename
                         # --- END ---
 
                 except ValueError:
-                    print(
-                        f"⚠️ Could not parse date for {download_symbol}. Skipping comparison."
-                    )
+                    print(f"⚠️ Could not parse date for {download_symbol}. Skipping comparison.")
             else:
                 print(f"⚠️ Could not parse kline filename: {kline_filename}")
 

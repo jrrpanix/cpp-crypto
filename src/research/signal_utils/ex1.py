@@ -1,7 +1,8 @@
-import sys
 import os
-from trade_move import symbol_trade_move
+import sys
+
 import polars as pl
+from trade_move import symbol_trade_move
 
 
 def main():

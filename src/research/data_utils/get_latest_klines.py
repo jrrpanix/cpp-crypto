@@ -1,5 +1,6 @@
-import requests
 import os
+
+import requests
 
 
 def get_all_perpetual_symbols():
@@ -12,9 +13,7 @@ def get_all_perpetual_symbols():
         resp = requests.get(url, timeout=20)
         resp.raise_for_status()
         data = resp.json()
-        symbols = [
-            s["symbol"] for s in data["symbols"] if s.get("contractType") == "PERPETUAL"
-        ]
+        symbols = [s["symbol"] for s in data["symbols"] if s.get("contractType") == "PERPETUAL"]
         return sorted(symbols)
     except Exception as e:
         print(f"⚠️ Error fetching perpetual symbols: {e}")
@@ -48,12 +47,10 @@ def download_kline(year, month, symbol, output_dir, dry_run=False):
 
 if __name__ == "__main__":
     import argparse
-    import sys
     import csv
+    import sys
 
-    parser = argparse.ArgumentParser(
-        description="Download monthly kline data from Binance."
-    )
+    parser = argparse.ArgumentParser(description="Download monthly kline data from Binance.")
     parser.add_argument("--year", type=int, help="Year to download (e.g., 2024).")
     parser.add_argument("--month", type=int, help="Month to download (e.g., 7).")
     parser.add_argument(
@@ -87,9 +84,7 @@ if __name__ == "__main__":
 
     # Check if the symbols file exists, create it if it doesn't
     if not os.path.exists(args.symbols_file):
-        print(
-            f"⏳ Symbols file not found at '{args.symbols_file}'. Fetching from Binance API..."
-        )
+        print(f"⏳ Symbols file not found at '{args.symbols_file}'. Fetching from Binance API...")
         symbols = get_all_perpetual_symbols()
         if symbols:
             # Ensure the directory for the symbols file exists
@@ -109,7 +104,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     # Read symbols from the file
-    with open(args.symbols_file, "r") as f:
+    with open(args.symbols_file) as f:
         reader = csv.reader(f)
         symbols = [row[0] for row in reader]
 

@@ -1,8 +1,9 @@
+
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import List
 
 router = APIRouter()
+
 
 class StatusMessage(BaseModel):
     id: int
@@ -11,8 +12,10 @@ class StatusMessage(BaseModel):
     timestamp_ns: int
     consumer_id: str
 
+
 # In-memory store of recent messages
-status_store: List[StatusMessage] = []
+status_store: list[StatusMessage] = []
+
 
 @router.post("/status")
 async def receive_status(msg: StatusMessage):
@@ -25,7 +28,7 @@ async def receive_status(msg: StatusMessage):
 
     return {"ok": True}
 
-@router.get("/status/latest", response_model=List[StatusMessage])
+
+@router.get("/status/latest", response_model=list[StatusMessage])
 async def get_latest_status():
     return status_store[-20:]  # Return last 20 for frontend
-

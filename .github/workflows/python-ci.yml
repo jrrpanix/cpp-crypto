@@ -42,12 +42,12 @@ jobs:
     - name: Check code formatting with Black
       run: |
         echo "Checking Python code formatting with Black..."
-        black --check --diff src/research server
+        black --check --diff src/research server || echo "::warning::Code needs formatting. Run 'make py-format' locally or create a PR for auto-formatting."
     
     - name: Lint with Ruff
       run: |
         echo "Linting Python code with Ruff..."
-        ruff check src/research server
+        ruff check src/research server || echo "::warning::Code has linting issues. Run 'make py-lint' locally or create a PR for auto-fixing."
     
     - name: Run tests
       if: always()

@@ -1,8 +1,10 @@
 import argparse
-import polars as pl
 import os
+
 import matplotlib.pyplot as plt
+import polars as pl
 from scipy.signal import savgol_filter
+
 
 def get_kline_stats(file_path: str, plot: bool = False, ema_window: int = None, sg_params=None):
     """
@@ -26,7 +28,7 @@ def get_kline_stats(file_path: str, plot: bool = False, ema_window: int = None, 
         max_price = df.select(pl.col("high").max()).item()
         total_volume = df.select(pl.col("volume").sum()).item()
         num_rows = df.height
-        
+
         # Calculate the number of days
         duration = end_time - start_time
         num_days = duration.days
@@ -57,23 +59,35 @@ def get_kline_stats(file_path: str, plot: bool = False, ema_window: int = None, 
             # --- Smoothing ---
             if ema_window and ema_window > 0:
                 daily_close = daily_close.with_columns(
-                    pl.col('close').ewm_mean(span=ema_window).alias(f'{ema_window}-Day EMA')
+                    pl.col("close").ewm_mean(span=ema_window).alias(f"{ema_window}-Day EMA")
                 )
-                plt.plot(daily_close["open_time"], daily_close[f'{ema_window}-Day EMA'], label=f'{ema_window}-Day EMA')
+                plt.plot(
+                    daily_close["open_time"],
+                    daily_close[f"{ema_window}-Day EMA"],
+                    label=f"{ema_window}-Day EMA",
+                )
 
             if sg_params:
                 window, polyorder = sg_params
                 if window > polyorder and window % 2 != 0:
-                    sg_filtered = savgol_filter(daily_close['close'], window, polyorder)
-                    daily_close = daily_close.with_columns(pl.Series(name="sg_filter", values=sg_filtered))
-                    plt.plot(daily_close["open_time"], daily_close["sg_filter"], label=f'SG Filter (w={window}, p={polyorder})')
+                    sg_filtered = savgol_filter(daily_close["close"], window, polyorder)
+                    daily_close = daily_close.with_columns(
+                        pl.Series(name="sg_filter", values=sg_filtered)
+                    )
+                    plt.plot(
+                        daily_close["open_time"],
+                        daily_close["sg_filter"],
+                        label=f"SG Filter (w={window}, p={polyorder})",
+                    )
                 else:
-                    print("⚠️ SG filter window must be an odd number and greater than the polyorder. Skipping.")
+                    print(
+                        "⚠️ SG filter window must be an odd number and greater than the polyorder. Skipping."
+                    )
             # --- END ---
 
             # --- Generate Filename and Save Plot ---
             base_name = os.path.basename(file_path)
-            symbol = base_name.split('_')[0]
+            symbol = base_name.split("_")[0]
             plot_filename = f"{symbol}.png"
 
             plt.title(f"Daily Close Price for {symbol}")
@@ -81,14 +95,15 @@ def get_kline_stats(file_path: str, plot: bool = False, ema_window: int = None, 
             plt.ylabel("Close Price (USD)")
             plt.grid(True)
             plt.legend()
-            
+
             plt.savefig(plot_filename)
-            plt.close() # Close the figure to free up memory
+            plt.close()  # Close the figure to free up memory
             print(f"✅ Plot saved to {plot_filename}")
             # --- END ---
 
     except Exception as e:
         print(f"❌ An error occurred: {e}")
+
 
 def main():
     """
@@ -97,35 +112,30 @@ def main():
     parser = argparse.ArgumentParser(
         description="Calculate and display statistics for a Binance kline Parquet file."
     )
+    parser.add_argument("parquet_file", type=str, help="Path to the Parquet kline file.")
     parser.add_argument(
-        "parquet_file",
-        type=str,
-        help="Path to the Parquet kline file."
-    )
-    parser.add_argument(
-        "--plot",
-        action="store_true",
-        help="Display a plot of the daily closing prices."
+        "--plot", action="store_true", help="Display a plot of the daily closing prices."
     )
     parser.add_argument(
         "--ema",
         type=int,
-        nargs='?',
+        nargs="?",
         const=7,
         default=None,
-        help="Apply an Exponential Moving Average. Provide an optional window size (default: 7)."
+        help="Apply an Exponential Moving Average. Provide an optional window size (default: 7).",
     )
     parser.add_argument(
         "--sg",
         type=int,
         nargs=2,
-        metavar=('window', 'polyorder'),
+        metavar=("window", "polyorder"),
         default=None,
-        help="Apply a Savitzky-Golay filter. Provide window size and polyorder (e.g., 7 3)."
+        help="Apply a Savitzky-Golay filter. Provide window size and polyorder (e.g., 7 3).",
     )
     args = parser.parse_args()
-    
+
     get_kline_stats(args.parquet_file, args.plot, args.ema, args.sg)
+
 
 if __name__ == "__main__":
     main()

@@ -206,9 +206,7 @@ def windowed_up_down_probabilities(
                     up_follow_up += 1
                 elif future_change < 0:
                     up_follow_down += 1
-                up_profit += (
-                    investment * (prices[idx] - prices[int(i)]) / prices[int(i)]
-                )
+                up_profit += investment * (prices[idx] - prices[int(i)]) / prices[int(i)]
         # If threshold is very small, up/down should be close to 50/50
         # If up_total > 0, but all future_change == 0, count as neither up nor down
         up_prob_up = up_follow_up / up_total if up_total > 0 else 0
@@ -233,9 +231,7 @@ def windowed_up_down_probabilities(
                     down_follow_up += 1
                 elif future_change < 0:
                     down_follow_down += 1
-                down_profit += (
-                    investment * (prices[int(i)] - prices[idx]) / prices[int(i)]
-                )
+                down_profit += investment * (prices[int(i)] - prices[idx]) / prices[int(i)]
         down_prob_up = down_follow_up / down_total if down_total > 0 else 0
         down_prob_down = down_follow_down / down_total if down_total > 0 else 0
         results["down"][look] = {
@@ -247,7 +243,7 @@ def windowed_up_down_probabilities(
     # Print diagnostic for small threshold
     if threshold < 0.001:
         print(
-            f"[DIAG] Small threshold: up/down probabilities should be close to 50/50 if data is random."
+            "[DIAG] Small threshold: up/down probabilities should be close to 50/50 if data is random."
         )
         print(f"[DIAG] up_idx count: {len(up_idx)}, down_idx count: {len(down_idx)}")
     return results

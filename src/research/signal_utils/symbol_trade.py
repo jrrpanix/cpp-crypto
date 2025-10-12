@@ -1,4 +1,5 @@
 import sys
+
 from trade_move import symbol_trade_move
 
 
@@ -43,9 +44,7 @@ def main():
     print(f"Total dollar trade volume (entry): {summary['total_dollar_entry']}")
     print(f"Total dollar trade volume (exit): {summary['total_dollar_exit']}")
     print(f"Total dollar trade volume (entry + exit): {summary['total_dollar_volume']}")
-    print(
-        f"Total profit before transaction costs: {summary['total_profit_before_fees']}"
-    )
+    print(f"Total profit before transaction costs: {summary['total_profit_before_fees']}")
     print(f"Total transaction fees: {summary['total_transaction_fees']}")
     print(f"Total profit after transaction costs: {summary['total_profit_after_fees']}")
     print(f"Number of trades: {summary['num_trades']}")

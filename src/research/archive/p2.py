@@ -1,10 +1,8 @@
-import polars as pl
 import sys
-import plotly.graph_objects as go
 
 import mplfinance as mpf
-
-
+import plotly.graph_objects as go
+import polars as pl
 
 fname = sys.argv[1]
 df = pl.read_parquet(fname)
@@ -12,7 +10,7 @@ df1 = df.clone()
 print(df)
 print(df.columns)
 
-time_diff = df['close_time'][0] - df['open_time'][0]
+time_diff = df["close_time"][0] - df["open_time"][0]
 print("Time differential (first row):", time_diff)
 
 
@@ -22,24 +20,25 @@ df = df.with_columns(
 )
 
 print(df)
-df_filtered = df.filter(
-    (pl.col("close_gt_prev") == True) & (pl.col("pattern_window") == True)
-)
+df_filtered = df.filter((pl.col("close_gt_prev") == True) & (pl.col("pattern_window") == True))
 print(df_filtered)
 
 pdf = df1
-fig = go.Figure(data=[go.Candlestick(
-    x=pdf["open_time"],
-    open=pdf["open"],
-    high=pdf["high"],
-    low=pdf["low"],
-    close=pdf["close"]
-)])
+fig = go.Figure(
+    data=[
+        go.Candlestick(
+            x=pdf["open_time"],
+            open=pdf["open"],
+            high=pdf["high"],
+            low=pdf["low"],
+            close=pdf["close"],
+        )
+    ]
+)
 
 fig.update_layout(title="Candlestick Chart", xaxis_rangeslider_visible=False)
-#fig.show()
-#fig.write_image("cs.png")
+# fig.show()
+# fig.write_image("cs.png")
 
 zdf = pdf.to_pandas().set_index("open_time")
 mpf.plot(zdf, type="line", style="charles", savefig="candlestick.png")
-
