@@ -55,6 +55,11 @@ RUN curl -Ls https://astral.sh/uv/install.sh | sh
 # uv installs to ~/.local/bin by default; add it to PATH
 ENV PATH="/root/.local/bin:${PATH}"
 
+# Step 5: Copy and install C++ dependencies
+COPY scripts/install/deps_install.sh /workspace/scripts/install/deps_install.sh
+RUN chmod +x /workspace/scripts/install/deps_install.sh && \
+    /workspace/scripts/install/deps_install.sh
+
 WORKDIR /workspace
 
 # Copy Python dependency definitions
