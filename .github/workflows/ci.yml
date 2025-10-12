@@ -32,9 +32,8 @@ jobs:
         push: true
         load: true
         tags: cpp-crypto-dev:latest
-        outputs: type=cacheonly
-        cache-from: type=ghcr,ref=ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev-cache:latest
-        cache-to: type=ghcr,ref=ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev-cache:latest,mode=max
+        cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev-cache:latest
+        cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev-cache:latest,mode=max
 
     - name: Start development container
       run: make run-dev
