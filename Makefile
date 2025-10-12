@@ -15,6 +15,7 @@ COMPOSE_FILE_2C := $(COMPOSE_DIR)/docker-compose-2-consumers.yml
 
 # Use this to run commands inside the running dev container
 DOCKER_EXEC := docker exec -it $(DEV_CONTAINER_NAME)
+DOCKER_EXEC_CI := docker exec $(DEV_CONTAINER_NAME)
 
 .PHONY: help build-dev run-dev shell-dev stop-dev deps build-code run-live rebuild-live stop-live run-test rebuild-test stop-test test
 
@@ -80,12 +81,12 @@ stop-dev:
 
 # Install C++ dependencies inside the container
 deps:
-	$(DOCKER_EXEC) ./scripts/install/deps_install.sh
+	$(DOCKER_EXEC_CI) ./scripts/install/deps_install.sh
 
 # Build all C++ applications inside the container
 build-code:
-	$(DOCKER_EXEC) ./scripts/build/binance_build.sh
-	$(DOCKER_EXEC) ./scripts/build/consumer_build.sh
+	$(DOCKER_EXEC_CI) ./scripts/build/binance_build.sh
+	$(DOCKER_EXEC_CI) ./scripts/build/consumer_build.sh
 
 
 # ==============================================================================
@@ -127,6 +128,6 @@ stop-test:
 
 # Run all C++ tests inside the container
 test:
-	$(DOCKER_EXEC) ./scripts/run_tests.sh
+	$(DOCKER_EXEC_CI) ./scripts/run_tests.sh
 
 
