@@ -29,9 +29,10 @@ jobs:
       with:
         context: .
         file: ./docker/Dockerfile.dev
-        push: false
+        push: true
         load: true
         tags: cpp-crypto-dev:latest
+        outputs: type=cacheonly
         cache-from: type=ghcr,ref=ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev-cache:latest
         cache-to: type=ghcr,ref=ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev-cache:latest,mode=max
 
