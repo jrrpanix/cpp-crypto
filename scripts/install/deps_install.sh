@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e  # Exit on error
 
-INSTALLDIR="/workspace/install"
+INSTALLDIR="/opt/cpp-crypto-deps"
 THIRD_PARTY_DIR="/workspace/third_party"
 
 # Create required directories

@@ -10,16 +10,12 @@ rm -rf build_binance
 mkdir -p build_binance
 cd build_binance
 
-# Configure and build
-cmake --trace-expand .. \
-  -DCMAKE_PREFIX_PATH=/workspace/install \
-  -DLOCAL_INCLUDE_DIR=/workspace/install/include \
-  -DLOCAL_LIB_DIR=/workspace/install/lib \
-  -DCMAKE_INSTALL_PREFIX=/workspace/apps \
-  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_CXX_COMPILER=/usr/bin/g++
+# Run cmake
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_PREFIX_PATH=/opt/cpp-crypto-deps
 
+# Build the project
 make -j"$(nproc)"
 make install
 
