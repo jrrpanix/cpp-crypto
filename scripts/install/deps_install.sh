@@ -89,10 +89,10 @@ else
 fi
 
 # Final check to see what was installed
-echo "--- Listing contents of installation directory ---"
-echo "--- Include directory ---"
+echo "--- Listing contents of installation directory: $INSTALLDIR ---"
+echo "--- Include directory ($INSTALLDIR/include): ---"
 ls -l $INSTALLDIR/include
-echo "--- Lib directory ---"
+echo "--- Lib directory ($INSTALLDIR/lib): ---"
 ls -l $INSTALLDIR/lib
 echo "-------------------------------------------------"
 
