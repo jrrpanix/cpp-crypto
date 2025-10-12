@@ -88,3 +88,11 @@ else
       -O "$CPPZMQ_HEADER"
 fi
 
+# Final check to see what was installed
+echo "--- Listing contents of installation directory ---"
+echo "--- Include directory ---"
+ls -l $INSTALLDIR/include
+echo "--- Lib directory ---"
+ls -l $INSTALLDIR/lib
+echo "-------------------------------------------------"
+
