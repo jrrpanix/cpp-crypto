@@ -6,16 +6,20 @@ set -e
 if [ -d "/opt/cpp-crypto-deps/bin/tests" ]; then
   TEST_DIR="/opt/cpp-crypto-deps/bin/tests"
   echo "Using CI test directory: $TEST_DIR"
+elif [ -d "/workspace/src/install/bin/tests" ]; then
+  TEST_DIR="/workspace/src/install/bin/tests"
+  echo "Using local src/install test directory: $TEST_DIR"
 elif [ -d "/workspace/install/bin/tests" ]; then
   TEST_DIR="/workspace/install/bin/tests"
-  echo "Using local test directory: $TEST_DIR"
+  echo "Using local install test directory: $TEST_DIR"
 elif [ -d "/workspace/apps/bin/tests" ]; then
   TEST_DIR="/workspace/apps/bin/tests"
   echo "Using legacy test directory: $TEST_DIR"
 else
   echo "Test directory not found in any expected location:"
   echo "  - /opt/cpp-crypto-deps/bin/tests (CI)"
-  echo "  - /workspace/install/bin/tests (local)"
+  echo "  - /workspace/src/install/bin/tests (local src/install)"
+  echo "  - /workspace/install/bin/tests (local install)"
   echo "  - /workspace/apps/bin/tests (legacy)"
   echo "Please ensure you have run 'make build-code' first."
   exit 1

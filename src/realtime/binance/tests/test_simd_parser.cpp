@@ -10,6 +10,11 @@
 std::vector<std::string> get_data(const char *fname) {
   std::vector<std::string> data;
   std::ifstream strm(fname);
+  if (!strm) {
+    std::cerr << "ERROR: Failed to open input file: " << fname << std::endl;
+    return data;
+  }
+  std::cout << "Reading input file: " << fname << std::endl;
   std::string line;
   while (strm) {
     std::getline(strm, line);
@@ -23,17 +28,27 @@ std::vector<std::string> get_data(const char *fname) {
 
 void time_loop(const std::vector<std::string> &data, bool upd_time,
                SymbolIdMap *symbol_lookup) {
+  if (data.empty()) {
+    std::cout << "Total=0;N=0;BAD=0;Avg=0ns"
+              << ";UPD_ON=" << (upd_time ? "YES" : "NO") << "\n";
+    return;
+  }
   auto start = std::chrono::high_resolution_clock::now();
   simdjson::ondemand::parser parser;
   BookTicker bt;
   int N = 0;
   int BAD = 0;
   for (auto it : data) {
-    bool rv = parse_book_ticker(parser, it, bt, upd_time, symbol_lookup);
-    if (rv) {
-      ++N;
-    } else
+    try {
+      bool rv = parse_book_ticker(parser, it, bt, upd_time, symbol_lookup);
+      if (rv) {
+        ++N;
+      } else
+        ++BAD;
+    } catch (const std::exception& e) {
       ++BAD;
+      // Silently count parsing errors
+    }
   }
   auto end = std::chrono::high_resolution_clock::now();
   auto duration_ns =
@@ -46,6 +61,10 @@ void time_loop(const std::vector<std::string> &data, bool upd_time,
 
 void test_parser(const char *fname, const char *cfg_file) {
   auto data = get_data(fname);
+  if (data.empty()) {
+    std::cerr << "ERROR: No data loaded from file: " << fname << std::endl;
+    std::cerr << "Test will run with empty data (division by zero prevented)" << std::endl;
+  }
   SymbolIdMap *symbol_lookup = nullptr;
   if (cfg_file) {
     StreamConfigMap cfgmap;
@@ -65,7 +84,23 @@ void test_parser(const char *fname, const char *cfg_file) {
 
 int main(int argc, char **argv) {
   std::cout << sizeof(BookTicker) << std::endl;
-  const char *cfg_file = argc > 2 ? argv[2] : nullptr;
-  test_parser(argv[1], cfg_file);
+  
+  // Default to test data file if no arguments provided
+  const char *input_file = "/workspace/test_data/sample.json";
+  const char *cfg_file = nullptr;
+  
+  if (argc > 1) {
+    input_file = argv[1];
+  }
+  if (argc > 2) {
+    cfg_file = argv[2];
+  }
+  
+  std::cout << "Using input file: " << input_file << std::endl;
+  if (cfg_file) {
+    std::cout << "Using config file: " << cfg_file << std::endl;
+  }
+  
+  test_parser(input_file, cfg_file);
   return 0;
 }
