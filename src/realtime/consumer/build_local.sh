@@ -1,21 +1,16 @@
 #!/bin/sh
 set -e
 
-# Ensure we're running from inside simd-d
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
-
 # Clean and create build directory
-rm -rf build_consumer
-mkdir -p build_consumer
-cd build_consumer
+rm -rf build
+mkdir -p build
+cd build
 
 # Run cmake
 cmake .. \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_PREFIX_PATH=/opt/cpp-crypto-deps
+    -DCMAKE_BUILD_TYPE=Release
 
 # Build the project
-make VERBOSE=1 -j"$(nproc)"
+make -j"$(nproc)"
 make install
 

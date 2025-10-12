@@ -9,17 +9,28 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Allow overriding via -D in CLI
-set(LOCAL_INCLUDE_DIR "${PROJECT_SRC_DIR}/install/include" CACHE PATH "Local include path")
-set(LOCAL_LIB_DIR "${PROJECT_SRC_DIR}/install/lib" CACHE PATH "Local lib path")
+# Enable verbose output to see full compiler commands
+set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Intelligently determine the dependency root directory
+# Use /opt/cpp-crypto-deps for CI, otherwise use project's install directory
+if(EXISTS "/opt/cpp-crypto-deps/include")
+    set(DEPS_ROOT "/opt/cpp-crypto-deps")
+    message(STATUS "Using CI dependencies: ${DEPS_ROOT}")
+else()
+    set(DEPS_ROOT "${PROJECT_SRC_DIR}/install")
+    message(STATUS "Using local dependencies: ${DEPS_ROOT}")
+endif()
+
+# Add the dependency directories to the search paths
+include_directories(${DEPS_ROOT}/include)
+link_directories(${DEPS_ROOT}/lib)
 
 # Include directories
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ../common/ # Common utilities
-    ../../../third_party/cpr/include
-    ../../../third_party/simdjson/include
-    ../../../third_party/IXWebSocket/src
 )
 
 # Add binance_main executable
@@ -28,9 +39,8 @@ target_include_directories(binance_main
   PRIVATE
   ${PROJECT_SRC_DIR}/src/realtime
   ${CMAKE_CURRENT_SOURCE_DIR}/book_ticker
-  ${LOCAL_INCLUDE_DIR}
 )
-target_link_directories(binance_main PRIVATE ${LOCAL_LIB_DIR})
+target_link_directories(binance_main PRIVATE ${DEPS_ROOT}/lib)
 target_compile_options(binance_main PRIVATE -O3 -march=native)
 target_link_libraries(binance_main
   PRIVATE
@@ -50,9 +60,8 @@ target_include_directories(mock_binance_main
   PRIVATE
   ${PROJECT_SRC_DIR}/src/realtime
   ${CMAKE_CURRENT_SOURCE_DIR}/book_ticker
-  ${LOCAL_INCLUDE_DIR}
 )
-target_link_directories(mock_binance_main PRIVATE ${LOCAL_LIB_DIR})
+target_link_directories(mock_binance_main PRIVATE ${DEPS_ROOT}/lib)
 target_compile_options(mock_binance_main PRIVATE -O3 -march=native)
 target_link_libraries(mock_binance_main
   PRIVATE
@@ -69,11 +78,10 @@ install(TARGETS mock_binance_main DESTINATION bin)
 
 # mock_producer
 add_executable(mock_producer_main mock_producer_main.cpp)
-target_link_directories(mock_producer_main PRIVATE ${LOCAL_LIB_DIR})
+target_link_directories(mock_producer_main PRIVATE ${DEPS_ROOT}/lib)
 target_include_directories(mock_producer_main
   PRIVATE
     ${PROJECT_SRC_DIR}/src/realtime
-    ${LOCAL_INCLUDE_DIR}
 )
 
 target_compile_options(mock_producer_main PRIVATE -O3 -march=native)
@@ -94,9 +102,8 @@ add_executable(parquet_reader parquet_reader.cpp)
 target_include_directories(parquet_reader
   PRIVATE
   ${PROJECT_SRC_DIR}/src/realtime
-  ${LOCAL_INCLUDE_DIR}
 )
-target_link_directories(parquet_reader PRIVATE ${LOCAL_LIB_DIR})
+target_link_directories(parquet_reader PRIVATE ${DEPS_ROOT}/lib)
 target_compile_options(parquet_reader PRIVATE -O3 -march=native)
 target_link_libraries(parquet_reader
   PRIVATE
@@ -126,10 +133,9 @@ foreach(TEST_SRC ${TEST_SOURCES})
         PRIVATE
             ${PROJECT_SRC_DIR}/src/realtime
             ${CMAKE_CURRENT_SOURCE_DIR}/book_ticker
-            ${LOCAL_INCLUDE_DIR}
     )
 
-    target_link_directories(${TEST_NAME} PRIVATE ${LOCAL_LIB_DIR})
+    target_link_directories(${TEST_NAME} PRIVATE ${DEPS_ROOT}/lib)
     target_compile_options(${TEST_NAME} PRIVATE -O3 -march=native)
 
     target_link_libraries(${TEST_NAME}
