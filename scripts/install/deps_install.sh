@@ -60,7 +60,7 @@ if [ -f "$ROBIN_HOOD_HEADER" ]; then
   echo "✅ robin_hood.h already exists, skipping download."
 else
   echo "📥 Downloading robin_hood.h..."
-  wget -q https://raw.githubusercontent.com/martinus/robin-hood-hashing/master/src/include/robin_hood.h \
+  wget https://raw.githubusercontent.com/martinus/robin-hood-hashing/master/src/include/robin_hood.h \
       -O "$ROBIN_HOOD_HEADER"
 fi
 
