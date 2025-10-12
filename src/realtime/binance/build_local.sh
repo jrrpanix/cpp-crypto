@@ -12,6 +12,7 @@ cd build_binance
 
 # Configure and build
 cmake .. \
+  -DCMAKE_PREFIX_PATH=/workspace/install \
   -DLOCAL_INCLUDE_DIR=/workspace/install/include \
   -DLOCAL_LIB_DIR=/workspace/install/lib \
   -DCMAKE_INSTALL_PREFIX=/workspace/apps \
