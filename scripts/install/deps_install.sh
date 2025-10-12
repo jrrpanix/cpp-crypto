@@ -43,10 +43,6 @@ build_project "simdjson" "https://github.com/simdjson/simdjson.git" ""
 # Build CPR (HTTP client, depends on libcurl)
 build_project "cpr" "https://github.com/libcpr/cpr.git" "-DCPR_USE_SYSTEM_CURL=ON"
 
-# Install robin_hood.h from third_party
-echo "🔧 Installing robin_hood.h..."
-cp -f "$THIRD_PARTY_DIR/robin_hood/robin_hood.h" "$INSTALLDIR/include/"
-
 # Install nlohmann/json single-header
 NLOHMANN_HEADER="$INSTALLDIR/include/nlohmann/json.hpp"
 if [ -f "$NLOHMANN_HEADER" ]; then
