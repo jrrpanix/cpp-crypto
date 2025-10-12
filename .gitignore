@@ -53,6 +53,7 @@ dist/
 # C++ build files
 /apps/
 /install/
+src/install/
 
 # Docker
 .dockerignore

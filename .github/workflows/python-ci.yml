@@ -1,0 +1,100 @@
+name: Python CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/research/**/*.py'
+      - 'server/**/*.py'
+      - 'pyproject.toml'
+      - '.github/workflows/python-ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/research/**/*.py'
+      - 'server/**/*.py'
+      - 'pyproject.toml'
+      - '.github/workflows/python-ci.yml'
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+    
+    - name: Install uv
+      run: |
+        curl -Ls https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+    
+    - name: Install dependencies
+      run: |
+        uv pip install --system -e ".[dev]"
+    
+    - name: Check code formatting with Black
+      run: |
+        echo "Checking Python code formatting with Black..."
+        black --check --diff src/research server
+    
+    - name: Lint with Ruff
+      run: |
+        echo "Linting Python code with Ruff..."
+        ruff check src/research server
+    
+    - name: Run tests
+      if: always()
+      run: |
+        echo "Running Python tests..."
+        if [ -d "src/research/tests" ] && [ "$(ls -A src/research/tests/test_*.py 2>/dev/null)" ]; then
+          pytest src/research/tests
+        else
+          echo "No tests found, skipping..."
+        fi
+  
+  auto-format:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: lint-and-format
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.head_ref }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Install uv
+      run: |
+        curl -Ls https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+    
+    - name: Install dependencies
+      run: |
+        uv pip install --system black ruff
+    
+    - name: Auto-format with Black
+      run: |
+        black src/research server
+    
+    - name: Auto-fix with Ruff
+      run: |
+        ruff check --fix src/research server || true
+    
+    - name: Commit changes
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: "style: auto-format Python code with Black and Ruff"
+        file_pattern: "src/research/**/*.py server/**/*.py"

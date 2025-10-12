@@ -25,7 +25,6 @@ dev = [
     "ruff>=0.6.0",
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
-    "pre-commit>=3.5.0",
 ]
 
 [tool.black]

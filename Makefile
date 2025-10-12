@@ -37,6 +37,13 @@ help:
 	@echo "  make deps           Install C++ third-party dependencies inside the dev container"
 	@echo "  make build-code     Compile all C++ applications inside the dev container"
 	@echo ""
+	@echo "--- Python Code Quality ---"
+	@echo "  make py-format      Format Python code with Black"
+	@echo "  make py-lint        Lint Python code with Ruff"
+	@echo "  make py-check       Check Python formatting and linting (no changes)"
+	@echo "  make py-test        Run Python tests"
+	@echo "  make py-all         Format, lint, and test Python code"
+	@echo ""
 	@echo "--- Application Services (Live) ---"
 	@echo "  make run-live       Start all live services using docker-compose"
 	@echo "  make rebuild-live   Rebuild and start all live services"
@@ -129,5 +136,40 @@ stop-test:
 # Run all C++ tests inside the container
 test:
 	$(DOCKER_EXEC_CI) ./scripts/run_tests.sh
+
+
+# ==============================================================================
+# Python Code Quality
+# ==============================================================================
+
+# Format Python code with Black
+py-format:
+	@echo "🎨 Formatting Python code with Black..."
+	$(DOCKER_EXEC_CI) black src/research server
+
+# Lint Python code with Ruff
+py-lint:
+	@echo "🔍 Linting Python code with Ruff..."
+	$(DOCKER_EXEC_CI) ruff check --fix src/research server
+
+# Check Python formatting and linting without making changes
+py-check:
+	@echo "✅ Checking Python code formatting..."
+	$(DOCKER_EXEC_CI) black --check src/research server
+	@echo "✅ Checking Python code linting..."
+	$(DOCKER_EXEC_CI) ruff check src/research server
+
+# Run Python tests
+py-test:
+	@echo "🧪 Running Python tests..."
+	@if $(DOCKER_EXEC_CI) bash -c "[ -d 'src/research/tests' ] && [ -n \"\$$(ls -A src/research/tests/test_*.py 2>/dev/null)\" ]"; then \
+		$(DOCKER_EXEC_CI) pytest src/research/tests; \
+	else \
+		echo "⚠️  No tests found in src/research/tests"; \
+	fi
+
+# Run all Python quality checks
+py-all: py-format py-lint py-test
+	@echo "✨ Python code quality checks complete!"
 
 
