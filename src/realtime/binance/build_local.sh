@@ -16,6 +16,6 @@ cmake .. \
     -DCMAKE_PREFIX_PATH=/opt/cpp-crypto-deps
 
 # Build the project
-make -j"$(nproc)"
+make VERBOSE=1 -j"$(nproc)"
 make install
 
