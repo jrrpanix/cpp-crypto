@@ -81,7 +81,7 @@ def detect_signals(
 
 
 def simulate_trades(
-    df: pl.DataFrame, hold_window: int, position_size: float
+    df: pl.DataFrame, hold_window: int, position_size: float, position_limit: int = 1
 ) -> tuple[pl.DataFrame, dict]:
     """
     Simulate trades based on up and down signals.
@@ -90,6 +90,7 @@ def simulate_trades(
         df: DataFrame with 'signal_up' and 'signal_down' columns
         hold_window: Number of periods to hold position
         position_size: Dollar amount to invest per trade
+        position_limit: Maximum number of concurrent positions allowed (both long and short combined)
 
     Returns:
         Tuple of (DataFrame with trade results, summary statistics dict)
@@ -105,6 +106,8 @@ def simulate_trades(
     if len(up_signal_indices) == 0 and len(down_signal_indices) == 0:
         return pl.DataFrame(), {
             "num_trades": 0,
+            "rejected_signals": 0,
+            "position_limit": position_limit,
             "trade_size": position_size,
             "max_long_exposure": 0.0,
             "max_short_exposure": 0.0,
@@ -127,6 +130,7 @@ def simulate_trades(
         }
 
     trades = []
+    rejected_signals = 0
     
     # Combine and sort all signals by index
     all_signals = []
@@ -138,7 +142,10 @@ def simulate_trades(
     # Sort by signal index (chronological order)
     all_signals.sort(key=lambda x: x[0])
     
-    # Process every signal - no overlap prevention
+    # Track open positions: list of (entry_idx, exit_idx) tuples
+    open_positions = []
+    
+    # Process every signal with position limit enforcement
     for signal_idx, direction in all_signals:
         # Entry: next bar after signal (signal_idx + 1)
         entry_idx = signal_idx + 1
@@ -148,6 +155,14 @@ def simulate_trades(
 
         # Check if we have enough data
         if exit_idx >= len(df):
+            continue
+
+        # Close any positions that have exited by this entry time
+        open_positions = [(e_idx, x_idx) for e_idx, x_idx in open_positions if x_idx > entry_idx]
+        
+        # Check position limit - reject trade if at limit
+        if len(open_positions) >= position_limit:
+            rejected_signals += 1
             continue
 
         # Get entry and exit prices
@@ -165,6 +180,9 @@ def simulate_trades(
             # Calculate profit for short trade (sell high, buy low)
             profit_pct = (entry_price / exit_price) - 1
             profit_dollars = position_size * profit_pct
+
+        # Add to open positions
+        open_positions.append((entry_idx, exit_idx))
 
         trades.append(
             {
@@ -185,6 +203,8 @@ def simulate_trades(
     if not trades:
         return pl.DataFrame(), {
             "num_trades": 0,
+            "rejected_signals": rejected_signals,
+            "position_limit": position_limit,
             "trade_size": position_size,
             "max_long_exposure": 0.0,
             "max_short_exposure": 0.0,
@@ -346,6 +366,8 @@ def simulate_trades(
 
     summary = {
         "num_trades": num_trades,
+        "rejected_signals": rejected_signals,
+        "position_limit": position_limit,
         "trade_size": position_size,
         "max_long_exposure": max_long_exposure,
         "max_short_exposure": max_short_exposure,
@@ -424,6 +446,7 @@ def run_simulation(
     detection_window: int,
     hold_window: int,
     position_size: float,
+    position_limit: int = 1,
     verbose: bool = True,
 ) -> tuple[pl.DataFrame, dict]:
     """
@@ -436,6 +459,7 @@ def run_simulation(
         detection_window: Number of periods to detect signal over
         hold_window: Number of periods to hold position
         position_size: Dollar amount to invest per trade
+        position_limit: Maximum number of concurrent positions allowed (default: 1)
         verbose: Print results if True
 
     Returns:
@@ -451,7 +475,7 @@ def run_simulation(
     df = detect_signals(df, up_threshold, down_threshold, detection_window)
 
     # Simulate trades
-    trades_df, summary = simulate_trades(df, hold_window, position_size)
+    trades_df, summary = simulate_trades(df, hold_window, position_size, position_limit)
 
     # Create cumulative PnL plot if we have trades
     if len(trades_df) > 0:
@@ -472,10 +496,12 @@ def run_simulation(
         print(f"  Detection window: {detection_window} periods")
         print(f"  Hold window: {hold_window} periods")
         print(f"  Position size: ${position_size:,.2f}")
+        print(f"  Position limit: {summary['position_limit']} concurrent trades (max exposure: ${summary['position_limit'] * position_size:,.2f})")
         print(f"\nSignals Detected:")
         print(f"  UP signals: {num_up_signals}")
         print(f"  DOWN signals: {num_down_signals}")
         print(f"  Total signals: {num_up_signals + num_down_signals}")
+        print(f"  Rejected (at limit): {summary['rejected_signals']}")
         print(f"\nTrades Executed:")
         print(f"  Date range: {summary['date_range']}")
         print(f"  Number of days: {summary['num_days']}")
@@ -509,14 +535,17 @@ def main():
         epilog="""
 Examples:
   # 1% up threshold, -1% down threshold, 5-period detection, 5-period hold, $1000 position
-  python window_sim.py data.parquet 0.01 -0.01 5 5 1000
+  python window_sim.py BTC 0.01 -0.01 5 5 1000
+
+  # Full path still works
+  python window_sim.py /full/path/to/data.parquet 0.01 -0.01 5 5 1000
 
   # Save trades to CSV
-  python window_sim.py data.parquet 0.01 -0.01 5 5 1000 --output trades.csv
+  python window_sim.py ETH 0.01 -0.01 5 5 1000 --output trades.csv
         """,
     )
 
-    parser.add_argument("parquet_file", help="Path to parquet file with kline data")
+    parser.add_argument("symbol", help="Symbol (e.g., BTC, ETH) or full path to parquet file")
     parser.add_argument(
         "up_threshold", type=float, help="Minimum price increase to trigger buy (e.g., 0.01 for 1%)"
     )
@@ -535,6 +564,13 @@ Examples:
         "position_size", type=float, help="Dollar amount to invest per trade"
     )
     parser.add_argument(
+        "--position-limit",
+        "-p",
+        type=int,
+        default=1,
+        help="Maximum number of concurrent positions allowed (default: 1)",
+    )
+    parser.add_argument(
         "--output",
         "-o",
         help="Save trades to CSV file",
@@ -545,9 +581,40 @@ Examples:
         action="store_true",
         help="Suppress output",
     )
+    parser.add_argument(
+        "--data-dir",
+        default="/workspace/data/klines",
+        help="Directory containing parquet files (default: /workspace/data/klines)",
+    )
+    parser.add_argument(
+        "--suffix",
+        default="USDT",
+        help="Suffix to append to symbol (default: USDT)",
+    )
 
     args = parser.parse_args()
 
+    # Construct full path if symbol provided instead of full path
+    if args.symbol.endswith('.parquet'):
+        # Full path provided
+        parquet_file = args.symbol
+    else:
+        # Symbol provided - construct path
+        # Look for files matching pattern: {SYMBOL}{SUFFIX}_1m_*.parquet
+        data_dir = Path(args.data_dir)
+        symbol_with_suffix = f"{args.symbol}{args.suffix}"
+        matching_files = list(data_dir.glob(f"{symbol_with_suffix}_1m_*.parquet"))
+        
+        if not matching_files:
+            parser.error(f"No files found matching pattern: {symbol_with_suffix}_1m_*.parquet in {data_dir}")
+        elif len(matching_files) > 1:
+            # Use the most recent file (by filename, which includes date range)
+            matching_files.sort()
+            parquet_file = str(matching_files[-1])
+            print(f"Multiple files found, using most recent: {parquet_file}")
+        else:
+            parquet_file = str(matching_files[0])
+    
     # Validate inputs
     if args.up_threshold <= 0:
         parser.error("Up threshold must be positive")
@@ -559,17 +626,20 @@ Examples:
         parser.error("Hold window must be at least 1")
     if args.position_size <= 0:
         parser.error("Position size must be positive")
-    if not Path(args.parquet_file).exists():
-        parser.error(f"File not found: {args.parquet_file}")
+    if args.position_limit < 1:
+        parser.error("Position limit must be at least 1")
+    if not Path(parquet_file).exists():
+        parser.error(f"File not found: {parquet_file}")
 
     # Run simulation
     trades_df, summary = run_simulation(
-        args.parquet_file,
+        parquet_file,
         args.up_threshold,
         args.down_threshold,
         args.detection_window,
         args.hold_window,
         args.position_size,
+        args.position_limit,
         verbose=not args.quiet,
     )
 
