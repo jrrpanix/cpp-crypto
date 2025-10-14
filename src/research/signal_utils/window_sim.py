@@ -81,7 +81,7 @@ def detect_signals(
 
 
 def simulate_trades(
-    df: pl.DataFrame, hold_window: int, position_size: float, position_limit: int = 1
+    df: pl.DataFrame, hold_window: int, position_size: float, position_limit: int = 1, fee_rate: float = 0.001, num_accounts: int = 1
 ) -> tuple[pl.DataFrame, dict]:
     """
     Simulate trades based on up and down signals.
@@ -91,6 +91,8 @@ def simulate_trades(
         hold_window: Number of periods to hold position
         position_size: Dollar amount to invest per trade
         position_limit: Maximum number of concurrent positions allowed (both long and short combined)
+        fee_rate: Transaction fee rate applied to both entry and exit (default: 0.001 = 0.1%)
+        num_accounts: Number of accounts (1=single account with position reversal, 2=separate long/short accounts)
 
     Returns:
         Tuple of (DataFrame with trade results, summary statistics dict)
@@ -106,19 +108,30 @@ def simulate_trades(
     if len(up_signal_indices) == 0 and len(down_signal_indices) == 0:
         return pl.DataFrame(), {
             "num_trades": 0,
-            "rejected_signals": 0,
+            "rejected_up_signals": 0,
+            "rejected_down_signals": 0,
             "position_limit": position_limit,
+            "num_accounts": num_accounts,
+            "fee_rate": fee_rate,
+            "total_fees": 0.0,
             "trade_size": position_size,
             "max_long_exposure": 0.0,
             "max_short_exposure": 0.0,
             "num_up_trades": 0,
             "num_down_trades": 0,
-            "up_profit": 0.0,
-            "down_profit": 0.0,
-            "total_profit": 0.0,
-            "total_profit_pct": 0.0,
-            "total_roi": 0.0,
-            "avg_profit": 0.0,
+            "gross_up_profit": 0.0,
+            "up_fees": 0.0,
+            "net_up_profit": 0.0,
+            "gross_down_profit": 0.0,
+            "down_fees": 0.0,
+            "net_down_profit": 0.0,
+            "gross_profit": 0.0,
+            "net_profit": 0.0,
+            "gross_profit_pct": 0.0,
+            "net_profit_pct": 0.0,
+            "gross_roi": 0.0,
+            "net_roi": 0.0,
+            "avg_net_profit": 0.0,
             "avg_profit_pct": 0.0,
             "win_rate": 0.0,
             "num_winners": 0,
@@ -130,7 +143,8 @@ def simulate_trades(
         }
 
     trades = []
-    rejected_signals = 0
+    rejected_up_signals = 0
+    rejected_down_signals = 0
     
     # Combine and sort all signals by index
     all_signals = []
@@ -142,8 +156,17 @@ def simulate_trades(
     # Sort by signal index (chronological order)
     all_signals.sort(key=lambda x: x[0])
     
-    # Track open positions: list of (entry_idx, exit_idx) tuples
-    open_positions = []
+    # Track open positions differently based on num_accounts
+    if num_accounts == 1:
+        # Single account: track net position (long=positive, short=negative)
+        # List of (entry_idx, exit_idx, direction, entry_time, exit_time)
+        open_positions = []
+    else:
+        # Multiple accounts: track long and short separately
+        # List of (entry_idx, exit_idx, direction)
+        open_positions = []
+    
+    max_concurrent_positions = 0
     
     # Process every signal with position limit enforcement
     for signal_idx, direction in all_signals:
@@ -157,13 +180,84 @@ def simulate_trades(
         if exit_idx >= len(df):
             continue
 
-        # Close any positions that have exited by this entry time
-        open_positions = [(e_idx, x_idx) for e_idx, x_idx in open_positions if x_idx > entry_idx]
-        
-        # Check position limit - reject trade if at limit
-        if len(open_positions) >= position_limit:
-            rejected_signals += 1
-            continue
+        if num_accounts == 1:
+            # Single account logic: close opposite positions and reverse
+            # Remove positions that have already exited
+            open_positions = [(e_idx, x_idx, d, e_time, x_time) for e_idx, x_idx, d, e_time, x_time in open_positions if x_idx > entry_idx]
+            
+            # Check if we have opposite direction positions
+            opposite_direction = "DOWN" if direction == "UP" else "UP"
+            opposite_positions = [p for p in open_positions if p[2] == opposite_direction]
+            same_direction_positions = [p for p in open_positions if p[2] == direction]
+            
+            if opposite_positions:
+                # Close opposite positions and reverse
+                for opp_entry_idx, opp_exit_idx, opp_dir, opp_entry_time, opp_exit_time in opposite_positions:
+                    # Close the opposite position early at this entry_idx
+                    entry_row = df.row(entry_idx, named=True)
+                    early_exit_price = entry_row["open"]
+                    
+                    # Get original entry price
+                    opp_entry_row = df.row(opp_entry_idx, named=True)
+                    opp_entry_price = opp_entry_row["open"]
+                    
+                    # Calculate fees for early exit
+                    entry_fee = position_size * fee_rate
+                    exit_fee = position_size * fee_rate
+                    total_fees = entry_fee + exit_fee
+                    
+                    if opp_dir == "UP":
+                        profit_pct = (early_exit_price / opp_entry_price) - 1
+                        gross_profit_dollars = position_size * profit_pct
+                        net_profit_dollars = gross_profit_dollars - total_fees
+                        net_profit_pct = net_profit_dollars / position_size
+                    else:  # DOWN
+                        profit_pct = (opp_entry_price / early_exit_price) - 1
+                        gross_profit_dollars = position_size * profit_pct
+                        net_profit_dollars = gross_profit_dollars - total_fees
+                        net_profit_pct = net_profit_dollars / position_size
+                    
+                    # Record the closed trade
+                    trades.append({
+                        "signal_idx": opp_entry_idx - 1,  # Approximate
+                        "entry_idx": opp_entry_idx,
+                        "exit_idx": entry_idx,  # Early exit
+                        "entry_time": opp_entry_time,
+                        "exit_time": entry_row["open_time"],
+                        "direction": opp_dir,
+                        "entry_price": opp_entry_price,
+                        "exit_price": early_exit_price,
+                        "profit_pct": profit_pct,
+                        "net_profit_pct": net_profit_pct,
+                        "gross_profit_dollars": gross_profit_dollars,
+                        "fees": total_fees,
+                        "net_profit_dollars": net_profit_dollars,
+                        "position_size": position_size,
+                    })
+                
+                # Remove all opposite positions
+                open_positions = same_direction_positions
+            
+            # Check position limit for same direction
+            if len(open_positions) >= position_limit:
+                if direction == "UP":
+                    rejected_up_signals += 1
+                else:
+                    rejected_down_signals += 1
+                continue
+                
+        else:
+            # Multiple accounts logic: original behavior
+            # Close any positions that have already exited
+            open_positions = [(e_idx, x_idx, d) for e_idx, x_idx, d in open_positions if x_idx > entry_idx]
+            
+            # Check position limit - reject trade if at limit
+            if len(open_positions) >= position_limit:
+                if direction == "UP":
+                    rejected_up_signals += 1
+                else:
+                    rejected_down_signals += 1
+                continue
 
         # Get entry and exit prices
         entry_row = df.row(entry_idx, named=True)
@@ -172,17 +266,39 @@ def simulate_trades(
         entry_price = entry_row["open"]
         exit_price = exit_row["close"]
 
+        # Calculate transaction fees (applied to both entry and exit)
+        entry_fee = position_size * fee_rate
+        exit_fee = position_size * fee_rate
+        total_fees = entry_fee + exit_fee
+
         if direction == "UP":
             # Calculate profit for long trade (buy low, sell high)
             profit_pct = (exit_price / entry_price) - 1
-            profit_dollars = position_size * profit_pct
+            gross_profit_dollars = position_size * profit_pct
+            net_profit_dollars = gross_profit_dollars - total_fees
+            net_profit_pct = net_profit_dollars / position_size
         else:  # direction == "DOWN"
             # Calculate profit for short trade (sell high, buy low)
             profit_pct = (entry_price / exit_price) - 1
-            profit_dollars = position_size * profit_pct
+            gross_profit_dollars = position_size * profit_pct
+            net_profit_dollars = gross_profit_dollars - total_fees
+            net_profit_pct = net_profit_dollars / position_size
 
         # Add to open positions
-        open_positions.append((entry_idx, exit_idx))
+        if num_accounts == 1:
+            open_positions.append((entry_idx, exit_idx, direction, entry_row["open_time"], exit_row["close_time"]))
+        else:
+            open_positions.append((entry_idx, exit_idx, direction))
+        
+        # Track maximum concurrent positions
+        if len(open_positions) > max_concurrent_positions:
+            max_concurrent_positions = len(open_positions)
+            # Debug: Log when we exceed limit
+            if max_concurrent_positions > position_limit:
+                entry_time = df.row(entry_idx, named=True)["open_time"]
+                print(f"WARNING: Exceeded position limit! At entry_idx={entry_idx} (time={entry_time}), have {max_concurrent_positions} positions (limit={position_limit})")
+                print(f"  Current signal: {direction}, entry={entry_idx}, exit={exit_idx}")
+                print(f"  Open positions: {open_positions}")
 
         trades.append(
             {
@@ -195,7 +311,10 @@ def simulate_trades(
                 "entry_price": entry_price,
                 "exit_price": exit_price,
                 "profit_pct": profit_pct,
-                "profit_dollars": profit_dollars,
+                "net_profit_pct": net_profit_pct,
+                "gross_profit_dollars": gross_profit_dollars,
+                "fees": total_fees,
+                "net_profit_dollars": net_profit_dollars,
                 "position_size": position_size,
             }
         )
@@ -203,19 +322,30 @@ def simulate_trades(
     if not trades:
         return pl.DataFrame(), {
             "num_trades": 0,
-            "rejected_signals": rejected_signals,
+            "rejected_up_signals": rejected_up_signals,
+            "rejected_down_signals": rejected_down_signals,
             "position_limit": position_limit,
+            "num_accounts": num_accounts,
+            "fee_rate": fee_rate,
+            "total_fees": 0.0,
             "trade_size": position_size,
             "max_long_exposure": 0.0,
             "max_short_exposure": 0.0,
             "num_up_trades": 0,
             "num_down_trades": 0,
-            "up_profit": 0.0,
-            "down_profit": 0.0,
-            "total_profit": 0.0,
-            "total_profit_pct": 0.0,
-            "total_roi": 0.0,
-            "avg_profit": 0.0,
+            "gross_up_profit": 0.0,
+            "up_fees": 0.0,
+            "net_up_profit": 0.0,
+            "gross_down_profit": 0.0,
+            "down_fees": 0.0,
+            "net_down_profit": 0.0,
+            "gross_profit": 0.0,
+            "net_profit": 0.0,
+            "gross_profit_pct": 0.0,
+            "net_profit_pct": 0.0,
+            "gross_roi": 0.0,
+            "net_roi": 0.0,
+            "avg_net_profit": 0.0,
             "avg_profit_pct": 0.0,
             "win_rate": 0.0,
             "num_winners": 0,
@@ -228,6 +358,8 @@ def simulate_trades(
 
     # Create trades DataFrame
     trades_df = pl.DataFrame(trades)
+    
+    print(f"DEBUG: Position limit: {position_limit}, Max concurrent during execution: {max_concurrent_positions}")
 
     # Calculate date range
     first_date = trades_df["entry_time"].min()
@@ -241,6 +373,7 @@ def simulate_trades(
     
     # Calculate maximum exposure (long and short positions) efficiently
     # Create events for entry (+1) and exit (-1) for each direction
+    # Use bar indices instead of timestamps to match execution logic
     long_events = []
     short_events = []
     
@@ -250,25 +383,26 @@ def simulate_trades(
     
     for trade in trades:
         if trade["direction"] == "UP":
-            long_events.append((trade["entry_time"], 1))    # Long entry
-            long_events.append((trade["exit_time"], -1))    # Long exit
+            long_events.append((trade["entry_idx"], 1, trade["entry_time"]))    # Long entry
+            long_events.append((trade["exit_idx"], -1, trade["exit_time"]))      # Long exit
         else:  # DOWN
-            short_events.append((trade["entry_time"], 1))   # Short entry
-            short_events.append((trade["exit_time"], -1))   # Short exit
+            short_events.append((trade["entry_idx"], 1, trade["entry_time"]))   # Short entry
+            short_events.append((trade["exit_idx"], -1, trade["exit_time"]))    # Short exit
     
     print(f"DEBUG POST: Long events created: {len(long_events)}, Short events created: {len(short_events)}")
     print(f"DEBUG POST: Expected long: {num_up_in_trades * 2}, Expected short: {num_down_in_trades * 2}")
     
     # Debug: Count entries vs exits
-    long_entries = sum(1 for time, delta in long_events if delta == 1)
-    long_exits = sum(1 for time, delta in long_events if delta == -1)
-    short_entries = sum(1 for time, delta in short_events if delta == 1)
-    short_exits = sum(1 for time, delta in short_events if delta == -1)
+    long_entries = sum(1 for idx, delta, time in long_events if delta == 1)
+    long_exits = sum(1 for idx, delta, time in long_events if delta == -1)
+    short_entries = sum(1 for idx, delta, time in short_events if delta == 1)
+    short_exits = sum(1 for idx, delta, time in short_events if delta == -1)
     print(f"DEBUG: Long entries: {long_entries}, exits: {long_exits}")
     print(f"DEBUG: Short entries: {short_entries}, exits: {short_exits}")
     
-    # Sort events by time, with exits before entries at same time
-    long_events.sort(key=lambda x: (x[0], x[1]))
+    # Sort events by bar index, with exits before entries at same index
+    # This matches the execution logic where we filter out positions with exit_idx >= entry_idx
+    long_events.sort(key=lambda x: (x[0], x[1]))  # Sort by (index, delta)
     short_events.sort(key=lambda x: (x[0], x[1]))
     
     # Calculate max long exposure
@@ -280,7 +414,7 @@ def simulate_trades(
     # Debug: check for negative counts
     min_long_count = 0
     
-    for time, delta in long_events:
+    for idx, delta, time in long_events:
         current_long_count += delta
         if current_long_count < min_long_count:
             min_long_count = current_long_count
@@ -300,7 +434,7 @@ def simulate_trades(
     # Debug: check for negative counts
     min_short_count = 0
     
-    for time, delta in short_events:
+    for idx, delta, time in short_events:
         current_short_count += delta
         if current_short_count < min_short_count:
             min_short_count = current_short_count
@@ -315,6 +449,19 @@ def simulate_trades(
     print(f"DEBUG: Max long count: {max_long_count} (min: {min_long_count}) at {max_long_time}")
     print(f"DEBUG: Max short count: {max_short_count} (min: {min_short_count}) at {max_short_time}")
     print(f"DEBUG: Long events: {len(long_events)}, Short events: {len(short_events)}")
+    
+    # Debug: Find which trades were active at max times
+    if max_long_time:
+        overlapping_longs = [t for t in trades if t["direction"] == "UP" and t["entry_time"] <= max_long_time <= t["exit_time"]]
+        print(f"DEBUG: Trades active at max long time:")
+        for i, t in enumerate(overlapping_longs[:5]):  # Show first 5
+            print(f"  Trade {i+1}: entry_idx={t['entry_idx']}, exit_idx={t['exit_idx']}, entry_time={t['entry_time']}, exit_time={t['exit_time']}")
+    
+    if max_short_time:
+        overlapping_shorts = [t for t in trades if t["direction"] == "DOWN" and t["entry_time"] <= max_short_time <= t["exit_time"]]
+        print(f"DEBUG: Trades active at max short time:")
+        for i, t in enumerate(overlapping_shorts[:5]):  # Show first 5
+            print(f"  Trade {i+1}: entry_idx={t['entry_idx']}, exit_idx={t['exit_idx']}, entry_time={t['entry_time']}, exit_time={t['exit_time']}")
     
     # Debug: Count active trades at max times
     if max_long_time and max_short_time:
@@ -335,25 +482,32 @@ def simulate_trades(
     print(f"DEBUG: Sample DOWN trade directions: {[t['direction'] for t in sample_down]}")
     
     # Calculate summary statistics overall
-    total_profit = trades_df["profit_dollars"].sum()
-    avg_profit = trades_df["profit_dollars"].mean()
+    total_gross_profit = trades_df["gross_profit_dollars"].sum()
+    total_net_profit = trades_df["net_profit_dollars"].sum()
+    avg_net_profit = trades_df["net_profit_dollars"].mean()
     avg_profit_pct = trades_df["profit_pct"].mean()
     num_trades = len(trades_df)
-    num_winners = (trades_df["profit_dollars"] > 0).sum()
-    num_losers = (trades_df["profit_dollars"] < 0).sum()
+    num_winners = (trades_df["net_profit_dollars"] > 0).sum()
+    num_losers = (trades_df["net_profit_dollars"] < 0).sum()
     win_rate = num_winners / num_trades if num_trades > 0 else 0.0
     avg_trades_per_day = num_trades / num_days
 
     # Calculate total return on investment (ROI)
     # Assumes position_size is invested per trade
     total_invested = position_size * num_trades
-    total_roi = (total_profit / total_invested * 100) if total_invested > 0 else 0.0
+    gross_roi = (total_gross_profit / total_invested * 100) if total_invested > 0 else 0.0
+    net_roi = (total_net_profit / total_invested * 100) if total_invested > 0 else 0.0
 
-    # Calculate Sharpe ratio
+    # Calculate Sharpe ratios (gross and net)
     # Sharpe = mean(returns) / std(returns) * sqrt(252)
-    # Using profit_pct as returns, annualized with sqrt(252) for trading days per year
-    std_return = trades_df["profit_pct"].std()
-    sharpe_ratio = (avg_profit_pct / std_return * (252 ** 0.5)) if std_return > 0 else 0.0
+    # Using profit_pct as gross returns, net_profit_pct as net returns
+    # Annualized with sqrt(252) for trading days per year
+    std_gross_return = trades_df["profit_pct"].std()
+    gross_sharpe_ratio = (avg_profit_pct / std_gross_return * (252 ** 0.5)) if std_gross_return > 0 else 0.0
+    
+    avg_net_profit_pct = trades_df["net_profit_pct"].mean()
+    std_net_return = trades_df["net_profit_pct"].std()
+    net_sharpe_ratio = (avg_net_profit_pct / std_net_return * (252 ** 0.5)) if std_net_return > 0 else 0.0
 
     # Calculate statistics by direction
     up_trades = trades_df.filter(pl.col("direction") == "UP")
@@ -361,29 +515,55 @@ def simulate_trades(
     
     num_up_trades = len(up_trades)
     num_down_trades = len(down_trades)
-    up_profit = up_trades["profit_dollars"].sum() if num_up_trades > 0 else 0.0
-    down_profit = down_trades["profit_dollars"].sum() if num_down_trades > 0 else 0.0
+    
+    # UP trades: gross, fees, net
+    gross_up_profit = up_trades["gross_profit_dollars"].sum() if num_up_trades > 0 else 0.0
+    up_fees = up_trades["fees"].sum() if num_up_trades > 0 else 0.0
+    net_up_profit = up_trades["net_profit_dollars"].sum() if num_up_trades > 0 else 0.0
+    
+    # DOWN trades: gross, fees, net
+    gross_down_profit = down_trades["gross_profit_dollars"].sum() if num_down_trades > 0 else 0.0
+    down_fees = down_trades["fees"].sum() if num_down_trades > 0 else 0.0
+    net_down_profit = down_trades["net_profit_dollars"].sum() if num_down_trades > 0 else 0.0
+    
+    # Calculate total fees
+    total_fees = trades_df["fees"].sum()
 
     summary = {
         "num_trades": num_trades,
-        "rejected_signals": rejected_signals,
+        "rejected_up_signals": rejected_up_signals,
+        "rejected_down_signals": rejected_down_signals,
         "position_limit": position_limit,
+        "num_accounts": num_accounts,
+        "fee_rate": fee_rate,
+        "total_fees": total_fees,
         "trade_size": position_size,
         "max_long_exposure": max_long_exposure,
         "max_short_exposure": max_short_exposure,
         "num_up_trades": num_up_trades,
         "num_down_trades": num_down_trades,
-        "up_profit": up_profit,
-        "down_profit": down_profit,
-        "total_profit": total_profit,
-        "total_profit_pct": (total_profit / (position_size * num_trades)) * 100,
-        "total_roi": total_roi,
-        "avg_profit": avg_profit,
+        # UP trades breakdown
+        "gross_up_profit": gross_up_profit,
+        "up_fees": up_fees,
+        "net_up_profit": net_up_profit,
+        # DOWN trades breakdown
+        "gross_down_profit": gross_down_profit,
+        "down_fees": down_fees,
+        "net_down_profit": net_down_profit,
+        # Overall totals
+        "gross_profit": total_gross_profit,
+        "net_profit": total_net_profit,
+        "gross_profit_pct": (total_gross_profit / (position_size * num_trades)) * 100,
+        "net_profit_pct": (total_net_profit / (position_size * num_trades)) * 100,
+        "gross_roi": gross_roi,
+        "net_roi": net_roi,
+        "avg_net_profit": avg_net_profit,
         "avg_profit_pct": avg_profit_pct * 100,
         "win_rate": win_rate * 100,
         "num_winners": num_winners,
         "num_losers": num_losers,
-        "sharpe_ratio": sharpe_ratio,
+        "gross_sharpe_ratio": gross_sharpe_ratio,
+        "net_sharpe_ratio": net_sharpe_ratio,
         "date_range": date_range,
         "num_days": num_days,
         "avg_trades_per_day": avg_trades_per_day,
@@ -405,7 +585,7 @@ def plot_cumulative_pnl(trades_df: pl.DataFrame, parquet_file: str) -> None:
 
     # Calculate cumulative PnL
     trades_df = trades_df.with_columns(
-        [pl.col("profit_dollars").cum_sum().alias("cumulative_pnl")]
+        [pl.col("net_profit_dollars").cum_sum().alias("cumulative_pnl")]
     )
 
     # Extract crypto name from parquet file
@@ -447,6 +627,8 @@ def run_simulation(
     hold_window: int,
     position_size: float,
     position_limit: int = 1,
+    fee_rate: float = 0.001,
+    num_accounts: int = 1,
     verbose: bool = True,
 ) -> tuple[pl.DataFrame, dict]:
     """
@@ -460,6 +642,8 @@ def run_simulation(
         hold_window: Number of periods to hold position
         position_size: Dollar amount to invest per trade
         position_limit: Maximum number of concurrent positions allowed (default: 1)
+        fee_rate: Transaction fee rate applied to both entry and exit (default: 0.001 = 0.1%)
+        num_accounts: Number of accounts (1=single account with position reversal, 2=separate long/short accounts, default: 1)
         verbose: Print results if True
 
     Returns:
@@ -475,7 +659,7 @@ def run_simulation(
     df = detect_signals(df, up_threshold, down_threshold, detection_window)
 
     # Simulate trades
-    trades_df, summary = simulate_trades(df, hold_window, position_size, position_limit)
+    trades_df, summary = simulate_trades(df, hold_window, position_size, position_limit, fee_rate, num_accounts)
 
     # Create cumulative PnL plot if we have trades
     if len(trades_df) > 0:
@@ -497,11 +681,15 @@ def run_simulation(
         print(f"  Hold window: {hold_window} periods")
         print(f"  Position size: ${position_size:,.2f}")
         print(f"  Position limit: {summary['position_limit']} concurrent trades (max exposure: ${summary['position_limit'] * position_size:,.2f})")
+        print(f"  Number of accounts: {summary['num_accounts']} {'(position reversal)' if summary['num_accounts'] == 1 else '(separate long/short)'}")
+        print(f"  Fee rate: {summary['fee_rate']:.4f} ({summary['fee_rate']*100:.2f}%)")
         print(f"\nSignals Detected:")
         print(f"  UP signals: {num_up_signals}")
         print(f"  DOWN signals: {num_down_signals}")
         print(f"  Total signals: {num_up_signals + num_down_signals}")
-        print(f"  Rejected (at limit): {summary['rejected_signals']}")
+        print(f"  Rejected UP (at limit): {summary['rejected_up_signals']}")
+        print(f"  Rejected DOWN (at limit): {summary['rejected_down_signals']}")
+        print(f"  Total rejected: {summary['rejected_up_signals'] + summary['rejected_down_signals']}")
         print(f"\nTrades Executed:")
         print(f"  Date range: {summary['date_range']}")
         print(f"  Number of days: {summary['num_days']}")
@@ -509,19 +697,31 @@ def run_simulation(
         print(f"  Trade size: ${summary['trade_size']:,.2f}")
         print(f"  Max long exposure: ${summary['max_long_exposure']:,.2f}")
         print(f"  Max short exposure: ${summary['max_short_exposure']:,.2f}")
-        print(f"  UP trades: {summary['num_up_trades']} (profit: ${summary['up_profit']:,.2f})")
-        print(f"  DOWN trades: {summary['num_down_trades']} (profit: ${summary['down_profit']:,.2f})")
+        print(f"\nTrade Breakdown (Gross / Fees / Net):")
+        print(f"  UP trades: {summary['num_up_trades']}")
+        print(f"    Gross profit: ${summary['gross_up_profit']:,.2f}")
+        print(f"    Fees paid:    ${summary['up_fees']:,.2f}")
+        print(f"    Net profit:   ${summary['net_up_profit']:,.2f}")
+        print(f"  DOWN trades: {summary['num_down_trades']}")
+        print(f"    Gross profit: ${summary['gross_down_profit']:,.2f}")
+        print(f"    Fees paid:    ${summary['down_fees']:,.2f}")
+        print(f"    Net profit:   ${summary['net_down_profit']:,.2f}")
         print(f"  Average trades per day: {summary['avg_trades_per_day']:.2f}")
-        print(f"\nPerformance:")
-        print(f"  Total profit: ${summary['total_profit']:,.2f}")
-        print(f"  Total profit %: {summary['total_profit_pct']:.2f}%")
-        print(f"  Total ROI: {summary['total_roi']:.2f}%")
-        print(f"  Average profit per trade: ${summary['avg_profit']:,.2f}")
-        print(f"  Average profit % per trade: {summary['avg_profit_pct']:.2f}%")
+        print(f"\nPerformance Summary:")
+        print(f"  Gross profit:     ${summary['gross_profit']:,.2f}")
+        print(f"  Total fees:       ${summary['total_fees']:,.2f}")
+        print(f"  Net profit:       ${summary['net_profit']:,.2f}")
+        print(f"  Gross profit %:   {summary['gross_profit_pct']:.2f}%")
+        print(f"  Net profit %:     {summary['net_profit_pct']:.2f}%")
+        print(f"  Gross ROI:        {summary['gross_roi']:.2f}%")
+        print(f"  Net ROI:          {summary['net_roi']:.2f}%")
+        print(f"  Avg net profit/trade: ${summary['avg_net_profit']:,.2f}")
+        print(f"  Avg profit % per trade: {summary['avg_profit_pct']:.2f}%")
         print(f"  Win rate: {summary['win_rate']:.2f}%")
         print(f"  Winners: {summary['num_winners']}")
         print(f"  Losers: {summary['num_losers']}")
-        print(f"  Sharpe ratio: {summary['sharpe_ratio']:.4f}")
+        print(f"  Gross Sharpe ratio: {summary['gross_sharpe_ratio']:.4f}")
+        print(f"  Net Sharpe ratio:   {summary['net_sharpe_ratio']:.4f}")
         print("=" * 80 + "\n")
 
     return trades_df, summary
@@ -569,6 +769,21 @@ Examples:
         type=int,
         default=1,
         help="Maximum number of concurrent positions allowed (default: 1)",
+    )
+    parser.add_argument(
+        "--fee-rate",
+        "-f",
+        type=float,
+        default=0.0003,
+        help="Transaction fee rate applied to both entry and exit (default: 0.001 = 0.1%%)",
+    )
+    parser.add_argument(
+        "--num-accounts",
+        "-n",
+        type=int,
+        default=1,
+        choices=[1, 2],
+        help="Number of accounts: 1=single account with position reversal, 2=separate long/short accounts (default: 1)",
     )
     parser.add_argument(
         "--output",
@@ -628,6 +843,8 @@ Examples:
         parser.error("Position size must be positive")
     if args.position_limit < 1:
         parser.error("Position limit must be at least 1")
+    if args.fee_rate < 0:
+        parser.error("Fee rate must be non-negative")
     if not Path(parquet_file).exists():
         parser.error(f"File not found: {parquet_file}")
 
@@ -640,6 +857,8 @@ Examples:
         args.hold_window,
         args.position_size,
         args.position_limit,
+        args.fee_rate,
+        args.num_accounts,
         verbose=not args.quiet,
     )
 
