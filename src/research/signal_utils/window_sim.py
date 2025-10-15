@@ -509,11 +509,11 @@ def simulate_trades(
     # Using profit_pct as gross returns, net_profit_pct as net returns
     # Annualized with sqrt(252) for trading days per year
     std_gross_return = trades_df["profit_pct"].std()
-    gross_sharpe_ratio = (avg_profit_pct / std_gross_return * (252 ** 0.5)) if std_gross_return > 0 else 0.0
+    gross_sharpe_ratio = (avg_profit_pct / std_gross_return * (252 ** 0.5)) if (std_gross_return is not None and std_gross_return > 0) else 0.0
     
     avg_net_profit_pct = trades_df["net_profit_pct"].mean()
     std_net_return = trades_df["net_profit_pct"].std()
-    net_sharpe_ratio = (avg_net_profit_pct / std_net_return * (252 ** 0.5)) if std_net_return > 0 else 0.0
+    net_sharpe_ratio = (avg_net_profit_pct / std_net_return * (252 ** 0.5)) if (std_net_return is not None and std_net_return > 0) else 0.0
 
     # Calculate statistics by direction
     long_trades = trades_df.filter(pl.col("direction") == "B")
