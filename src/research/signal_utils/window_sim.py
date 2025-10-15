@@ -185,7 +185,7 @@ def simulate_trades(
 
         if num_accounts == 1:
             # Single account logic: close opposite positions and reverse
-            # Remove positions that have already exited
+            # Remove positions that have already exited  
             open_positions = [(e_idx, x_idx, d, e_time, x_time) for e_idx, x_idx, d, e_time, x_time in open_positions if x_idx > entry_idx]
             
             # Check if we have opposite direction positions
@@ -196,60 +196,71 @@ def simulate_trades(
             if opposite_positions:
                 # Close opposite positions and reverse
                 for opp_entry_idx, opp_exit_idx, opp_dir, opp_entry_time, opp_exit_time in opposite_positions:
-                    # Close the opposite position early at this entry_idx
-                    entry_row = df.row(entry_idx, named=True)
-                    early_exit_price = entry_row["open"]
-                    
-                    # Get original entry price
-                    opp_entry_row = df.row(opp_entry_idx, named=True)
-                    opp_entry_price = opp_entry_row["open"]
-                    
-                    # Calculate fees for early exit
-                    entry_fee = position_size * fee_rate
-                    exit_fee = position_size * fee_rate
-                    total_fees = entry_fee + exit_fee
-                    
-                    if opp_dir == "B":
-                        # Long trade being closed: profit = (exit - entry) / entry
-                        profit_pct = (early_exit_price / opp_entry_price) - 1
-                        gross_profit_dollars = position_size * profit_pct
-                        net_profit_dollars = gross_profit_dollars - total_fees
-                        net_profit_pct = net_profit_dollars / position_size
-                    else:  # "S" - Short trade
-                        # Short trade being closed: profit = (entry - exit) / entry
-                        profit_pct = (opp_entry_price / early_exit_price) - 1
-                        gross_profit_dollars = position_size * profit_pct
-                        net_profit_dollars = gross_profit_dollars - total_fees
-                        net_profit_pct = net_profit_dollars / position_size
-                    
-                    # Record the closed trade
-                    trades.append({
-                        "signal_idx": opp_entry_idx - 1,  # Approximate
-                        "entry_idx": opp_entry_idx,
-                        "exit_idx": entry_idx,  # Early exit
-                        "entry_time": opp_entry_time,
-                        "exit_time": entry_row["open_time"],
-                        "direction": opp_dir,
-                        "entry_price": opp_entry_price,
-                        "exit_price": early_exit_price,
-                        "profit_pct": profit_pct,
-                        "net_profit_pct": net_profit_pct,
-                        "gross_profit_dollars": gross_profit_dollars,
-                        "fees": total_fees,
-                        "net_profit_dollars": net_profit_dollars,
-                        "position_size": position_size,
-                    })
+                    # Find and update the existing trade record for this position
+                    # The trade was already added to the trades list when it was opened
+                    # We need to update its exit_idx and recalculate profit
+                    for trade in trades:
+                        if (trade["entry_idx"] == opp_entry_idx and 
+                            trade["direction"] == opp_dir and
+                            trade["exit_idx"] == opp_exit_idx):  # Match the original scheduled exit
+                            # Update to early exit
+                            entry_row_for_early = df.row(entry_idx, named=True)
+                            early_exit_price = entry_row_for_early["open"]
+                            
+                            # Get original entry price
+                            opp_entry_row = df.row(opp_entry_idx, named=True)
+                            opp_entry_price = opp_entry_row["open"]
+                            
+                            # Calculate fees for early exit
+                            entry_fee = position_size * fee_rate
+                            exit_fee = position_size * fee_rate
+                            total_fees = entry_fee + exit_fee
+                            
+                            if opp_dir == "B":
+                                # Long trade being closed: profit = (exit - entry) / entry
+                                profit_pct = (early_exit_price / opp_entry_price) - 1
+                                gross_profit_dollars = position_size * profit_pct
+                                net_profit_dollars = gross_profit_dollars - total_fees
+                                net_profit_pct = net_profit_dollars / position_size
+                            else:  # "S" - Short trade
+                                # Short trade being closed: profit = (entry - exit) / entry
+                                profit_pct = (opp_entry_price / early_exit_price) - 1
+                                gross_profit_dollars = position_size * profit_pct
+                                net_profit_dollars = gross_profit_dollars - total_fees
+                                net_profit_pct = net_profit_dollars / position_size
+                            
+                            # Update the existing trade record
+                            trade["exit_idx"] = entry_idx  # Early exit
+                            trade["exit_time"] = entry_row_for_early["open_time"]
+                            trade["exit_price"] = early_exit_price
+                            trade["profit_pct"] = profit_pct
+                            trade["net_profit_pct"] = net_profit_pct
+                            trade["gross_profit_dollars"] = gross_profit_dollars
+                            trade["fees"] = total_fees
+                            trade["net_profit_dollars"] = net_profit_dollars
+                            break  # Found and updated the trade
                 
                 # Remove all opposite positions
                 open_positions = same_direction_positions
+            else:
+                # No opposite positions, just keep same direction
+                open_positions = same_direction_positions
+            
+            # DETECTION: Log state right before limit check
+            check_count = len(open_positions)
+            will_reject = check_count >= position_limit
             
             # Check position limit for same direction
-            if len(open_positions) >= position_limit:
+            if check_count >= position_limit:
                 if signal_type == "UP":
                     rejected_up_signals += 1
                 else:
                     rejected_down_signals += 1
                 continue
+            
+            # DETECTION: If we get here, we're accepting the trade
+            # Store this info for breach detection
+            accepted_with_count = check_count
                 
         else:
             # Multiple accounts logic: original behavior
@@ -292,18 +303,17 @@ def simulate_trades(
         # Add to open positions
         if num_accounts == 1:
             open_positions.append((entry_idx, exit_idx, trade_direction, entry_row["open_time"], exit_row["close_time"]))
+            
+            # DETECTION: Check if we've exceeded the limit for this direction (should never happen)
+            same_dir_in_list = [p for p in open_positions if p[2] == trade_direction]
+            if len(same_dir_in_list) > position_limit:
+                print(f"\n⚠️  BREACH! {trade_direction} positions: {len(same_dir_in_list)} > limit {position_limit} at entry_idx={entry_idx}\n")
         else:
             open_positions.append((entry_idx, exit_idx, trade_direction))
         
         # Track maximum concurrent positions
         if len(open_positions) > max_concurrent_positions:
             max_concurrent_positions = len(open_positions)
-            # Debug: Log when we exceed limit
-            if max_concurrent_positions > position_limit:
-                entry_time = df.row(entry_idx, named=True)["open_time"]
-                print(f"WARNING: Exceeded position limit! At entry_idx={entry_idx} (time={entry_time}), have {max_concurrent_positions} positions (limit={position_limit})")
-                print(f"  Current signal: {signal_type} → {trade_direction}, entry={entry_idx}, exit={exit_idx}")
-                print(f"  Open positions: {open_positions}")
 
         trades.append(
             {
@@ -311,7 +321,7 @@ def simulate_trades(
                 "entry_idx": entry_idx,
                 "exit_idx": exit_idx,
                 "entry_time": entry_row["open_time"],
-                "exit_time": exit_row["close_time"],
+                "exit_time": exit_row["open_time"],  # Use open_time: position exits at start of exit bar
                 "signal_type": signal_type,
                 "direction": trade_direction,
                 "entry_price": entry_price,
@@ -458,13 +468,13 @@ def simulate_trades(
     
     # Debug: Find which trades were active at max times
     if max_long_time:
-        overlapping_longs = [t for t in trades if t["direction"] == "B" and t["entry_time"] <= max_long_time <= t["exit_time"]]
-        print(f"DEBUG: Trades active at max long time:")
-        for i, t in enumerate(overlapping_longs[:5]):  # Show first 5
+        overlapping_longs = [t for t in trades if t["direction"] == "B" and t["entry_time"] <= max_long_time < t["exit_time"]]
+        print(f"DEBUG: Trades active at max long time (showing all {len(overlapping_longs)}):")
+        for i, t in enumerate(overlapping_longs):
             print(f"  Trade {i+1}: entry_idx={t['entry_idx']}, exit_idx={t['exit_idx']}, entry_time={t['entry_time']}, exit_time={t['exit_time']}")
     
     if max_short_time:
-        overlapping_shorts = [t for t in trades if t["direction"] == "S" and t["entry_time"] <= max_short_time <= t["exit_time"]]
+        overlapping_shorts = [t for t in trades if t["direction"] == "S" and t["entry_time"] <= max_short_time < t["exit_time"]]
         print(f"DEBUG: Trades active at max short time:")
         for i, t in enumerate(overlapping_shorts[:5]):  # Show first 5
             print(f"  Trade {i+1}: entry_idx={t['entry_idx']}, exit_idx={t['exit_idx']}, entry_time={t['entry_time']}, exit_time={t['exit_time']}")
@@ -472,13 +482,13 @@ def simulate_trades(
     # Debug: Count active trades at max times
     if max_long_time and max_short_time:
         # Count how many trades were actually active at max_long_time
-        active_long_at_max = sum(1 for t in trades if t["direction"] == "B" and t["entry_time"] <= max_long_time <= t["exit_time"])
-        active_short_at_max_long = sum(1 for t in trades if t["direction"] == "S" and t["entry_time"] <= max_long_time <= t["exit_time"])
+        active_long_at_max = sum(1 for t in trades if t["direction"] == "B" and t["entry_time"] <= max_long_time < t["exit_time"])
+        active_short_at_max_long = sum(1 for t in trades if t["direction"] == "S" and t["entry_time"] <= max_long_time < t["exit_time"])
         print(f"DEBUG: At max long time ({max_long_time}): {active_long_at_max} long, {active_short_at_max_long} short")
         
         # Count how many trades were actually active at max_short_time  
-        active_short_at_max = sum(1 for t in trades if t["direction"] == "S" and t["entry_time"] <= max_short_time <= t["exit_time"])
-        active_long_at_max_short = sum(1 for t in trades if t["direction"] == "B" and t["entry_time"] <= max_short_time <= t["exit_time"])
+        active_short_at_max = sum(1 for t in trades if t["direction"] == "S" and t["entry_time"] <= max_short_time < t["exit_time"])
+        active_long_at_max_short = sum(1 for t in trades if t["direction"] == "B" and t["entry_time"] <= max_short_time < t["exit_time"])
         print(f"DEBUG: At max short time ({max_short_time}): {active_long_at_max_short} long, {active_short_at_max} short")
     
     # Debug: Sample some trades to verify direction
