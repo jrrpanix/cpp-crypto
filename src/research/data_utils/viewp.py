@@ -38,6 +38,13 @@ def main():
     args = parser.parse_args()
 
     view_parquet_columns(args.parquet_file)
+    df = pl.read_parquet(args.parquet_file)
+    print(f"\nTotal rows: {len(df):,}")
+    if "symbol" in df.columns:
+        print(f"Unique symbols: {df['symbol'].n_unique()}")
+    if "open_time" in df.columns and "close_time" in df.columns:
+        print(f"Date range: {df['open_time'].min()} to {df['close_time'].max()}")
+    print(df)
 
 
 if __name__ == "__main__":
