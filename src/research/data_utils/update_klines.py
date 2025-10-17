@@ -7,6 +7,72 @@ from datetime import datetime
 import polars as pl
 
 
+def read_binance_zip(zip_path: str, existing_schema: dict = None) -> pl.DataFrame:
+    """
+    Read a Binance kline CSV from a zip file and optionally match schema.
+    
+    This function can be imported by other scripts that need to read Binance zip files.
+    
+    Args:
+        zip_path: Path to the zip file
+        existing_schema: Optional schema dict to match column types
+        
+    Returns:
+        Polars DataFrame with the kline data
+    """
+    with zipfile.ZipFile(zip_path, "r") as z:
+        csv_name = z.namelist()[0]
+        with z.open(csv_name) as f:
+            # polars can't read directly from the zip stream, so read into bytes
+            csv_bytes = f.read()
+            
+            # Always read CSV with default inference first
+            # Use infer_schema_length=0 to scan all rows for proper type inference
+            # This prevents issues where early rows have integer-like floats
+            df = pl.read_csv(io.BytesIO(csv_bytes), has_header=True, infer_schema_length=0)
+            
+            # Convert timestamp columns from milliseconds to datetime
+            # Timestamps can be either Int64 or String in the CSV
+            if "open_time" in df.columns:
+                if df["open_time"].dtype == pl.Int64:
+                    df = df.with_columns(
+                        pl.from_epoch(pl.col("open_time"), time_unit="ms").alias("open_time")
+                    )
+                elif df["open_time"].dtype == pl.String or df["open_time"].dtype == pl.Utf8:
+                    # Parse string as int64 first, then convert to datetime
+                    df = df.with_columns(
+                        pl.from_epoch(pl.col("open_time").cast(pl.Int64), time_unit="ms").alias("open_time")
+                    )
+            
+            if "close_time" in df.columns:
+                if df["close_time"].dtype == pl.Int64:
+                    df = df.with_columns(
+                        pl.from_epoch(pl.col("close_time"), time_unit="ms").alias("close_time")
+                    )
+                elif df["close_time"].dtype == pl.String or df["close_time"].dtype == pl.Utf8:
+                    # Parse string as int64 first, then convert to datetime
+                    df = df.with_columns(
+                        pl.from_epoch(pl.col("close_time").cast(pl.Int64), time_unit="ms").alias("close_time")
+                    )
+            
+            # If schema is provided, cast columns to match
+            if existing_schema:
+                for col_name, col_type in existing_schema.items():
+                    if col_name in df.columns:
+                        # Only cast if types don't match
+                        if df[col_name].dtype != col_type:
+                            try:
+                                df = df.with_columns(
+                                    pl.col(col_name).cast(col_type)
+                                )
+                            except Exception as e:
+                                print(
+                                    f"    ⚠️ Could not cast column '{col_name}' to {col_type}. Error: {e}"
+                                )
+            
+            return df
+
+
 def update_klines(kline_dir: str, download_dir: str):
     """
     Update kline files with the latest monthly downloads.
@@ -92,25 +158,8 @@ def update_klines(kline_dir: str, download_dir: str):
                         # Read existing kline parquet file
                         existing_df = pl.read_parquet(kline_file_path)
 
-                        # Read new data from the zip file
-                        with zipfile.ZipFile(download_file_path, "r") as z:
-                            csv_name = z.namelist()[0]
-                            with z.open(csv_name) as f:
-                                # polars can't read directly from the zip stream, so read into bytes
-                                csv_bytes = f.read()
-                                new_df = pl.read_csv(io.BytesIO(csv_bytes), has_header=True)
-
-                                # Match the schema of new_df to existing_df before concatenating
-                                for col_name, col_type in existing_df.schema.items():
-                                    if col_name in new_df.columns:
-                                        try:
-                                            new_df = new_df.with_columns(
-                                                pl.col(col_name).cast(col_type)
-                                            )
-                                        except Exception as e:
-                                            print(
-                                                f"    ⚠️ Could not cast column '{col_name}' to {col_type}. Error: {e}"
-                                            )
+                        # Read new data from the zip file using shared function
+                        new_df = read_binance_zip(download_file_path, existing_df.schema)
 
                         # Append the new data to the existing dataframe
                         merged_df = pl.concat([existing_df, new_df])
