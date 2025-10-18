@@ -63,9 +63,9 @@ class CryptoDashboard {
     connectWebSocket() {
         try {
             // Try to connect to the server WebSocket endpoint
-            // Since we're in a container, try the Python server port (usually 8000)
+            // Use the same host and port as the current page
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//localhost:8000/ws`;
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
             
             this.addLog(`Connecting to WebSocket: ${wsUrl}`, 'info');
             this.updateConnectionStatus('connecting');
@@ -156,15 +156,15 @@ class CryptoDashboard {
     attemptReconnect() {
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
-            const delay = this.reconnectInterval * this.reconnectAttempts;
+            const delay = Math.min(this.reconnectInterval * this.reconnectAttempts, 30000); // Cap at 30s
             
-            this.addLog(`Attempting to reconnect in ${delay/1000}s (${this.reconnectAttempts}/${this.maxReconnectAttempts})`, 'warning');
+            this.addLog(`Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay/1000}s`, 'warning');
             
             setTimeout(() => {
                 this.connectWebSocket();
             }, delay);
         } else {
-            this.addLog('Max reconnection attempts reached. Falling back to HTTP polling.', 'error');
+            this.addLog('WebSocket connection failed. Trying HTTP polling...', 'warning');
             this.fallbackToHttpPolling();
         }
     }
@@ -172,49 +172,70 @@ class CryptoDashboard {
     fallbackToHttpPolling() {
         this.addLog('Starting HTTP polling fallback', 'info');
         
+        let consecutiveErrors = 0;
+        const maxErrors = 3;
+        
         // Poll the server for data every 5 seconds
-        setInterval(async () => {
+        const pollInterval = setInterval(async () => {
             try {
-                const response = await fetch('http://localhost:8000/status/latest');
+                const response = await fetch(`${window.location.origin}/status/latest`);
                 if (response.ok) {
+                    consecutiveErrors = 0; // Reset error count on success
                     const messages = await response.json();
                     
-                    // Convert server messages to frontend format
-                    messages.forEach(msg => {
-                        // Handle both Python server format AND original Binance format
-                        let priceUpdate;
+                    if (messages && messages.length > 0) {
+                        // Convert server messages to frontend format
+                        messages.forEach(msg => {
+                            // Handle both Python server format AND original Binance format
+                            let priceUpdate;
+                            
+                            if (msg.e === 'bookTicker') {
+                                // Original Binance WebSocket format
+                                priceUpdate = {
+                                    symbol: msg.s || 'Unknown',
+                                    bid_price: parseFloat(msg.b),
+                                    ask_price: parseFloat(msg.a),
+                                    timestamp: msg.E || Date.now()
+                                };
+                            } else {
+                                // Python server format
+                                priceUpdate = {
+                                    symbol: msg.consumer_id || 'Unknown',
+                                    bid_price: msg.bid_price,
+                                    ask_price: msg.ask_price,
+                                    timestamp: msg.timestamp_ns ? msg.timestamp_ns / 1000000 : Date.now()
+                                };
+                            }
+                            
+                            this.addPriceUpdate(priceUpdate);
+                        });
                         
-                        if (msg.e === 'bookTicker') {
-                            // Original Binance WebSocket format
-                            priceUpdate = {
-                                symbol: msg.s || 'Unknown',
-                                bid_price: parseFloat(msg.b),
-                                ask_price: parseFloat(msg.a),
-                                timestamp: msg.E || Date.now()
-                            };
-                        } else {
-                            // Python server format
-                            priceUpdate = {
-                                symbol: msg.consumer_id || 'Unknown',
-                                bid_price: msg.bid_price,
-                                ask_price: msg.ask_price,
-                                timestamp: msg.timestamp_ns ? msg.timestamp_ns / 1000000 : Date.now()
-                            };
-                        }
-                        
-                        this.addPriceUpdate(priceUpdate);
-                    });
-                    
-                    // Update metrics based on received data
-                    this.updateMetrics({
-                        activeSymbols: new Set(messages.map(m => m.consumer_id)).size,
-                        messagesPerSec: messages.length > 0 ? Math.floor(messages.length / 5) : 0,
-                        totalMessages: (this.metrics.totalMessages || 0) + messages.length
-                    });
+                        // Update metrics based on received data
+                        this.updateMetrics({
+                            activeSymbols: new Set(messages.map(m => m.consumer_id || m.s)).size,
+                            messagesPerSec: messages.length > 0 ? Math.floor(messages.length / 5) : 0,
+                            totalMessages: (this.metrics.totalMessages || 0) + messages.length
+                        });
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
             } catch (error) {
+                consecutiveErrors++;
                 console.error('HTTP polling error:', error);
-                this.addLog(`HTTP polling failed: ${error.message}`, 'error');
+                
+                if (consecutiveErrors === 1) {
+                    this.addLog(`No backend server detected (${error.message})`, 'warning');
+                    this.addLog('Switching to demo mode...', 'info');
+                } else if (consecutiveErrors >= maxErrors) {
+                    this.addLog(`HTTP polling stopped after ${maxErrors} failures`, 'error');
+                    this.addLog('Backend server not available - demo data only', 'warning');
+                    clearInterval(pollInterval);
+                    // Start demo data if not already started
+                    if (this.metrics.totalMessages === 0) {
+                        setTimeout(() => this.generateDemoData(), 1000);
+                    }
+                }
             }
         }, 5000);
     }
@@ -341,11 +362,11 @@ class CryptoDashboard {
     startMetricsUpdater() {
         // Generate some demo data if no real data is coming in
         setTimeout(() => {
-            if (this.metrics.totalMessages === 0) {
-                this.addLog('No live data detected, generating demo data...', 'warning');
+            if (this.metrics.totalMessages === 0 && this.recentTrades.length === 0 && this.priceUpdates.length === 0) {
+                this.addLog('No backend connection - starting demo mode', 'info');
                 this.generateDemoData();
             }
-        }, 10000);
+        }, 8000); // Reduced from 10s to 8s for faster demo start
     }
     
     generateDemoData() {
