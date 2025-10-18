@@ -2,20 +2,62 @@
 # It uses a multi-stage build to create a minimal final image.
 
 # --- Build Stage ---
-# We use the development Dockerfile as our builder to ensure a consistent
-# and reproducible build environment. This stage will contain all the
-# build tools, source code, and intermediate build artifacts.
-FROM cpp-crypto-dev:latest AS builder
+FROM ubuntu:22.04 AS builder
 
-# Copy the entire project context into the builder
-COPY . /workspace
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build tools and dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    curl \
+    wget \
+    gperf \
+    pkg-config \
+    libssl-dev \
+    zlib1g-dev \
+    libzmq3-dev \
+    libspdlog-dev \
+    libcurl4-openssl-dev \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    software-properties-common \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Apache Arrow/Parquet dev libraries
+RUN wget -O apache-arrow-apt-source-latest.deb https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb && \
+    apt-get install -y ./apache-arrow-apt-source-latest.deb && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends libarrow-dev libparquet-dev && \
+    rm ./apache-arrow-apt-source-latest.deb && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /workspace
 
-# Install C++ dependencies (e.g., third_party libs) and build the C++ applications.
-# The final binaries will be installed to /workspace/install/
-RUN ./scripts/install/deps_install.sh
-RUN ./scripts/build/binance_build.sh
-RUN ./scripts/build/consumer_build.sh
+# Copy scripts first
+COPY scripts/ /workspace/scripts/
+
+# Install C++ dependencies to /opt/cpp-crypto-deps
+RUN chmod +x /workspace/scripts/install/deps_install.sh && \
+    /workspace/scripts/install/deps_install.sh
+
+# Now copy source code (after deps are cached)
+COPY src/ /workspace/src/
+
+# Build the C++ applications
+# The binaries will be installed to /workspace/install/bin
+RUN chmod +x /workspace/scripts/build/binance_build.sh && \
+    chmod +x /workspace/scripts/build/consumer_build.sh && \
+    ./scripts/build/binance_build.sh && \
+    ./scripts/build/consumer_build.sh
+
+# Verify binaries were created
+# Binaries are installed to /opt/cpp-crypto-deps/bin (since that directory exists)
+RUN ls -la /opt/cpp-crypto-deps/bin/ && \
+    echo "✅ Binaries built successfully:" && \
+    ls -1 /opt/cpp-crypto-deps/bin/
 
 
 # --- Runtime Stage ---
@@ -23,23 +65,54 @@ RUN ./scripts/build/consumer_build.sh
 # copies the necessary compiled binaries and runtime dependencies.
 FROM ubuntu:22.04
 
-# Install only essential runtime dependencies.
-# Note: libarrow and libparquet are not included here as we assume the
-# binaries that need them are statically linked or not used in this runtime.
-# If they are needed, they must be added here.
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install only essential runtime dependencies (base system libraries)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
-    libzmq3-dev \
+    libzmq5 \
+    libspdlog1 \
+    libcurl4 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Set a working directory for the application
 WORKDIR /app
 
-# Copy the compiled C++ binaries and any necessary configuration files
-# from the 'builder' stage to the final runtime image.
-COPY --from=builder /workspace/install/bin /app/bin
-COPY --from=builder /workspace/install/config /app/config
+# Copy the compiled C++ binaries from the builder stage
+# Binaries are in /opt/cpp-crypto-deps/bin (not /workspace/install/bin)
+COPY --from=builder /opt/cpp-crypto-deps/bin /app/bin
+
+# Copy configuration files if they exist
+COPY --from=builder /opt/cpp-crypto-deps/config /app/config
+
+# Copy all shared libraries from custom-built dependencies
+COPY --from=builder /opt/cpp-crypto-deps/lib /usr/local/lib/cpp-crypto-deps
+
+# Create a script to copy Arrow/Parquet libs and run it
+RUN echo '#!/bin/sh' > /tmp/copy-libs.sh && \
+    echo 'set -e' >> /tmp/copy-libs.sh && \
+    echo 'find /usr/lib -name "libarrow*.so*" -exec cp -P {} /usr/local/lib/cpp-crypto-deps/ \; 2>/dev/null || true' >> /tmp/copy-libs.sh && \
+    echo 'find /usr/lib -name "libparquet*.so*" -exec cp -P {} /usr/local/lib/cpp-crypto-deps/ \; 2>/dev/null || true' >> /tmp/copy-libs.sh && \
+    chmod +x /tmp/copy-libs.sh
+
+# Execute in builder context via a temporary stage trick - or just install Arrow in runtime
+# Since this is getting complex, let's just install Arrow runtime packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    wget gnupg lsb-release && \
+    wget -O apache-arrow-apt-source-latest.deb https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb && \
+    apt-get install -y ./apache-arrow-apt-source-latest.deb && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends libarrow-dev libparquet-dev && \
+    rm apache-arrow-apt-source-latest.deb && \
+    apt-get remove -y wget gnupg lsb-release && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Add custom lib path to ld.so.conf and update cache
+RUN echo "/usr/local/lib/cpp-crypto-deps" > /etc/ld.so.conf.d/cpp-crypto.conf && \
+    ldconfig
 
 # Example: Set a default command to run one of the consumers.
 # This should be adapted based on the desired runtime behavior.

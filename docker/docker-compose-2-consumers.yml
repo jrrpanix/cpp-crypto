@@ -2,8 +2,8 @@
 services:
   producer:
     build:
-      context: .
-      dockerfile: docker/runtime/Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile.runtime
     container_name: producer
     depends_on:
       - consumer1
@@ -11,7 +11,7 @@ services:
     networks:
       - market-net
     volumes:
-      - .:/workspace
+      - ..:/workspace
     working_dir: /workspace/apps/bin
     command: >
       ./binance_main
@@ -22,22 +22,22 @@ services:
 
   consumer1:
     build:
-      context: .
-      dockerfile: docker/runtime/Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile.runtime
     networks:
       - market-net
     volumes:
-      - .:/workspace
+      - ..:/workspace
     command: /workspace/apps/bin/consumer_main
 
   consumer2:
     build:
-      context: .
-      dockerfile: docker/runtime/Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile.runtime
     networks:
       - market-net
     volumes:
-      - .:/workspace
+      - ..:/workspace
     command: /workspace/apps/bin/consumer_main
 
 networks:

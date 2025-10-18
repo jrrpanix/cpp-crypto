@@ -1,38 +1,44 @@
 services:
   consumer:
     build:
-      context: .
-      dockerfile: docker/runtime/Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile.runtime
     container_name: consumer
     networks:
       - market-net
-    command: /workspace/apps/bin/consumer_main --sendweb
+    command: /app/bin/consumer_main --sendweb
+    # Mount data directory for access to parquet files if needed
+    # Mount config directory so binaries can find their config files
     volumes:
-      - .:/workspace
+      - ../data:/workspace/data:ro
+      - ../apps/config:/workspace/apps/config:ro
 
   producer:
     build:
-      context: .
-      dockerfile: docker/runtime/Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile.runtime
     container_name: producer
     depends_on:
       - consumer
     networks:
       - market-net
+    command: /app/bin/mock_binance_main
+    # Mount data, config, and test_data directories
     volumes:
-      - .:/workspace
-    command: /workspace/apps/bin/mock_binance_main
+      - ../data:/workspace/data:ro
+      - ../apps/config:/workspace/apps/config:ro
+      - ../test_data:/workspace/test_data:ro
 
 
   webserver:
     build:
-      context: .                          # repo root
+      context: ..                          # repo root
       dockerfile: docker/webserver/Dockerfile
     container_name: fastapi-server
     networks:
       - market-net
     volumes:
-      - ./server:/app                     # mount code where the Dockerfile expects it
+      - ../server:/app                     # mount code where the Dockerfile expects it
     ports:
       - "8000:8000"
 
