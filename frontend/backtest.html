@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Strategy Backtest</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-size: 0.9rem;
+        }
+
+        input, select {
+            padding: 10px;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results-section {
+            display: none;
+        }
+
+        .results-section.active {
+            display: block;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #3498db;
+        }
+
+        .metric-label {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .metric-value.positive {
+            color: #27ae60;
+        }
+
+        .metric-value.negative {
+            color: #e74c3c;
+        }
+
+        .plot-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .plot-container img {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .error-message {
+            background: #fee;
+            border: 2px solid #e74c3c;
+            color: #c0392b;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .info-box {
+            background: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .direction-select {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .direction-btn {
+            padding: 10px;
+            border: 2px solid #ecf0f1;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .direction-btn.selected {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+
+        .direction-btn:hover {
+            border-color: #3498db;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Trading Strategy Backtest</h1>
+            <p class="subtitle">Test window-based trading strategies on historical data</p>
+        </div>
+
+        <div class="card">
+            <h2>Strategy Parameters</h2>
+            <div class="info-box">
+                <strong>How it works:</strong> Define events as up/down price movements within a detection window. 
+                When threshold is hit, enter position and hold for specified period.
+                Example: "BTC 0.01 B -0.02 S 30 30" = Buy if +1% in 30 bars, Sell if -2% in 30 bars, hold for 30 bars.
+            </div>
+
+            <form id="backtestForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="symbol">Symbol</label>
+                        <select id="symbol" required>
+                            <option value="">Loading symbols...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="upThreshold">UP Threshold (e.g., 0.01 = 1%)</label>
+                        <input type="number" id="upThreshold" step="0.001" value="0.01" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>UP Direction</label>
+                        <div class="direction-select">
+                            <button type="button" class="direction-btn selected" data-target="upDirection" data-value="B">
+                                📈 Buy (Long)
+                            </button>
+                            <button type="button" class="direction-btn" data-target="upDirection" data-value="S">
+                                📉 Sell (Short)
+                            </button>
+                        </div>
+                        <input type="hidden" id="upDirection" value="B">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="downThreshold">DOWN Threshold (e.g., -0.02 = -2%)</label>
+                        <input type="number" id="downThreshold" step="0.001" value="-0.02" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>DOWN Direction</label>
+                        <div class="direction-select">
+                            <button type="button" class="direction-btn" data-target="downDirection" data-value="B">
+                                📈 Buy (Long)
+                            </button>
+                            <button type="button" class="direction-btn selected" data-target="downDirection" data-value="S">
+                                📉 Sell (Short)
+                            </button>
+                        </div>
+                        <input type="hidden" id="downDirection" value="S">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="detectionWindow">Detection Window (bars)</label>
+                        <input type="number" id="detectionWindow" min="1" value="30" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="holdWindow">Hold Window (bars)</label>
+                        <input type="number" id="holdWindow" min="1" value="30" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="positionSize">Position Size ($)</label>
+                        <input type="number" id="positionSize" min="1" value="1000" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="positionLimit">Position Limit (concurrent)</label>
+                        <input type="number" id="positionLimit" min="1" value="1" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="feeRate">Fee Rate (e.g., 0.0003 = 0.03%)</label>
+                        <input type="number" id="feeRate" step="0.0001" value="0.0003" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="numAccounts">Number of Accounts</label>
+                        <select id="numAccounts" required>
+                            <option value="1">1 (Position Reversal)</option>
+                            <option value="2">2 (Separate Long/Short)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="startDate">Start Date (optional)</label>
+                        <input type="date" id="startDate">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn" id="runBtn">
+                    🚀 Run Backtest
+                </button>
+            </form>
+        </div>
+
+        <div id="loadingSection" class="card loading" style="display: none;">
+            <div class="spinner"></div>
+            <h3>Running backtest...</h3>
+            <p>This may take a few seconds depending on data size</p>
+        </div>
+
+        <div id="resultsSection" class="results-section">
+            <div class="card">
+                <h2>Performance Results</h2>
+                <div id="metricsContainer" class="metrics-grid"></div>
+            </div>
+
+            <div class="card">
+                <h2>Cumulative PnL</h2>
+                <div id="plotContainer" class="plot-container"></div>
+            </div>
+
+            <div class="card">
+                <h2>Trade Breakdown</h2>
+                <div id="breakdownContainer"></div>
+            </div>
+        </div>
+
+        <div id="errorSection" class="card" style="display: none;">
+            <div class="error-message">
+                <h3>❌ Error</h3>
+                <p id="errorMessage"></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="backtest.js"></script>
+</body>
+</html>

@@ -8,10 +8,45 @@ A high-performance C++/Python platform for real-time crypto data processing and 
 
 - **Real-time Engine (C++):** A C++17-based application for consuming and processing high-frequency data from Binance. It uses a lock-free, multi-threaded design to minimize latency.
 - **Research & Data Utilities (Python):** A suite of Python scripts using libraries like Polars and Pandas for data acquisition, analysis, and signal generation.
+- **Backtest Webapp:** A web-based interface for testing window-based trading strategies on historical data with comprehensive performance analytics.
+
+---
+
+## 🚀 Quick Start
+
+### Live Data WebSocket
+```bash
+# Test mode with mock data
+make run-websocket
+# Access: http://localhost:8082
+
+# Live Binance data
+make run-live-websocket
+# Access: http://localhost:8083
+```
+
+### Backtest Analysis Webapp
+```bash
+# Start backtest webapp
+make run-backtest
+# Access: http://localhost:8084
+```
+See [Backtest Quick Start Guide](docs/BACKTEST_QUICKSTART.md) for detailed usage.
 
 ---
 
 ## 🛠️ Development Workflow
+
+**First Time Setup:**
+```sh
+# 1. Configure your data directory location
+cp .env.example .env
+# Edit .env to set DATA_DIR to your data location
+# See docs/DATA_DIRECTORY_SETUP.md for details
+
+# 2. Build the development image
+make build-dev
+```
 
 All development is done inside a Docker container. The `Makefile` provides a simple interface for managing the environment.
 
@@ -39,6 +74,8 @@ All development is done inside a Docker container. The `Makefile` provides a sim
     ```sh
     make stop-dev
     ```
+
+> **Note**: If you haven't set up your data directory, see [Data Directory Setup Guide](docs/DATA_DIRECTORY_SETUP.md)
 
 ---
 

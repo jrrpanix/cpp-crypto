@@ -12,6 +12,8 @@ dependencies = [
     "rich",
     "fastapi",
     "uvicorn[standard]",
+    "flask>=3.0.0",
+    "flask-cors>=4.0.0",
     "plotly>=6.3.0",
     "kaleido>=1.0.0",
     "mplfinance>=0.12.10b0",

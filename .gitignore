@@ -35,6 +35,10 @@
 data/
 downloads/
 
+# Environment variables
+.env
+.env.local
+
 # Python
 .venv/
 __pycache__/

@@ -3,6 +3,10 @@
 # ==============================================================================
 SHELL := /bin/bash
 
+# Load environment variables from .env file if it exists
+-include .env
+export
+
 # Docker image and container names
 DEV_IMAGE_NAME := cpp-crypto-dev
 DEV_CONTAINER_NAME := cpp-crypto-dev-container
@@ -14,6 +18,7 @@ COMPOSE_FILE_TEST := $(COMPOSE_DIR)/docker-compose-test.yml
 COMPOSE_FILE_FAST_TEST := $(COMPOSE_DIR)/docker-compose-fast-test.yml
 COMPOSE_FILE_WEBSOCKET := $(COMPOSE_DIR)/docker-compose-websocket.yml
 COMPOSE_FILE_LIVE_WEBSOCKET := $(COMPOSE_DIR)/docker-compose-live-websocket.yml
+COMPOSE_FILE_BACKTEST := $(COMPOSE_DIR)/docker-compose-backtest.yml
 COMPOSE_FILE_2C := $(COMPOSE_DIR)/docker-compose-2-consumers.yml
 
 # Use this to run commands inside the running dev container
@@ -83,6 +88,14 @@ help:
 	@echo "  make logs-live-websocket View logs from LIVE WebSocket services"
 	@echo "  make status-live-websocket  Check status of LIVE WebSocket services"
 	@echo "  make stop-live-websocket Stop LIVE WebSocket services"
+	@echo ""
+	@echo "--- Backtest Webapp Services ---"
+	@echo "  make run-backtest   Start backtest webapp (Flask API + frontend, port 8084)"
+	@echo "  make run-backtest-verbose  Start backtest services with output"
+	@echo "  make rebuild-backtest  Rebuild and start backtest services"
+	@echo "  make logs-backtest  View logs from backtest services"
+	@echo "  make status-backtest  Check status of backtest services"
+	@echo "  make stop-backtest  Stop backtest services"
 	@echo ""
 	@echo "--- Testing ---"
 	@echo "  make test           Run all C++ tests inside the container"
@@ -270,6 +283,40 @@ stop-live-websocket:
 # Clean live WebSocket services
 clean-live-websocket:
 	docker-compose -f $(COMPOSE_FILE_LIVE_WEBSOCKET) down -v --remove-orphans
+
+# ==============================================================================
+# Backtest Webapp Services (Strategy Analysis)
+# ==============================================================================
+
+# Start backtest webapp services (Flask API + static frontend)
+run-backtest:
+	@echo "🚀 Starting backtest webapp (Flask API + frontend on port 8084)..."
+	docker-compose -f $(COMPOSE_FILE_BACKTEST) up -d --build
+
+# Start backtest services with output visible
+run-backtest-verbose:
+	@echo "🚀 Starting backtest webapp with output..."
+	docker-compose -f $(COMPOSE_FILE_BACKTEST) up --build
+
+# Rebuild and start backtest services
+rebuild-backtest:
+	docker-compose -f $(COMPOSE_FILE_BACKTEST) down && docker-compose -f $(COMPOSE_FILE_BACKTEST) up -d --build
+
+# View logs from backtest services
+logs-backtest:
+	docker-compose -f $(COMPOSE_FILE_BACKTEST) logs -f
+
+# Check status of backtest services
+status-backtest:
+	docker-compose -f $(COMPOSE_FILE_BACKTEST) ps
+
+# Stop backtest services
+stop-backtest:
+	docker-compose -f $(COMPOSE_FILE_BACKTEST) down
+
+# Clean backtest services
+clean-backtest:
+	docker-compose -f $(COMPOSE_FILE_BACKTEST) down -v --remove-orphans
 
 # ==============================================================================
 # Testing
