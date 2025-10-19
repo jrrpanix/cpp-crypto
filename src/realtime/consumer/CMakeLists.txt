@@ -33,7 +33,7 @@ include_directories(
     ../common/ # Common utilities
 )
 
-# Build consumer_main executable
+# Build consumer_main executable (original HTTP version)
 add_executable(consumer_main consumer_main.cpp)
 
 # Include paths (aligned with BookTicker location)
@@ -56,6 +56,30 @@ target_link_libraries(consumer_main
     crypto
 )
 
-# Optional: install the consumer binary (like binance_main)
-install(TARGETS consumer_main DESTINATION bin)
+# Build consumer_ws_main executable (new WebSocket version)
+add_executable(consumer_ws_main consumer_ws_main.cpp)
+
+# Include paths for WebSocket version
+target_include_directories(consumer_ws_main
+  PRIVATE
+  ${PROJECT_SRC_DIR}/src/realtime
+  ${PROJECT_SRC_DIR}/third_party/IXWebSocket
+)
+
+target_link_directories(consumer_ws_main PRIVATE ${DEPS_ROOT}/lib)
+target_compile_options(consumer_ws_main PRIVATE -O3 -march=native)
+
+# Link WebSocket consumer with IXWebSocket and ZMQ
+target_link_libraries(consumer_ws_main
+  PRIVATE
+    ixwebsocket
+    zmq
+    pthread
+    ssl
+    crypto
+    z  # zlib for IXWebSocket compression
+)
+
+# Install both binaries
+install(TARGETS consumer_main consumer_ws_main DESTINATION bin)
 

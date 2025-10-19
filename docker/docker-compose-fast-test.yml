@@ -22,12 +22,12 @@ services:
       - consumer
     networks:
       - market-net
-    command: /app/bin/mock_binance_main --throttle 100 --variation 0.002 --shock-prob 0.03 --shock-mag 0.008
+    command: /app/bin/mock_binance_main --throttle 20 --variation 0.002 --shock-prob 0.08 --shock-mag 0.015
     environment:
-      - PRODUCER_THROTTLE_MS=100
+      - PRODUCER_THROTTLE_MS=20
       - PRODUCER_VARIATION=0.002
-      - PRODUCER_SHOCK_PROB=0.03
-      - PRODUCER_SHOCK_MAG=0.008
+      - PRODUCER_SHOCK_PROB=0.08
+      - PRODUCER_SHOCK_MAG=0.015
     # Mount data, config, and test_data directories
     volumes:
       - ../data:/workspace/data:ro
@@ -49,4 +49,3 @@ services:
 
 networks:
   market-net:
-

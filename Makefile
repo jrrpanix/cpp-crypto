@@ -11,13 +11,15 @@ DEV_CONTAINER_NAME := cpp-crypto-dev-container
 COMPOSE_DIR := docker
 COMPOSE_FILE := $(COMPOSE_DIR)/docker-compose.yml
 COMPOSE_FILE_TEST := $(COMPOSE_DIR)/docker-compose-test.yml
+COMPOSE_FILE_FAST_TEST := $(COMPOSE_DIR)/docker-compose-fast-test.yml
+COMPOSE_FILE_WEBSOCKET := $(COMPOSE_DIR)/docker-compose-websocket.yml
 COMPOSE_FILE_2C := $(COMPOSE_DIR)/docker-compose-2-consumers.yml
 
 # Use this to run commands inside the running dev container
 DOCKER_EXEC := docker exec -it $(DEV_CONTAINER_NAME)
 DOCKER_EXEC_CI := docker exec $(DEV_CONTAINER_NAME)
 
-.PHONY: help build-dev run-dev shell-dev stop-dev deps build-code run-live rebuild-live stop-live run-test rebuild-test stop-test test
+.PHONY: help build-dev run-dev shell-dev stop-dev deps build-code run-live rebuild-live stop-live run-test rebuild-test stop-test run-fast-test rebuild-fast-test stop-fast-test run-websocket rebuild-websocket stop-websocket test
 
 # ==============================================================================
 # Help Target
@@ -50,9 +52,28 @@ help:
 	@echo "  make stop-live      Stop all live services"
 	@echo ""
 	@echo "--- Application Services (Test) ---"
-	@echo "  make run-test       Start the mock/test services using docker-compose"
+	@echo "  make run-test       Start mock/test services (10 msg/sec, realistic)"
+	@echo "  make run-test-verbose  Start the mock/test services with output"
 	@echo "  make rebuild-test   Rebuild and start the mock/test services"
+	@echo "  make logs-test      View logs from running test services"
+	@echo "  make status-test    Check status of test services"
 	@echo "  make stop-test      Stop the mock/test services"
+	@echo ""
+	@echo "--- Fast Test Services (High-Frequency) ---"
+	@echo "  make run-fast-test  Start FAST mock/test services (50 msg/sec max, shocks)"
+	@echo "  make run-fast-test-verbose  Start FAST services with output"
+	@echo "  make rebuild-fast-test  Rebuild and start FAST services"
+	@echo "  make logs-fast-test View logs from running FAST test services"
+	@echo "  make status-fast-test  Check status of FAST test services"
+	@echo "  make stop-fast-test Stop the FAST mock/test services"
+	@echo ""
+	@echo "--- Direct WebSocket Services (No FastAPI!) ---"
+	@echo "  make run-websocket  Start direct consumer→WebSocket→frontend (clean!)"
+	@echo "  make run-websocket-verbose  Start WebSocket services with output"
+	@echo "  make rebuild-websocket  Rebuild and start WebSocket services"
+	@echo "  make logs-websocket View logs from WebSocket services"
+	@echo "  make status-websocket  Check status of WebSocket services"
+	@echo "  make stop-websocket Stop WebSocket services"
 	@echo ""
 	@echo "--- Testing ---"
 	@echo "  make test           Run all C++ tests inside the container"
@@ -117,17 +138,91 @@ stop-live:
 # Application Services (Test)
 # ==============================================================================
 
-# Run test services (mock data)
+# Run test services (mock data) in background
 run-test:
+	@echo "🚀 Starting test services in background..."
+	docker-compose -f $(COMPOSE_FILE_TEST) up -d
+	@echo "✅ Test services running. Use 'make logs-test' to view output or 'make stop-test' to stop."
+
+# Run test services with output (foreground)
+run-test-verbose:
 	docker-compose -f $(COMPOSE_FILE_TEST) up
 
 # Rebuild and run test services
 rebuild-test:
-	docker-compose -f $(COMPOSE_FILE_TEST) up --build
+	docker-compose -f $(COMPOSE_FILE_TEST) up --build -d
+
+# View logs from test services
+logs-test:
+	docker-compose -f $(COMPOSE_FILE_TEST) logs -f
+
+# Check status of test services
+status-test:
+	docker-compose -f $(COMPOSE_FILE_TEST) ps
 
 # Stop test services
 stop-test:
 	docker-compose -f $(COMPOSE_FILE_TEST) down
+
+# ==============================================================================
+# Fast Test Services (High-Frequency Replay)
+# ==============================================================================
+
+# Start the fast mock/test services in background (5ms throttle, 0.5% variation)
+run-fast-test:
+	@echo "🚀 Starting FAST mock/test services (high-frequency replay)..."
+	docker-compose -f $(COMPOSE_FILE_FAST_TEST) up -d --build
+
+# Start the fast mock/test services with output visible
+run-fast-test-verbose:
+	@echo "🚀 Starting FAST mock/test services (high-frequency replay) with output..."
+	docker-compose -f $(COMPOSE_FILE_FAST_TEST) up --build
+
+# Rebuild and start the fast mock/test services
+rebuild-fast-test:
+	docker-compose -f $(COMPOSE_FILE_FAST_TEST) down && docker-compose -f $(COMPOSE_FILE_FAST_TEST) up -d --build
+
+# View logs from running fast test services
+logs-fast-test:
+	docker-compose -f $(COMPOSE_FILE_FAST_TEST) logs -f
+
+# Check status of fast test services
+status-fast-test:
+	docker-compose -f $(COMPOSE_FILE_FAST_TEST) ps
+
+# Stop fast test services
+stop-fast-test:
+	docker-compose -f $(COMPOSE_FILE_FAST_TEST) down
+
+# ==============================================================================
+# Direct WebSocket Services (No FastAPI Middleman)
+# ==============================================================================
+
+# Start the direct WebSocket services (consumer WebSocket + static frontend)
+run-websocket:
+	@echo "🚀 Starting direct WebSocket services (no FastAPI)..."
+	docker-compose -f $(COMPOSE_FILE_WEBSOCKET) up -d --build
+
+# Start the direct WebSocket services with output visible
+run-websocket-verbose:
+	@echo "🚀 Starting direct WebSocket services with output..."
+	docker-compose -f $(COMPOSE_FILE_WEBSOCKET) up --build
+
+# Rebuild and start the direct WebSocket services
+rebuild-websocket:
+	docker-compose -f $(COMPOSE_FILE_WEBSOCKET) down && docker-compose -f $(COMPOSE_FILE_WEBSOCKET) up -d --build
+
+# View logs from running WebSocket services
+logs-websocket:
+	docker-compose -f $(COMPOSE_FILE_WEBSOCKET) logs -f
+
+# Check status of WebSocket services
+status-websocket:
+	docker-compose -f $(COMPOSE_FILE_WEBSOCKET) ps
+
+# Stop WebSocket services
+stop-websocket:
+	docker-compose -f $(COMPOSE_FILE_WEBSOCKET) down
 
 # ==============================================================================
 # Testing

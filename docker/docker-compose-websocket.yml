@@ -3,14 +3,14 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.runtime
-    container_name: consumer
+    container_name: consumer-websocket
     networks:
       - market-net
-    command: /app/bin/consumer_main --sendweb
-    # Mount data directory for access to parquet files if needed
+    command: /app/bin/consumer_ws_main --websocket --port 9001
+    ports:
+      - "9001:9001"  # WebSocket server port
     # Mount config directory so binaries can find their config files
     volumes:
-      - ../data:/workspace/data:ro
       - ../apps/config:/workspace/apps/config:ro
 
   producer:
@@ -34,19 +34,16 @@ services:
       - ../apps/config:/workspace/apps/config:ro
       - ../test_data:/workspace/test_data:ro
 
-
+  # Simple HTTP server for serving static frontend files
   webserver:
-    build:
-      context: ..                          # repo root
-      dockerfile: docker/webserver/Dockerfile
-    container_name: fastapi-server
+    image: nginx:alpine
+    container_name: frontend-server
+    ports:
+      - "8082:80"  # Use port 8082 to avoid conflicts
+    volumes:
+      - ../frontend:/usr/share/nginx/html:ro
     networks:
       - market-net
-    volumes:
-      - ../server:/app                     # mount code where the Dockerfile expects it
-    ports:
-      - "8000:8000"
 
 networks:
   market-net:
-

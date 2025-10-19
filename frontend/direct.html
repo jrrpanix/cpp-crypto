@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Consumer WebSocket - Crypto Trading Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+
+        .header-subtitle {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .status-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .connection-status {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .status-connected {
+            background: #27ae60;
+            color: white;
+        }
+
+        .status-disconnected {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .heartbeat {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #95a5a6;
+            margin-right: 8px;
+            display: inline-block;
+        }
+
+        .heartbeat.active {
+            background: #27ae60;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .metrics {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .metric {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .table-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: #34495e;
+            color: white;
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #ecf0f1;
+            font-size: 0.95rem;
+        }
+
+        tr:hover {
+            background: rgba(52, 152, 219, 0.1);
+        }
+
+        .symbol {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .price {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+
+        .positive {
+            color: #27ae60;
+        }
+
+        .negative {
+            color: #e74c3c;
+        }
+
+        .spread {
+            font-family: 'Courier New', monospace;
+            color: #7f8c8d;
+        }
+
+        .message-count {
+            background: #ecf0f1;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            color: #34495e;
+            text-align: center;
+        }
+
+        .last-update {
+            color: #7f8c8d;
+            font-size: 0.85rem;
+        }
+
+        .no-data {
+            text-align: center;
+            color: #7f8c8d;
+            font-style: italic;
+            padding: 40px;
+        }
+
+        .architecture-info {
+            background: rgba(46, 204, 113, 0.1);
+            border: 2px solid #27ae60;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .architecture-info h3 {
+            color: #27ae60;
+            margin-bottom: 10px;
+        }
+
+        .architecture-info p {
+            color: #2c3e50;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Direct Consumer WebSocket</h1>
+            <p class="header-subtitle">Real-time crypto data streaming directly from C++ consumer to webpage</p>
+            
+            <div class="controls">
+                <div class="status-section">
+                    <div id="connectionStatus" class="connection-status status-disconnected">
+                        Disconnected
+                    </div>
+                    <div class="metric">
+                        <span class="heartbeat" id="heartbeat"></span>
+                        <span id="heartbeatText">No Activity</span>
+                    </div>
+                </div>
+                
+                <button id="connectBtn" class="btn" onclick="dashboard.toggleConnection()">
+                    Connect
+                </button>
+                
+                <button class="btn" onclick="dashboard.clearData()">
+                    Clear Data
+                </button>
+                
+                <div class="metrics">
+                    <div class="metric">
+                        📊 Total Messages: <strong id="totalMessages">0</strong>
+                    </div>
+                    <div class="metric">
+                        🔗 Source: <strong id="dataSourceText">No Connection</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Last Price</th>
+                        <th>Bid Price</th>
+                        <th>Ask Price</th>
+                        <th>Spread</th>
+                        <th>Messages</th>
+                        <th>Last Update</th>
+                    </tr>
+                </thead>
+                <tbody id="tradingTableBody">
+                    <tr>
+                        <td colspan="7" class="no-data">
+                            Click "Connect" to start receiving live data from consumer WebSocket
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="architecture-info">
+            <h3>🏗️ New Clean Architecture</h3>
+            <p>
+                <strong>Producer</strong> → ZMQ → <strong>Consumer (WebSocket Server)</strong> → <strong>Webpage (Direct Connection)</strong>
+                <br><br>
+                ✅ <strong>No FastAPI middleman</strong> - Direct WebSocket from C++ consumer to frontend<br>
+                ✅ <strong>Real-time streaming</strong> - No HTTP polling overhead<br>
+                ✅ <strong>Minimal latency</strong> - Data flows directly from ZMQ to WebSocket<br>
+                ✅ <strong>Simple deployment</strong> - Only producer, consumer, and static file server needed
+            </p>
+        </div>
+    </div>
+
+    <script src="websocket-direct.js"></script>
+</body>
+</html>

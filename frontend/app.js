@@ -179,9 +179,11 @@ class CryptoDashboard {
         const pollInterval = setInterval(async () => {
             try {
                 const response = await fetch(`${window.location.origin}/status/latest`);
+                console.log(`Dashboard: Fetched ${window.location.origin}/status/latest, status: ${response.status}`);
                 if (response.ok) {
                     consecutiveErrors = 0; // Reset error count on success
                     const messages = await response.json();
+                    console.log(`Dashboard: Received ${messages.length} messages from server`);
                     
                     if (messages && messages.length > 0) {
                         // Convert server messages to frontend format
@@ -229,12 +231,10 @@ class CryptoDashboard {
                     this.addLog('Switching to demo mode...', 'info');
                 } else if (consecutiveErrors >= maxErrors) {
                     this.addLog(`HTTP polling stopped after ${maxErrors} failures`, 'error');
-                    this.addLog('Backend server not available - demo data only', 'warning');
+                    this.addLog('Backend server not available - NO DATA MODE', 'warning');
                     clearInterval(pollInterval);
-                    // Start demo data if not already started
-                    if (this.metrics.totalMessages === 0) {
-                        setTimeout(() => this.generateDemoData(), 1000);
-                    }
+                    // NO demo data generation - stay in no-data state
+                    this.updateConnectionStatus('error');
                 }
             }
         }, 5000);
@@ -251,17 +251,17 @@ class CryptoDashboard {
         switch (status) {
             case 'connected':
                 dotElement.classList.add('connected');
-                textElement.textContent = 'Connected';
+                textElement.textContent = 'Connected (Real Data)';
                 break;
             case 'connecting':
                 dotElement.classList.add('connecting');
                 textElement.textContent = 'Connecting...';
                 break;
             case 'disconnected':
-                textElement.textContent = 'Disconnected';
+                textElement.textContent = 'Disconnected - No Data';
                 break;
             case 'error':
-                textElement.textContent = 'Connection Error';
+                textElement.textContent = 'No Server - No Data';
                 break;
         }
     }
@@ -289,6 +289,7 @@ class CryptoDashboard {
     }
     
     addPriceUpdate(price) {
+        console.log(`Dashboard: Adding price update for ${price.symbol}: bid=${price.bid_price}, ask=${price.ask_price}, timestamp=${price.timestamp}`);
         this.priceUpdates.unshift(price);
         if (this.priceUpdates.length > this.maxHistoryItems) {
             this.priceUpdates = this.priceUpdates.slice(0, this.maxHistoryItems);
@@ -360,60 +361,10 @@ class CryptoDashboard {
     }
     
     startMetricsUpdater() {
-        // Generate some demo data if no real data is coming in
-        setTimeout(() => {
-            if (this.metrics.totalMessages === 0 && this.recentTrades.length === 0 && this.priceUpdates.length === 0) {
-                this.addLog('No backend connection - starting demo mode', 'info');
-                this.generateDemoData();
-            }
-        }, 8000); // Reduced from 10s to 8s for faster demo start
+        // No demo data generation - only real data sources allowed
+        console.log('Dashboard: Waiting for real server connection - no demo data');
     }
     
-    generateDemoData() {
-        // Realistic price ranges for each symbol
-        const symbolPrices = {
-            'BTCUSDT': { base: 43000, range: 4000 },    // BTC: $43k-47k
-            'ETHUSDT': { base: 2200, range: 300 },      // ETH: $2.2k-2.5k
-            'ADAUSDT': { base: 0.35, range: 0.1 },      // ADA: $0.35-0.45
-            'DOTUSDT': { base: 4.5, range: 1.0 },       // DOT: $4.5-5.5
-            'LINKUSDT': { base: 11, range: 2 }          // LINK: $11-13
-        };
-        
-        setInterval(() => {
-            // Pick a random symbol
-            const symbols = Object.keys(symbolPrices);
-            const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-            const priceConfig = symbolPrices[symbol];
-            
-            // Generate realistic price for this symbol
-            const basePrice = priceConfig.base + (Math.random() * priceConfig.range);
-            const spread = basePrice * 0.001; // 0.1% spread
-            
-            // Generate fake trade
-            const trade = {
-                symbol: symbol,
-                price: basePrice + (Math.random() - 0.5) * spread * 2,
-                timestamp: Date.now()
-            };
-            this.addTrade(trade);
-            
-            // Generate fake price update with bid/ask
-            const price = {
-                symbol: symbol,
-                bid_price: basePrice - spread/2,
-                ask_price: basePrice + spread/2,
-                timestamp: Date.now()
-            };
-            this.addPriceUpdate(price);
-            
-            // Update metrics
-            this.updateMetrics({
-                activeSymbols: symbols.length,
-                messagesPerSec: Math.floor(Math.random() * 100) + 10,
-                totalMessages: (this.metrics.totalMessages || 0) + Math.floor(Math.random() * 50) + 1
-            });
-        }, 2000);
-    }
     
     // Utility functions
     formatNumber(num) {
