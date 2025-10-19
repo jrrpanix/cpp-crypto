@@ -1,0 +1,46 @@
+services:
+  consumer-websocket:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.runtime
+    container_name: consumer-websocket-live
+    ports:
+      - "9001:9001"
+    networks:
+      - market-net
+    command: /app/bin/consumer_ws_main
+    volumes:
+      - ../data:/workspace/data:ro
+      - ../apps/config:/workspace/apps/config:ro
+
+  producer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.runtime
+    container_name: producer-live
+    depends_on:
+      - consumer-websocket
+    networks:
+      - market-net
+    volumes:
+      - ../data:/workspace/data:ro
+      - ../apps/config:/workspace/apps/config:ro
+    command: >
+      /app/bin/binance_main
+      --config_file /workspace/apps/config/binance/config.json
+      --key fut
+      --symbol_file /workspace/apps/config/binance/symbols.json
+      --zmqon
+
+  frontend-server:
+    image: nginx:alpine
+    container_name: frontend-server-live
+    ports:
+      - "8083:80"  # Different port to avoid conflicts
+    volumes:
+      - ../frontend:/usr/share/nginx/html:ro
+    networks:
+      - market-net
+
+networks:
+  market-net:

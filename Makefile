@@ -13,6 +13,7 @@ COMPOSE_FILE := $(COMPOSE_DIR)/docker-compose.yml
 COMPOSE_FILE_TEST := $(COMPOSE_DIR)/docker-compose-test.yml
 COMPOSE_FILE_FAST_TEST := $(COMPOSE_DIR)/docker-compose-fast-test.yml
 COMPOSE_FILE_WEBSOCKET := $(COMPOSE_DIR)/docker-compose-websocket.yml
+COMPOSE_FILE_LIVE_WEBSOCKET := $(COMPOSE_DIR)/docker-compose-live-websocket.yml
 COMPOSE_FILE_2C := $(COMPOSE_DIR)/docker-compose-2-consumers.yml
 
 # Use this to run commands inside the running dev container
@@ -68,12 +69,20 @@ help:
 	@echo "  make stop-fast-test Stop the FAST mock/test services"
 	@echo ""
 	@echo "--- Direct WebSocket Services (No FastAPI!) ---"
-	@echo "  make run-websocket  Start direct consumer→WebSocket→frontend (clean!)"
+	@echo "  make run-websocket  Start direct consumer→WebSocket→frontend (TEST data)"
 	@echo "  make run-websocket-verbose  Start WebSocket services with output"
 	@echo "  make rebuild-websocket  Rebuild and start WebSocket services"
 	@echo "  make logs-websocket View logs from WebSocket services"
 	@echo "  make status-websocket  Check status of WebSocket services"
 	@echo "  make stop-websocket Stop WebSocket services"
+	@echo ""
+	@echo "--- Live WebSocket Services (Real Binance!) ---"
+	@echo "  make run-live-websocket  Start LIVE Binance→WebSocket→frontend (port 8083)"
+	@echo "  make run-live-websocket-verbose  Start LIVE services with output"
+	@echo "  make rebuild-live-websocket  Rebuild and start LIVE WebSocket services"
+	@echo "  make logs-live-websocket View logs from LIVE WebSocket services"
+	@echo "  make status-live-websocket  Check status of LIVE WebSocket services"
+	@echo "  make stop-live-websocket Stop LIVE WebSocket services"
 	@echo ""
 	@echo "--- Testing ---"
 	@echo "  make test           Run all C++ tests inside the container"
@@ -223,6 +232,44 @@ status-websocket:
 # Stop WebSocket services
 stop-websocket:
 	docker-compose -f $(COMPOSE_FILE_WEBSOCKET) down
+
+# Clean WebSocket services (remove containers, networks, volumes)
+clean-websocket:
+	docker-compose -f $(COMPOSE_FILE_WEBSOCKET) down -v --remove-orphans
+
+# ==============================================================================
+# Live WebSocket Services (Real Binance + WebSocket Frontend)
+# ==============================================================================
+
+# Start live WebSocket services (real Binance data + WebSocket frontend)
+run-live-websocket:
+	@echo "🚀 Starting LIVE WebSocket services (real Binance data)..."
+	docker-compose -f $(COMPOSE_FILE_LIVE_WEBSOCKET) up -d --build
+
+# Start live WebSocket services with output visible
+run-live-websocket-verbose:
+	@echo "🚀 Starting LIVE WebSocket services with output..."
+	docker-compose -f $(COMPOSE_FILE_LIVE_WEBSOCKET) up --build
+
+# Rebuild and start live WebSocket services
+rebuild-live-websocket:
+	docker-compose -f $(COMPOSE_FILE_LIVE_WEBSOCKET) down && docker-compose -f $(COMPOSE_FILE_LIVE_WEBSOCKET) up -d --build
+
+# View logs from live WebSocket services
+logs-live-websocket:
+	docker-compose -f $(COMPOSE_FILE_LIVE_WEBSOCKET) logs -f
+
+# Check status of live WebSocket services
+status-live-websocket:
+	docker-compose -f $(COMPOSE_FILE_LIVE_WEBSOCKET) ps
+
+# Stop live WebSocket services
+stop-live-websocket:
+	docker-compose -f $(COMPOSE_FILE_LIVE_WEBSOCKET) down
+
+# Clean live WebSocket services
+clean-live-websocket:
+	docker-compose -f $(COMPOSE_FILE_LIVE_WEBSOCKET) down -v --remove-orphans
 
 # ==============================================================================
 # Testing
