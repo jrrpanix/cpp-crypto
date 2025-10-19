@@ -6,7 +6,7 @@ services:
     container_name: consumer-websocket
     networks:
       - market-net
-    command: /app/bin/consumer_ws_main --websocket --port 9001
+    command: /app/bin/consumer_ws_main --websocket --port 9001 --symbols /workspace/apps/config/binance/symbols.json
     ports:
       - "9001:9001"  # WebSocket server port
     # Mount config directory so binaries can find their config files

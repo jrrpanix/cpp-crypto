@@ -16,6 +16,8 @@ struct Args {
   bool websocket = false;
   int ws_port = 9001;
   std::string symbol_file = "/workspace/apps/config/binance/symbols.json";
+  int throttle_ms = 0;  // Throttle in milliseconds (0 = no throttle)
+  int max_rate = 0;     // Maximum messages per second (0 = unlimited)
 };
 
 Args parse_args(int argc, char **argv) {
@@ -28,6 +30,10 @@ Args parse_args(int argc, char **argv) {
       args.ws_port = std::stoi(argv[++i]);
     } else if (arg == "--symbols" && i + 1 < argc) {
       args.symbol_file = argv[++i];
+    } else if (arg == "--throttle" && i + 1 < argc) {
+      args.throttle_ms = std::stoi(argv[++i]);
+    } else if (arg == "--max-rate" && i + 1 < argc) {
+      args.max_rate = std::stoi(argv[++i]);
     }
   }
   return args;
@@ -146,7 +152,9 @@ int main(int argc, char **argv) {
   
   if (!args.websocket) {
     std::cerr << "❌ Use --websocket flag to enable WebSocket server mode\n";
-    std::cerr << "Usage: " << argv[0] << " --websocket [--port 9001] [--symbols path]\n";
+    std::cerr << "Usage: " << argv[0] << " --websocket [--port 9001] [--symbols path] [--throttle ms] [--max-rate rate]\n";
+    std::cerr << "  --throttle ms   : Throttle between messages (milliseconds)\n";
+    std::cerr << "  --max-rate rate : Maximum messages per second\n";
     return 1;
   }
 
@@ -186,6 +194,11 @@ int main(int argc, char **argv) {
     std::cout << "🚀 WebSocket server ready on port " << args.ws_port << std::endl;
     std::cout << "📡 Broadcasting BookTicker data to connected clients..." << std::endl;
 
+    // Throttling variables
+    auto last_send_time = std::chrono::steady_clock::now();
+    auto rate_window_start = std::chrono::steady_clock::now();
+    int messages_in_window = 0;
+
     // Main consumer loop
     int message_count = 0;
     while (true) {
@@ -212,16 +225,47 @@ int main(int argc, char **argv) {
                     << " | Bid: " << ticker.bid_price 
                     << " | Ask: " << ticker.ask_price << std::endl;
           
-          // Broadcast to WebSocket clients
-          nlohmann::json json_data = bookTickerToJson(ticker, symbol);
-          broadcaster->broadcast(json_data);
+          // Rate limiting check
+          auto now = std::chrono::steady_clock::now();
+          bool should_send = true;
           
-          message_count++;
+          if (args.max_rate > 0) {
+            // Check if we're in a new second window
+            auto time_since_window_start = std::chrono::duration_cast<std::chrono::seconds>(now - rate_window_start).count();
+            if (time_since_window_start >= 1) {
+              // Reset for new window
+              rate_window_start = now;
+              messages_in_window = 0;
+            }
+            
+            // Check if we've exceeded the rate limit
+            if (messages_in_window >= args.max_rate) {
+              should_send = false;
+            }
+          }
           
-          // Log statistics every 50 messages
-          if (message_count % 50 == 0) {
-            std::cout << "📊 Sent " << message_count << " messages to " 
-                      << broadcaster->getConnectionCount() << " WebSocket clients" << std::endl;
+          if (args.throttle_ms > 0) {
+            // Check throttle timing
+            auto time_since_last = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_send_time).count();
+            if (time_since_last < args.throttle_ms) {
+              should_send = false;
+            }
+          }
+          
+          if (should_send) {
+            // Broadcast to WebSocket clients
+            nlohmann::json json_data = bookTickerToJson(ticker, symbol);
+            broadcaster->broadcast(json_data);
+            
+            last_send_time = now;
+            messages_in_window++;
+            message_count++;
+            
+            // Log statistics every 50 messages
+            if (message_count % 50 == 0) {
+              std::cout << "📊 Sent " << message_count << " messages to " 
+                        << broadcaster->getConnectionCount() << " WebSocket clients" << std::endl;
+            }
           }
         }
       }
