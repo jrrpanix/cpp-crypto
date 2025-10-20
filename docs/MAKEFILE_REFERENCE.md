@@ -115,15 +115,15 @@ make run-backtest
 make logs-backtest
 make stop-backtest
 
-# WebSocket services
+# WebSocket services (test data)
 make run-websocket
 make logs-websocket
 make stop-websocket
 
-# Fast test services
-make run-fast-test
-make logs-fast-test
-make stop-fast-test
+# WebSocket services (live Binance data)
+make run-live-websocket
+make logs-live-websocket
+make stop-live-websocket
 ```
 
 ## 🔍 Troubleshooting
@@ -177,12 +177,9 @@ Key categories:
 - **Development Environment**: build-dev, run-dev, shell-dev, stop-dev
 - **Build Commands**: deps, build-code
 - **Python Quality**: py-format, py-lint, py-check, py-test, py-all
-- **Live Services**: run-live, rebuild-live, stop-live
-- **Test Services**: run-test, rebuild-test, stop-test, logs-test
-- **Fast Test**: run-fast-test, rebuild-fast-test, stop-fast-test
-- **WebSocket**: run-websocket, rebuild-websocket, stop-websocket
-- **Live WebSocket**: run-live-websocket, rebuild-live-websocket, stop-live-websocket
-- **Backtest**: run-backtest, rebuild-backtest, stop-backtest, logs-backtest
+- **WebSocket (Test Data)**: run-websocket, rebuild-websocket, stop-websocket, clean-websocket
+- **WebSocket (Live Binance)**: run-live-websocket, rebuild-live-websocket, stop-live-websocket, clean-live-websocket
+- **Backtest Webapp**: run-backtest, rebuild-backtest, stop-backtest, logs-backtest, clean-backtest
 - **Testing**: test
 
 ## 💡 Pro Tips

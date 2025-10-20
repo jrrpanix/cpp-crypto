@@ -13,9 +13,6 @@ DEV_CONTAINER_NAME := cpp-crypto-dev-container
 
 # Docker Compose file paths
 COMPOSE_DIR := docker
-COMPOSE_FILE := $(COMPOSE_DIR)/docker-compose.yml
-COMPOSE_FILE_TEST := $(COMPOSE_DIR)/docker-compose-test.yml
-COMPOSE_FILE_FAST_TEST := $(COMPOSE_DIR)/docker-compose-fast-test.yml
 COMPOSE_FILE_WEBSOCKET := $(COMPOSE_DIR)/docker-compose-websocket.yml
 COMPOSE_FILE_LIVE_WEBSOCKET := $(COMPOSE_DIR)/docker-compose-live-websocket.yml
 COMPOSE_FILE_BACKTEST := $(COMPOSE_DIR)/docker-compose-backtest.yml
@@ -25,7 +22,7 @@ COMPOSE_FILE_2C := $(COMPOSE_DIR)/docker-compose-2-consumers.yml
 DOCKER_EXEC := docker exec -it $(DEV_CONTAINER_NAME)
 DOCKER_EXEC_CI := docker exec $(DEV_CONTAINER_NAME)
 
-.PHONY: help build-dev run-dev shell-dev stop-dev deps build-code run-live rebuild-live stop-live run-test rebuild-test stop-test run-fast-test rebuild-fast-test stop-fast-test run-websocket rebuild-websocket stop-websocket test
+.PHONY: help build-dev run-dev shell-dev stop-dev deps build-code run-websocket rebuild-websocket stop-websocket run-live-websocket rebuild-live-websocket stop-live-websocket run-backtest rebuild-backtest stop-backtest test
 
 # ==============================================================================
 # Help Target
@@ -52,50 +49,32 @@ help:
 	@echo "  make py-test        Run Python tests"
 	@echo "  make py-all         Format, lint, and test Python code"
 	@echo ""
-	@echo "--- Application Services (Live) ---"
-	@echo "  make run-live       Start all live services using docker-compose"
-	@echo "  make rebuild-live   Rebuild and start all live services"
-	@echo "  make stop-live      Stop all live services"
+	@echo "--- WebSocket Services (Test Data) ---"
+	@echo "  make run-websocket         Start consumer→WebSocket→frontend (TEST data, port 8082)"
+	@echo "  make run-websocket-verbose Start WebSocket services with output"
+	@echo "  make rebuild-websocket     Rebuild and start WebSocket services"
+	@echo "  make logs-websocket        View logs from WebSocket services"
+	@echo "  make status-websocket      Check status of WebSocket services"
+	@echo "  make stop-websocket        Stop WebSocket services"
+	@echo "  make clean-websocket       Remove containers, networks, volumes"
 	@echo ""
-	@echo "--- Application Services (Test) ---"
-	@echo "  make run-test       Start mock/test services (10 msg/sec, realistic)"
-	@echo "  make run-test-verbose  Start the mock/test services with output"
-	@echo "  make rebuild-test   Rebuild and start the mock/test services"
-	@echo "  make logs-test      View logs from running test services"
-	@echo "  make status-test    Check status of test services"
-	@echo "  make stop-test      Stop the mock/test services"
-	@echo ""
-	@echo "--- Fast Test Services (High-Frequency) ---"
-	@echo "  make run-fast-test  Start FAST mock/test services (50 msg/sec max, shocks)"
-	@echo "  make run-fast-test-verbose  Start FAST services with output"
-	@echo "  make rebuild-fast-test  Rebuild and start FAST services"
-	@echo "  make logs-fast-test View logs from running FAST test services"
-	@echo "  make status-fast-test  Check status of FAST test services"
-	@echo "  make stop-fast-test Stop the FAST mock/test services"
-	@echo ""
-	@echo "--- Direct WebSocket Services (No FastAPI!) ---"
-	@echo "  make run-websocket  Start direct consumer→WebSocket→frontend (TEST data)"
-	@echo "  make run-websocket-verbose  Start WebSocket services with output"
-	@echo "  make rebuild-websocket  Rebuild and start WebSocket services"
-	@echo "  make logs-websocket View logs from WebSocket services"
-	@echo "  make status-websocket  Check status of WebSocket services"
-	@echo "  make stop-websocket Stop WebSocket services"
-	@echo ""
-	@echo "--- Live WebSocket Services (Real Binance!) ---"
-	@echo "  make run-live-websocket  Start LIVE Binance→WebSocket→frontend (port 8083)"
-	@echo "  make run-live-websocket-verbose  Start LIVE services with output"
-	@echo "  make rebuild-live-websocket  Rebuild and start LIVE WebSocket services"
-	@echo "  make logs-live-websocket View logs from LIVE WebSocket services"
-	@echo "  make status-live-websocket  Check status of LIVE WebSocket services"
-	@echo "  make stop-live-websocket Stop LIVE WebSocket services"
+	@echo "--- Live WebSocket Services (Real Binance Data) ---"
+	@echo "  make run-live-websocket         Start LIVE Binance→WebSocket→frontend (port 8083)"
+	@echo "  make run-live-websocket-verbose Start LIVE services with output"
+	@echo "  make rebuild-live-websocket     Rebuild and start LIVE WebSocket services"
+	@echo "  make logs-live-websocket        View logs from LIVE WebSocket services"
+	@echo "  make status-live-websocket      Check status of LIVE WebSocket services"
+	@echo "  make stop-live-websocket        Stop LIVE WebSocket services"
+	@echo "  make clean-live-websocket       Remove containers, networks, volumes"
 	@echo ""
 	@echo "--- Backtest Webapp Services ---"
-	@echo "  make run-backtest   Start backtest webapp (Flask API + frontend, port 8084)"
-	@echo "  make run-backtest-verbose  Start backtest services with output"
-	@echo "  make rebuild-backtest  Rebuild and start backtest services"
-	@echo "  make logs-backtest  View logs from backtest services"
-	@echo "  make status-backtest  Check status of backtest services"
-	@echo "  make stop-backtest  Stop backtest services"
+	@echo "  make run-backtest         Start backtest webapp (Flask API + frontend, port 8084)"
+	@echo "  make run-backtest-verbose Start backtest services with output"
+	@echo "  make rebuild-backtest     Rebuild and start backtest services"
+	@echo "  make logs-backtest        View logs from backtest services"
+	@echo "  make status-backtest      Check status of backtest services"
+	@echo "  make stop-backtest        Stop backtest services"
+	@echo "  make clean-backtest       Remove containers, networks, volumes"
 	@echo ""
 	@echo "--- Testing ---"
 	@echo "  make test           Run all C++ tests inside the container"
@@ -140,84 +119,7 @@ build-code:
 
 
 # ==============================================================================
-# Application Services (Live)
-# ==============================================================================
-
-# Run live services
-run-live:
-	docker-compose -f $(COMPOSE_FILE) up
-
-# Rebuild and run live services
-rebuild-live:
-	docker-compose -f $(COMPOSE_FILE) up --build
-
-# Stop live services
-stop-live:
-	docker-compose -f $(COMPOSE_FILE) down
-
-
-# ==============================================================================
-# Application Services (Test)
-# ==============================================================================
-
-# Run test services (mock data) in background
-run-test:
-	@echo "🚀 Starting test services in background..."
-	docker-compose -f $(COMPOSE_FILE_TEST) up -d
-	@echo "✅ Test services running. Use 'make logs-test' to view output or 'make stop-test' to stop."
-
-# Run test services with output (foreground)
-run-test-verbose:
-	docker-compose -f $(COMPOSE_FILE_TEST) up
-
-# Rebuild and run test services
-rebuild-test:
-	docker-compose -f $(COMPOSE_FILE_TEST) up --build -d
-
-# View logs from test services
-logs-test:
-	docker-compose -f $(COMPOSE_FILE_TEST) logs -f
-
-# Check status of test services
-status-test:
-	docker-compose -f $(COMPOSE_FILE_TEST) ps
-
-# Stop test services
-stop-test:
-	docker-compose -f $(COMPOSE_FILE_TEST) down
-
-# ==============================================================================
-# Fast Test Services (High-Frequency Replay)
-# ==============================================================================
-
-# Start the fast mock/test services in background (5ms throttle, 0.5% variation)
-run-fast-test:
-	@echo "🚀 Starting FAST mock/test services (high-frequency replay)..."
-	docker-compose -f $(COMPOSE_FILE_FAST_TEST) up -d --build
-
-# Start the fast mock/test services with output visible
-run-fast-test-verbose:
-	@echo "🚀 Starting FAST mock/test services (high-frequency replay) with output..."
-	docker-compose -f $(COMPOSE_FILE_FAST_TEST) up --build
-
-# Rebuild and start the fast mock/test services
-rebuild-fast-test:
-	docker-compose -f $(COMPOSE_FILE_FAST_TEST) down && docker-compose -f $(COMPOSE_FILE_FAST_TEST) up -d --build
-
-# View logs from running fast test services
-logs-fast-test:
-	docker-compose -f $(COMPOSE_FILE_FAST_TEST) logs -f
-
-# Check status of fast test services
-status-fast-test:
-	docker-compose -f $(COMPOSE_FILE_FAST_TEST) ps
-
-# Stop fast test services
-stop-fast-test:
-	docker-compose -f $(COMPOSE_FILE_FAST_TEST) down
-
-# ==============================================================================
-# Direct WebSocket Services (No FastAPI Middleman)
+# WebSocket Services (Test Data)
 # ==============================================================================
 
 # Start the direct WebSocket services (consumer WebSocket + static frontend)
