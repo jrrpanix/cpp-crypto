@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 95%;
             margin: 0 auto;
         }
 
@@ -200,29 +200,251 @@
             margin: 20px 0;
         }
 
-        .direction-select {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
+        /* Table Styles */
+        .params-table-container {
+            overflow-x: auto;
+            margin: 20px 0;
         }
 
-        .direction-btn {
-            padding: 10px;
-            border: 2px solid #ecf0f1;
+        .params-table {
+            width: 100%;
+            border-collapse: collapse;
             background: white;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
+            font-size: 0.9rem;
         }
 
-        .direction-btn.selected {
+        .params-table th {
+            background: #3498db;
+            color: white;
+            padding: 12px 8px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+            line-height: 1.3;
+            border: 1px solid #2980b9;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .params-table td {
+            padding: 8px;
+            border: 1px solid #ecf0f1;
+            text-align: center;
+        }
+
+        .params-table input,
+        .params-table select {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        .params-table input:focus,
+        .params-table select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .params-table .direction-cell {
+            padding: 4px;
+        }
+
+        .params-table .direction-btn {
+            width: 100%;
+            padding: 6px 4px;
+            margin: 2px 0;
+            border: 1px solid #ecf0f1;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.75rem;
+        }
+
+        .params-table .direction-btn.selected {
             background: #3498db;
             color: white;
             border-color: #3498db;
         }
 
-        .direction-btn:hover {
+        .params-table .direction-btn:hover {
             border-color: #3498db;
+        }
+
+        .params-table .action-cell {
+            white-space: nowrap;
+        }
+
+        .btn-sm {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 0 2px;
+        }
+
+        .btn-run {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-run:hover {
+            background: #229954;
+        }
+
+        .btn-run:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .btn-remove {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-remove:hover {
+            background: #c0392b;
+        }
+
+        .btn-add-row {
+            background: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 0;
+        }
+
+        .btn-add-row:hover {
+            background: #2980b9;
+        }
+
+        .status-cell {
+            font-size: 0.85rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .status-pending {
+            background: #ecf0f1;
+            color: #7f8c8d;
+        }
+
+        .status-running {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-complete {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Results Table */
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.9rem;
+        }
+
+        .results-table th {
+            background: #f8f9fa;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+            font-size: 0.85rem;
+        }
+
+        .results-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .results-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .metric-positive {
+            color: #27ae60;
+            font-weight: 600;
+        }
+
+        .metric-negative {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+
+        .plot-preview {
+            max-width: 150px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: transform 0.2s;
+        }
+
+        .plot-preview:hover {
+            transform: scale(1.05);
+        }
+
+        /* Modal for plot viewing */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+        }
+
+        .modal-content img {
+            max-width: 100%;
+            max-height: 90vh;
+            border-radius: 8px;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            color: white;
+            font-size: 32px;
+            cursor: pointer;
+            background: rgba(0, 0, 0, 0.5);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
     </style>
 </head>
@@ -230,127 +452,71 @@
     <div class="container">
         <div class="header">
             <h1>📊 Trading Strategy Backtest</h1>
-            <p class="subtitle">Test window-based trading strategies on historical data</p>
+            <p class="subtitle">Run multiple strategy tests simultaneously and compare results</p>
         </div>
 
         <div class="card">
             <h2>Strategy Parameters</h2>
             <div class="info-box">
                 <strong>How it works:</strong> Define events as up/down price movements within a detection window. 
-                When threshold is hit, enter position and hold for specified period.
-                Example: "BTC 0.01 B -0.02 S 30 30" = Buy if +1% in 30 bars, Sell if -2% in 30 bars, hold for 30 bars.
+                When threshold is hit, enter position and hold for specified period. Add multiple rows to test different parameter combinations.
             </div>
 
-            <form id="backtestForm">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="symbol">Symbol</label>
-                        <select id="symbol" required>
-                            <option value="">Loading symbols...</option>
-                        </select>
-                    </div>
+            <div class="params-table-container">
+                <table class="params-table" id="paramsTable">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Up<br>Thr</th>
+                            <th>Up<br>Dir</th>
+                            <th>Dn<br>Thr</th>
+                            <th>Dn<br>Dir</th>
+                            <th>Detection<br>Window</th>
+                            <th>Hold<br>Window</th>
+                            <th>Position<br>Size</th>
+                            <th>Pos<br>Limit</th>
+                            <th>N<br>Accounts</th>
+                            <th>Start<br>Date</th>
+                            <th>Fee<br>Rate</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="paramsTableBody">
+                        <!-- Rows will be added dynamically -->
+                    </tbody>
+                </table>
+            </div>
 
-                    <div class="form-group">
-                        <label for="upThreshold">UP Threshold (e.g., 0.01 = 1%)</label>
-                        <input type="number" id="upThreshold" step="0.001" value="0.01" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label>UP Direction</label>
-                        <div class="direction-select">
-                            <button type="button" class="direction-btn selected" data-target="upDirection" data-value="B">
-                                📈 Buy (Long)
-                            </button>
-                            <button type="button" class="direction-btn" data-target="upDirection" data-value="S">
-                                📉 Sell (Short)
-                            </button>
-                        </div>
-                        <input type="hidden" id="upDirection" value="B">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="downThreshold">DOWN Threshold (e.g., -0.02 = -2%)</label>
-                        <input type="number" id="downThreshold" step="0.001" value="-0.02" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label>DOWN Direction</label>
-                        <div class="direction-select">
-                            <button type="button" class="direction-btn" data-target="downDirection" data-value="B">
-                                📈 Buy (Long)
-                            </button>
-                            <button type="button" class="direction-btn selected" data-target="downDirection" data-value="S">
-                                📉 Sell (Short)
-                            </button>
-                        </div>
-                        <input type="hidden" id="downDirection" value="S">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="detectionWindow">Detection Window (bars)</label>
-                        <input type="number" id="detectionWindow" min="1" value="30" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="holdWindow">Hold Window (bars)</label>
-                        <input type="number" id="holdWindow" min="1" value="30" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="positionSize">Position Size ($)</label>
-                        <input type="number" id="positionSize" min="1" value="1000" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="positionLimit">Position Limit (concurrent)</label>
-                        <input type="number" id="positionLimit" min="1" value="1" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="feeRate">Fee Rate (e.g., 0.0003 = 0.03%)</label>
-                        <input type="number" id="feeRate" step="0.0001" value="0.0003" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="numAccounts">Number of Accounts</label>
-                        <select id="numAccounts" required>
-                            <option value="1">1 (Position Reversal)</option>
-                            <option value="2">2 (Separate Long/Short)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="startDate">Start Date (optional)</label>
-                        <input type="date" id="startDate">
-                    </div>
-                </div>
-
-                <button type="submit" class="btn" id="runBtn">
-                    🚀 Run Backtest
-                </button>
-            </form>
-        </div>
-
-        <div id="loadingSection" class="card loading" style="display: none;">
-            <div class="spinner"></div>
-            <h3>Running backtest...</h3>
-            <p>This may take a few seconds depending on data size</p>
+            <button class="btn-add-row" onclick="addParameterRow()">➕ Add Parameter Row</button>
         </div>
 
         <div id="resultsSection" class="results-section">
             <div class="card">
-                <h2>Performance Results</h2>
-                <div id="metricsContainer" class="metrics-grid"></div>
-            </div>
-
-            <div class="card">
-                <h2>Cumulative PnL</h2>
-                <div id="plotContainer" class="plot-container"></div>
-            </div>
-
-            <div class="card">
-                <h2>Trade Breakdown</h2>
-                <div id="breakdownContainer"></div>
+                <h2>Backtest Results</h2>
+                <div style="overflow-x: auto;">
+                    <table class="results-table" id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Parameters</th>
+                                <th>Gross<br>PnL</th>
+                                <th>Fees</th>
+                                <th>Net<br>PnL</th>
+                                <th>Net<br>ROI %</th>
+                                <th>Sharpe</th>
+                                <th>Max<br>DD %</th>
+                                <th>Trades</th>
+                                <th>Win<br>Rate %</th>
+                                <th>Avg Net<br>Profit</th>
+                                <th>Plot</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                            <!-- Results will be added dynamically -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -359,6 +525,14 @@
                 <h3>❌ Error</h3>
                 <p id="errorMessage"></p>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal for viewing plots -->
+    <div id="plotModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closePlotModal()">&times;</span>
+            <img id="modalPlotImage" src="" alt="PnL Chart">
         </div>
     </div>
 
