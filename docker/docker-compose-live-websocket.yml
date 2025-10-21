@@ -10,7 +10,7 @@ services:
       - market-net
     command: /app/bin/consumer_ws_main --websocket --port 9001 --symbols /workspace/apps/config/binance/symbols.json --max-rate 20
     volumes:
-      - ../data:/workspace/data:ro
+      - ${DATA_DIR:-../data}:/workspace/data:ro
       - ../apps/config:/workspace/apps/config:ro
 
   producer:
@@ -23,7 +23,7 @@ services:
     networks:
       - market-net
     volumes:
-      - ../data:/workspace/data:ro
+      - ${DATA_DIR:-../data}:/workspace/data:ro
       - ../apps/config:/workspace/apps/config:ro
     command: >
       /app/bin/binance_main

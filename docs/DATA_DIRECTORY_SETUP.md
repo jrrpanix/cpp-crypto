@@ -1,61 +1,67 @@
 # Data Directory Setup Guide
 
-## Problem
+## Overview
 
-The data directory is **not** included in the git repository (it's in `.gitignore`) because:
-- Data files are large (often GBs)
-- Data is user-specific
-- Different users may store data in different locations
+The data directory has been **moved OUTSIDE the project** from `/Users/yourname/github/cpp-crypto/data` to `/Users/yourname/github/data` to:
+- Keep the project repository clean (data files are large, often GBs)
+- Store data independently from the codebase
+- Allow multiple projects to share the same data
 
-## Solution
-
-This project uses an **environment variable** approach to configure the data directory location.
+**Important**: The data directory is **not** included in git (it's in `.gitignore`).
 
 ## Quick Setup
 
-### 1. Copy the environment template
+### 1. Verify your data location
 
+The data should now be at:
 ```bash
-cp .env.example .env
+/Users/yourname/github/data
 ```
 
-### 2. Edit `.env` to point to your data location
-
+NOT at:
 ```bash
-# For macOS/Linux users
-nano .env
-# or
-code .env
+/Users/yourname/github/cpp-crypto/data  # OLD location
 ```
 
-Set `DATA_DIR` to your actual data location:
+### 2. Check your `.env` file
 
 ```bash
-# Example 1: Data outside the project
-DATA_DIR=/Users/yourname/github/data
-
-# Example 2: Data inside the project (default)
-DATA_DIR=./data
-
-# Example 3: Absolute path on Linux
-DATA_DIR=/home/yourname/crypto-data
-```
-
-### 3. Create the data directory if it doesn't exist
-
-```bash
-mkdir -p /Users/yourname/github/data/kline_aggregate
-# Or wherever you set DATA_DIR
-```
-
-### 4. Verify the setup
-
-```bash
-# Check that your .env file exists
 cat .env
+```
 
-# Check that data directory exists
-ls -la $DATA_DIR
+Should contain:
+```bash
+DATA_DIR=/Users/johnreynolds/github/data  # Use YOUR username
+FLASK_ENV=development
+```
+
+### 3. For Docker containers
+
+The `.env` file is automatically loaded by:
+- `make run-dev` - Mounts `DATA_DIR` to `/workspace/data` inside container
+- `make run-backtest` - Mounts `DATA_DIR` to `/app/data` inside container  
+- `make run-websocket` - Mounts `DATA_DIR` to `/workspace/data` inside container
+- `make run-live-websocket` - Mounts `DATA_DIR` to `/workspace/data` inside container
+
+### 4. Test the setup
+
+```bash
+# Stop any running containers
+make stop-dev
+
+# Start fresh dev container
+make run-dev
+
+# Shell into container
+make shell-dev
+
+# Inside container, verify data is mounted
+ls -la /workspace/data/
+ls -la /workspace/data/klines/
+
+# Test window_sim.py
+cd /workspace/src/research/signal_utils
+uv run window_sim.py ETH 0.01 B -0.01 S 30 30 1000
 ```
 
 ## Data Directory Structure

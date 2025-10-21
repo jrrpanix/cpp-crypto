@@ -588,13 +588,13 @@ def simulate_trades(
     return trades_df, summary
 
 
-def plot_cumulative_pnl(trades_df: pl.DataFrame, parquet_file: str) -> None:
+def plot_cumulative_pnl(trades_df: pl.DataFrame, symbol: str) -> None:
     """
     Plot cumulative PnL over time and save to file.
 
     Args:
         trades_df: DataFrame with trade results including exit_time and profit_dollars
-        parquet_file: Original parquet filename, used to extract crypto name for output filename
+        symbol: Symbol name for the plot title and filename (e.g., 'btc', 'eth')
     """
     # Sort by exit time to get chronological order
     trades_df = trades_df.sort("exit_time")
@@ -604,12 +604,8 @@ def plot_cumulative_pnl(trades_df: pl.DataFrame, parquet_file: str) -> None:
         [pl.col("net_profit_dollars").cum_sum().alias("cumulative_pnl")]
     )
 
-    # Extract crypto name from parquet file
-    # Assumes format like "btc_klines.parquet" or path/to/btc_klines.parquet
-    parquet_path = Path(parquet_file)
-    filename = parquet_path.stem  # Gets filename without extension
-    # Try to extract crypto symbol (take first part before underscore or use full name)
-    crypto_name = filename.split("_")[0] if "_" in filename else filename
+    # Use symbol directly for output
+    crypto_name = symbol.lower()
 
     # Create the plot
     plt.figure(figsize=(12, 6))
@@ -636,7 +632,7 @@ def plot_cumulative_pnl(trades_df: pl.DataFrame, parquet_file: str) -> None:
 
 
 def run_simulation(
-    parquet_file: str,
+    df: pl.DataFrame,
     up_threshold: float,
     up_direction: str,
     down_threshold: float,
@@ -647,14 +643,14 @@ def run_simulation(
     position_limit: int = 1,
     fee_rate: float = 0.001,
     num_accounts: int = 1,
-    start_date: str = None,
     verbose: bool = True,
+    symbol: str = None,
 ) -> tuple[pl.DataFrame, dict]:
     """
-    Run the complete trading simulation.
+    Run the complete trading simulation on a DataFrame.
 
     Args:
-        parquet_file: Path to parquet file with kline data
+        df: Polars DataFrame with kline data (must have 'open_time', 'open', 'close' columns)
         up_threshold: Price movement threshold for UP signal (e.g., 0.01 for 1%)
         up_direction: Trade direction for UP threshold: 'B'=Buy/Long, 'S'=Sell/Short
         down_threshold: Price movement threshold for DOWN signal (e.g., -0.01 for -1%)
@@ -665,25 +661,24 @@ def run_simulation(
         position_limit: Maximum number of concurrent positions allowed (default: 1)
         fee_rate: Transaction fee rate applied to both entry and exit (default: 0.001 = 0.1%)
         num_accounts: Number of accounts (1=single account with position reversal, 2=separate long/short accounts, default: 1)
-        start_date: Optional start date in YYYY-MM-DD format to filter data (default: None = use all data)
         verbose: Print results if True
+        symbol: Optional symbol name for display purposes (default: None)
 
     Returns:
         Tuple of (trades DataFrame, summary statistics dict)
     """
-    # Load data
-    df = pl.read_parquet(parquet_file)
+    # Validate input DataFrame
+    required_columns = ['open_time', 'open', 'close']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"DataFrame missing required columns: {missing_columns}")
+    
+    if len(df) == 0:
+        raise ValueError("DataFrame is empty")
 
-    # Filter by start date if provided
-    if start_date:
-        from datetime import datetime
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        df = df.filter(pl.col("open_time") >= start_dt)
-        if len(df) == 0:
-            raise ValueError(f"No data found on or after start date {start_date}")
-
-    # Add index column for reference
-    df = df.with_row_index("index")
+    # Add index column for reference if not present
+    if "index" not in df.columns:
+        df = df.with_row_index("index")
     
     # Capture data range info
     data_start_date = df["open_time"].min()
@@ -702,8 +697,8 @@ def run_simulation(
     summary["num_data_rows"] = num_rows
 
     # Create cumulative PnL plot if we have trades
-    if len(trades_df) > 0:
-        plot_cumulative_pnl(trades_df, parquet_file)
+    if len(trades_df) > 0 and symbol:
+        plot_cumulative_pnl(trades_df, symbol)
 
     if verbose:
         # Count total signals detected
@@ -713,13 +708,9 @@ def run_simulation(
         print("\n" + "=" * 80)
         print("TRADE SIMULATION RESULTS")
         print("=" * 80)
-        print(f"\nCommand Line:")
-        import sys
-        print(f"  {' '.join(sys.argv)}")
+        if symbol:
+            print(f"\nSymbol: {symbol.upper()}")
         print(f"\nParameters:")
-        print(f"  Parquet file: {parquet_file}")
-        if start_date:
-            print(f"  Start date filter: {start_date}")
         print(f"  Up threshold: {up_threshold:.4f} ({up_threshold*100:.2f}%) → {up_direction} ({'Buy/Long' if up_direction == 'B' else 'Sell/Short'})")
         print(f"  Down threshold: {down_threshold:.4f} ({down_threshold*100:.2f}%) → {down_direction} ({'Buy/Long' if down_direction == 'B' else 'Sell/Short'})")
         print(f"  Detection window: {detection_window} periods")
@@ -774,6 +765,278 @@ def run_simulation(
         print("=" * 80 + "\n")
 
     return trades_df, summary
+
+
+def run_simulation_from_file(
+    parquet_file: str,
+    start_date: str,
+    up_threshold: float,
+    up_direction: str,
+    down_threshold: float,
+    down_direction: str,
+    detection_window: int,
+    hold_window: int,
+    position_size: float,
+    position_limit: int = 1,
+    fee_rate: float = 0.001,
+    num_accounts: int = 1,
+    verbose: bool = True,
+) -> tuple[pl.DataFrame, dict]:
+    """
+    Run trading simulation by loading data from a parquet file.
+    
+    This is a convenience wrapper around run_simulation() that handles file loading
+    and date filtering.
+
+    Args:
+        parquet_file: Path to parquet file with kline data
+        start_date: Start date for simulation (format: 'YYYY-MM-DD')
+        up_threshold: Price movement threshold for UP signal (e.g., 0.01 for 1%)
+        up_direction: Trade direction for UP threshold: 'B'=Buy/Long, 'S'=Sell/Short
+        down_threshold: Price movement threshold for DOWN signal (e.g., -0.01 for -1%)
+        down_direction: Trade direction for DOWN threshold: 'B'=Buy/Long, 'S'=Sell/Short
+        detection_window: Number of periods to detect signal over
+        hold_window: Number of periods to hold position
+        position_size: Dollar amount to invest per trade
+        position_limit: Maximum number of concurrent positions allowed (default: 1)
+        fee_rate: Transaction fee rate applied to both entry and exit (default: 0.001 = 0.1%)
+        num_accounts: Number of accounts (1=single account with position reversal, 2=separate long/short accounts, default: 1)
+        verbose: Print results if True
+
+    Returns:
+        Tuple of (trades DataFrame, summary statistics dict)
+    """
+    # Load the parquet file
+    df = pl.read_parquet(parquet_file)
+    
+    # Filter by start date if provided
+    if start_date:
+        df = df.filter(pl.col("open_time") >= start_date)
+    
+    # Extract symbol name from filename (e.g., "btc_klines.parquet" -> "btc")
+    parquet_path = Path(parquet_file)
+    filename = parquet_path.stem
+    symbol = filename.split("_")[0] if "_" in filename else filename
+    
+    # Run the simulation with the loaded data
+    return run_simulation(
+        df=df,
+        up_threshold=up_threshold,
+        up_direction=up_direction,
+        down_threshold=down_threshold,
+        down_direction=down_direction,
+        detection_window=detection_window,
+        hold_window=hold_window,
+        position_size=position_size,
+        position_limit=position_limit,
+        fee_rate=fee_rate,
+        num_accounts=num_accounts,
+        verbose=verbose,
+        symbol=symbol,
+    )
+
+
+def multisymbol_simulation(
+    symbol_list: list[str],
+    data_directory: str,
+    up_threshold: float,
+    up_direction: str,
+    down_threshold: float,
+    down_direction: str,
+    detection_window: int,
+    hold_window: int,
+    position_size: float,
+    position_limit: int = 1,
+    fee_rate: float = 0.001,
+    num_accounts: int = 1,
+    start_date: str = None,
+    verbose: bool = True,
+) -> tuple[dict[str, tuple[pl.DataFrame, dict]], dict]:
+    """
+    Run trading simulation across multiple symbols with the same parameters.
+
+    Args:
+        symbol_list: List of symbol names (e.g., ['btc', 'eth', 'sol'])
+        data_directory: Path to directory containing parquet files
+        up_threshold: Price movement threshold for UP signal (e.g., 0.01 for 1%)
+        up_direction: Trade direction for UP threshold: 'B'=Buy/Long, 'S'=Sell/Short
+        down_threshold: Price movement threshold for DOWN signal (e.g., -0.01 for -1%)
+        down_direction: Trade direction for DOWN threshold: 'B'=Buy/Long, 'S'=Sell/Short
+        detection_window: Number of periods to detect signal over
+        hold_window: Number of periods to hold position
+        position_size: Dollar amount to invest per trade
+        position_limit: Maximum number of concurrent positions allowed (default: 1)
+        fee_rate: Transaction fee rate applied to both entry and exit (default: 0.001 = 0.1%)
+        num_accounts: Number of accounts (1=single account with position reversal, 2=separate long/short accounts, default: 1)
+        start_date: Optional start date in YYYY-MM-DD format to filter data (default: None = use all data)
+        verbose: Print results if True
+
+    Returns:
+        Tuple of:
+        - Dictionary mapping symbol -> (trades_df, summary_dict)
+        - Aggregated summary statistics across all symbols
+    """
+    from pathlib import Path
+    
+    data_dir = Path(data_directory)
+    if not data_dir.exists():
+        raise ValueError(f"Data directory not found: {data_directory}")
+    
+    results = {}
+    failed_symbols = []
+    
+    # Aggregate metrics
+    total_trades = 0
+    total_gross_profit = 0.0
+    total_net_profit = 0.0
+    total_fees = 0.0
+    total_num_winners = 0
+    total_num_losers = 0
+    all_returns = []
+    
+    if verbose:
+        print("\n" + "=" * 80)
+        print("MULTI-SYMBOL SIMULATION")
+        print("=" * 80)
+        print(f"\nParameters:")
+        print(f"  Symbols: {len(symbol_list)}")
+        print(f"  UP: {up_threshold:+.4f} → {up_direction}")
+        print(f"  DOWN: {down_threshold:+.4f} → {down_direction}")
+        print(f"  Detection window: {detection_window} bars")
+        print(f"  Hold window: {hold_window} bars")
+        print(f"  Position size: ${position_size:,.2f}")
+        print(f"  Position limit: {position_limit}")
+        print(f"  Fee rate: {fee_rate:.4f} ({fee_rate*100:.2f}%)")
+        print(f"  Accounts: {num_accounts}")
+        if start_date:
+            print(f"  Start date: {start_date}")
+        print()
+    
+    # Run simulation for each symbol
+    for i, symbol in enumerate(symbol_list, 1):
+        if verbose:
+            print(f"[{i}/{len(symbol_list)}] Processing {symbol.upper()}...")
+        
+        # Find parquet file for this symbol
+        pattern = f"{symbol.lower()}_klines*.parquet"
+        matching_files = list(data_dir.glob(pattern))
+        
+        if not matching_files:
+            if verbose:
+                print(f"  ⚠️  No data file found for {symbol.upper()} (pattern: {pattern})")
+            failed_symbols.append(symbol)
+            continue
+        
+        # Use most recent file if multiple exist
+        if len(matching_files) > 1:
+            matching_files.sort()
+            parquet_file = str(matching_files[-1])
+            if verbose:
+                print(f"  Using: {Path(parquet_file).name}")
+        else:
+            parquet_file = str(matching_files[0])
+        
+        try:
+            # Run simulation for this symbol
+            trades_df, summary = run_simulation_from_file(
+                parquet_file,
+                start_date,
+                up_threshold,
+                up_direction,
+                down_threshold,
+                down_direction,
+                detection_window,
+                hold_window,
+                position_size,
+                position_limit,
+                fee_rate,
+                num_accounts,
+                verbose=False  # Suppress individual symbol output
+            )
+            
+            # Store results
+            results[symbol] = (trades_df, summary)
+            
+            # Aggregate metrics
+            total_trades += summary["num_trades"]
+            total_gross_profit += summary["gross_profit"]
+            total_net_profit += summary["net_profit"]
+            total_fees += summary["total_fees"]
+            total_num_winners += summary["num_winners"]
+            total_num_losers += summary["num_losers"]
+            
+            # Collect individual trade returns for aggregate Sharpe
+            if len(trades_df) > 0:
+                returns = (trades_df["net_profit_dollars"] / position_size).to_list()
+                all_returns.extend(returns)
+            
+            if verbose:
+                print(f"  ✓ {summary['num_trades']} trades, Net PnL: ${summary['net_profit']:,.2f}")
+        
+        except Exception as e:
+            if verbose:
+                print(f"  ❌ Error: {str(e)}")
+            failed_symbols.append(symbol)
+            continue
+    
+    # Calculate aggregated statistics
+    successful_symbols = len(results)
+    
+    if total_trades > 0:
+        aggregate_win_rate = (total_num_winners / total_trades) * 100
+        aggregate_avg_net_profit = total_net_profit / total_trades
+        
+        # Calculate aggregate Sharpe ratio
+        if len(all_returns) > 1:
+            import statistics
+            avg_return = statistics.mean(all_returns)
+            std_return = statistics.stdev(all_returns)
+            aggregate_sharpe = (avg_return / std_return) if std_return > 0 else 0.0
+        else:
+            aggregate_sharpe = 0.0
+    else:
+        aggregate_win_rate = 0.0
+        aggregate_avg_net_profit = 0.0
+        aggregate_sharpe = 0.0
+    
+    aggregate_summary = {
+        "num_symbols": len(symbol_list),
+        "successful_symbols": successful_symbols,
+        "failed_symbols": len(failed_symbols),
+        "failed_symbol_list": failed_symbols,
+        "total_trades": total_trades,
+        "total_gross_profit": total_gross_profit,
+        "total_net_profit": total_net_profit,
+        "total_fees": total_fees,
+        "total_num_winners": total_num_winners,
+        "total_num_losers": total_num_losers,
+        "aggregate_win_rate": aggregate_win_rate,
+        "aggregate_avg_net_profit": aggregate_avg_net_profit,
+        "aggregate_sharpe_ratio": aggregate_sharpe,
+        "avg_trades_per_symbol": total_trades / successful_symbols if successful_symbols > 0 else 0,
+        "avg_net_profit_per_symbol": total_net_profit / successful_symbols if successful_symbols > 0 else 0,
+    }
+    
+    if verbose:
+        print("\n" + "=" * 80)
+        print("AGGREGATE RESULTS")
+        print("=" * 80)
+        print(f"\nSymbols processed: {successful_symbols}/{len(symbol_list)}")
+        if failed_symbols:
+            print(f"Failed symbols: {', '.join(failed_symbols)}")
+        print(f"\nTotal trades: {total_trades}")
+        print(f"Avg trades per symbol: {aggregate_summary['avg_trades_per_symbol']:.1f}")
+        print(f"\nGross profit: ${total_gross_profit:,.2f}")
+        print(f"Total fees: ${total_fees:,.2f}")
+        print(f"Net profit: ${total_net_profit:,.2f}")
+        print(f"Avg net profit per symbol: ${aggregate_summary['avg_net_profit_per_symbol']:,.2f}")
+        print(f"\nWin rate: {aggregate_win_rate:.2f}%")
+        print(f"Winners: {total_num_winners}, Losers: {total_num_losers}")
+        print(f"Avg net profit per trade: ${aggregate_avg_net_profit:.2f}")
+        print(f"Aggregate Sharpe ratio: {aggregate_sharpe:.3f}")
+        print("=" * 80)
+    
+    return results, aggregate_summary
 
 
 def main():
@@ -925,8 +1188,9 @@ Examples:
             parser.error(f"Invalid start date format: {args.start_date}. Use YYYY-MM-DD format.")
 
     # Run simulation
-    trades_df, summary = run_simulation(
+    trades_df, summary = run_simulation_from_file(
         parquet_file,
+        args.start_date,
         args.up_threshold,
         args.up_direction,
         args.down_threshold,
@@ -937,7 +1201,6 @@ Examples:
         args.position_limit,
         args.fee_rate,
         args.num_accounts,
-        start_date=args.start_date,
         verbose=not args.quiet,
     )
 

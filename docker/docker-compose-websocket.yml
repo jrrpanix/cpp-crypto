@@ -30,7 +30,7 @@ services:
       - PRODUCER_SHOCK_MAG=0.008
     # Mount data, config, and test_data directories
     volumes:
-      - ../data:/workspace/data:ro
+      - ${DATA_DIR:-../data}:/workspace/data:ro
       - ../apps/config:/workspace/apps/config:ro
       - ../test_data:/workspace/test_data:ro
 

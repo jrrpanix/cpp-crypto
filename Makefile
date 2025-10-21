@@ -88,10 +88,11 @@ help:
 build-dev:
 	docker build -t $(DEV_IMAGE_NAME) -f $(COMPOSE_DIR)/Dockerfile.dev .
 
-# Run the development container, mounting the current directory
+# Run the development container, mounting the current directory and external data
 run-dev:
 	docker run -d --rm \
 		-v .:/workspace \
+		-v $(DATA_DIR):/workspace/data:ro \
 		--name $(DEV_CONTAINER_NAME) \
 		$(DEV_IMAGE_NAME) sleep infinity
 

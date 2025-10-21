@@ -175,8 +175,9 @@ def run_backtest():
         
         # Run simulation (suppress verbose output)
         # Run the simulation using window_sim module
-        trades_df, summary = window_sim.run_simulation(
+        trades_df, summary = window_sim.run_simulation_from_file(
             parquet_file,
+            start_date,
             up_threshold,
             up_direction,
             down_threshold,
@@ -187,7 +188,6 @@ def run_backtest():
             position_limit,
             fee_rate,
             num_accounts,
-            start_date,
             verbose=False
         )
         
