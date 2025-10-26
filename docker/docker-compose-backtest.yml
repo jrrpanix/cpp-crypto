@@ -12,21 +12,12 @@ services:
       # Mount source for live development
       - ../server/backtest_api.py:/app/backtest_api.py
       - ../src/research/signal_utils:/app/signal_utils:ro
+      # Mount frontend files so Flask can serve them
+      - ../frontend/backtest:/app/frontend/backtest:ro
     environment:
       - FLASK_ENV=${FLASK_ENV:-development}
       # Try both common data directory structures
       - DATA_PATH=/app/data/kline_aggregate:/app/data/aggregate_parquet:/app/data/klines
-    networks:
-      - backtest-network
-
-  backtest-frontend:
-    image: nginx:alpine
-    container_name: backtest-frontend
-    ports:
-      - "8084:80"
-    volumes:
-      - ../frontend/backtest/index.html:/usr/share/nginx/html/index.html:ro
-      - ../frontend/backtest/backtest.js:/usr/share/nginx/html/backtest.js:ro
     networks:
       - backtest-network
 

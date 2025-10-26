@@ -142,6 +142,9 @@ def run_backtest():
         # Get parameters from request
         params = request.json
         
+        print(f"DEBUG: Received backtest request for symbol: {params.get('symbol')}")
+        print(f"DEBUG: start_date value: {repr(params.get('start_date'))}")
+        
         symbol = params.get('symbol')
         up_threshold = float(params.get('up_threshold'))
         up_direction = params.get('up_direction', 'B')
@@ -154,6 +157,8 @@ def run_backtest():
         fee_rate = float(params.get('fee_rate', 0.0003))
         num_accounts = int(params.get('num_accounts', 1))
         start_date = params.get('start_date')
+        
+        print(f"DEBUG: Parsed start_date: {repr(start_date)}")
         
         # Validate inputs
         if up_threshold <= 0:
@@ -193,8 +198,19 @@ def run_backtest():
         
         # Generate cumulative PnL plot as base64
         plot_base64 = None
+        cumulative_pnl_series = []
         if len(trades_df) > 0:
             plot_base64 = generate_plot_base64(trades_df, symbol)
+            # Extract cumulative PnL time series for aggregation
+            trades_sorted = trades_df.sort("exit_time")
+            trades_sorted = trades_sorted.with_columns(
+                [pl.col("net_profit_dollars").cum_sum().alias("cumulative_pnl")]
+            )
+            cumulative_pnl_series = [
+                {"time": row["exit_time"].isoformat() if hasattr(row["exit_time"], 'isoformat') else str(row["exit_time"]), 
+                 "pnl": row["cumulative_pnl"]}
+                for row in trades_sorted.select(["exit_time", "cumulative_pnl"]).to_dicts()
+            ]
         
         # Prepare response
         response = {
@@ -202,7 +218,8 @@ def run_backtest():
             "summary": summary,
             "num_trades": len(trades_df),
             "plot": plot_base64,
-            "trades": trades_df.head(100).to_dicts() if len(trades_df) > 0 else []  # First 100 trades
+            "trades": trades_df.head(100).to_dicts() if len(trades_df) > 0 else [],  # First 100 trades
+            "cumulative_pnl_series": cumulative_pnl_series  # Time series for aggregation
         }
         
         return jsonify(response)
@@ -256,6 +273,39 @@ def generate_plot_base64(trades_df: pl.DataFrame, symbol: str) -> str:
 def health_check():
     """Health check endpoint."""
     return jsonify({"status": "healthy", "service": "backtest-api"})
+
+
+# ============================================================================
+# Static file serving routes (replaces nginx)
+# ============================================================================
+
+# Determine frontend directory based on environment
+# In Docker: /app/frontend/backtest (mounted from ../frontend/backtest)
+# Locally: ../frontend/backtest relative to this file
+FRONTEND_DIR = Path('/app/frontend/backtest') if Path('/app/frontend/backtest').exists() else Path(__file__).parent.parent / 'frontend' / 'backtest'
+
+@app.route('/')
+def index():
+    """Serve the main backtest page."""
+    return send_file(FRONTEND_DIR / 'index.html')
+
+
+@app.route('/multi-symbol.html')
+def multi_symbol_page():
+    """Serve the multi-symbol backtest page."""
+    return send_file(FRONTEND_DIR / 'multi-symbol.html')
+
+
+@app.route('/backtest.js')
+def backtest_js():
+    """Serve the backtest JavaScript."""
+    return send_file(FRONTEND_DIR / 'backtest.js', mimetype='application/javascript')
+
+
+@app.route('/multi-symbol.js')
+def multi_symbol_js():
+    """Serve the multi-symbol JavaScript."""
+    return send_file(FRONTEND_DIR / 'multi-symbol.js', mimetype='application/javascript')
 
 
 if __name__ == '__main__':

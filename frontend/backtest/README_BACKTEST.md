@@ -4,14 +4,23 @@ Web-based interface for the window_sim.py trading strategy backtesting tool.
 
 ## Overview
 
-This webapp provides an easy-to-use interface for testing window-based trading strategies on historical cryptocurrency data. Define event thresholds, hold periods, and position parameters through a web form, then view cumulative PnL charts and comprehensive performance metrics.
+This webapp provides an easy-to-use interface for testing window-based trading strategies on historical cryptocurrency data. It offers two modes:
+
+1. **Single Symbol Mode** (`index.html`) - Test multiple parameter combinations on specific symbols in a table format
+2. **Multi-Symbol Mode** (`multi-symbol.html`) - Test one parameter set across N randomly selected symbols to evaluate strategy robustness
+
+Define event thresholds, hold periods, and position parameters through a web form, then view cumulative PnL charts and comprehensive performance metrics.
 
 ## Architecture
 
-- **Backend**: Flask API server (`server/backtest_api.py`)
-- **Frontend**: Static HTML/JS (`frontend/backtest.html`, `frontend/backtest.js`)
+- **Backend**: Flask API server (`server/backtest_api.py`) - serves both API and static files
+- **Frontend**: Static HTML/JS files served by Flask
+  - `index.html` / `backtest.js` - Single symbol multi-parameter mode
+  - `multi-symbol.html` / `multi-symbol.js` - Multi-symbol mode
 - **Data**: Parquet files from `data/aggregate_parquet/`
 - **Engine**: `window_sim.py` strategy simulator
+
+**Note**: No nginx needed - Flask serves everything on a single port (5001) for simplicity.
 
 ## Quick Start
 
@@ -19,10 +28,27 @@ This webapp provides an easy-to-use interface for testing window-based trading s
 
 ```bash
 # Build and start services
+make run-backtest
+# or
 cd docker
 docker-compose -f docker-compose-backtest.yml up --build
 
-# Access webapp at http://localhost:8084
+# Access webapp at http://localhost:5001
+# - Single Symbol Mode: http://localhost:5001
+# - Multi-Symbol Mode: http://localhost:5001/multi-symbol.html
+```
+
+### Local Development
+
+```bash
+# Start Flask API (serves both API and frontend)
+cd server
+uv pip install flask flask-cors matplotlib polars
+uv run backtest_api.py
+
+# Access webapp at http://localhost:5000
+# - Single Symbol Mode: http://localhost:5000
+# - Multi-Symbol Mode: http://localhost:5000/multi-symbol.html
 ```
 
 ### Local Development

@@ -68,7 +68,7 @@ help:
 	@echo "  make clean-live-websocket       Remove containers, networks, volumes"
 	@echo ""
 	@echo "--- Backtest Webapp Services ---"
-	@echo "  make run-backtest         Start backtest webapp (Flask API + frontend, port 8084)"
+	@echo "  make run-backtest         Start backtest webapp (Flask serves all on port 5001)"
 	@echo "  make run-backtest-verbose Start backtest services with output"
 	@echo "  make rebuild-backtest     Rebuild and start backtest services"
 	@echo "  make logs-backtest        View logs from backtest services"
@@ -193,7 +193,7 @@ clean-live-websocket:
 
 # Start backtest webapp services (Flask API + static frontend)
 run-backtest:
-	@echo "🚀 Starting backtest webapp (Flask API + frontend on port 8084)..."
+	@echo "🚀 Starting backtest webapp (Flask serves all on port 5001)..."
 	docker-compose -f $(COMPOSE_FILE_BACKTEST) up -d --build
 
 # Start backtest services with output visible

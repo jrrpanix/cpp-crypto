@@ -811,7 +811,13 @@ def run_simulation_from_file(
     
     # Filter by start date if provided
     if start_date:
-        df = df.filter(pl.col("open_time") >= start_date)
+        # Convert start_date string to datetime for proper comparison
+        # Handles both date strings and datetime objects
+        if isinstance(start_date, str):
+            start_date_dt = pl.lit(start_date).str.strptime(pl.Datetime, "%Y-%m-%d")
+            df = df.filter(pl.col("open_time") >= start_date_dt)
+        else:
+            df = df.filter(pl.col("open_time") >= start_date)
     
     # Extract symbol name from filename (e.g., "btc_klines.parquet" -> "btc")
     parquet_path = Path(parquet_file)
