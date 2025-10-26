@@ -622,11 +622,26 @@ function clearResults() {
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+function init() {
     fetchSymbols();
     
-    document.getElementById('backtestForm').addEventListener('submit', runMultiSymbolBacktest);
-    document.getElementById('clearBtn').addEventListener('click', clearResults);
-});
+    const form = document.getElementById('backtestForm');
+    const clearBtn = document.getElementById('clearBtn');
+    
+    if (form) {
+        form.addEventListener('submit', runMultiSymbolBacktest);
+    }
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearResults);
+    }
+}
+
+// Run initialization when DOM is ready or immediately if already loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    // DOM is already ready, run init immediately
+    init();
+}
 
 })(); // End IIFE

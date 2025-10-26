@@ -11,10 +11,18 @@
     let backtestResults = [];
 
     // Initialize on page load
-    document.addEventListener('DOMContentLoaded', async () => {
+    async function init() {
         await loadSymbols();
         addParameterRow(); // Add initial row
-    });
+    }
+
+    // Run initialization when DOM is ready or immediately if already loaded
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        // DOM is already ready, run init immediately
+        init();
+    }
 
 // Load available symbols from API
 async function loadSymbols() {

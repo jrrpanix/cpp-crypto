@@ -381,7 +381,12 @@ function showStatus(type, message) {
 // Expose loadData to global scope for HTML onclick handler
 window.loadData = loadData;
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', init);
+// Run initialization when DOM is ready or immediately if already loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    // DOM is already ready, run init immediately
+    init();
+}
 
 })(); // End IIFE
