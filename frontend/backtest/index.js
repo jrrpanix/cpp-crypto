@@ -134,7 +134,7 @@ async function runMultiSymbolBacktest(event) {
             return;
         }
         
-        showStatus(`Running backtest on ${selectedSymbols.length} symbols: ${selectedSymbols.join(', ')}`, 'info');
+        showStatus(`Running backtest on ${selectedSymbols.length} symbols...`, 'info');
         
         // Prepare parameters
         const params = {
@@ -151,48 +151,51 @@ async function runMultiSymbolBacktest(event) {
             start_date: startDate || null  // Convert empty string to null
         };
         
-        // Run backtests in parallel for better performance
-        showStatus(`Running backtests on ${selectedSymbols.length} symbols in parallel...`, 'info');
-        currentResults = [];
-        
-        // Create array of promises for parallel execution
-        const backtestPromises = selectedSymbols.map(async (symbol, index) => {
-            try {
-                const result = await runSingleBacktest(symbol, params);
-                // Update progress as each completes
-                updateProgress(currentResults.length + 1, selectedSymbols.length);
-                showStatus(`Completed ${currentResults.length + 1}/${selectedSymbols.length} symbols`, 'info');
-                return result;
-            } catch (error) {
-                console.error(`Error testing ${symbol}:`, error);
-                // Return error result instead of throwing
-                return {
-                    symbol: symbol,
-                    summary: {
-                        num_trades: 0,
-                        gross_profit: 0,
-                        total_fees: 0,
-                        net_profit: 0,
-                        net_roi: 0,
-                        win_rate: 0,
-                        num_winners: 0,
-                        num_losers: 0,
-                        net_sharpe_ratio: 0,
-                        error: error.message
-                    },
-                    num_trades: 0
-                };
-            }
+        // Use batch API for better performance
+        const startTime = performance.now();
+        const response = await fetch(`${API_BASE_URL}/api/backtest/batch`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                symbols: selectedSymbols,
+                params: params
+            })
         });
         
-        // Wait for all backtests to complete
-        currentResults = await Promise.all(backtestPromises);
+        const data = await response.json();
+        const endTime = performance.now();
+        const duration = ((endTime - startTime) / 1000).toFixed(2);
         
-        updateProgress(selectedSymbols.length, selectedSymbols.length);
+        if (!data.success) {
+            throw new Error(data.error || 'Batch backtest failed');
+        }
+        
+        // Process results
+        currentResults = data.results
+            .filter(r => r.success)
+            .map(r => ({
+                symbol: r.symbol,
+                summary: r.summary,
+                num_trades: r.num_trades,
+                cumulative_pnl_series: r.cumulative_pnl_series || []
+            }));
+        
+        // Log any failures
+        const failures = data.results.filter(r => !r.success);
+        if (failures.length > 0) {
+            console.warn('Failed symbols:', failures.map(f => `${f.symbol}: ${f.error}`));
+        }
+        
+        if (currentResults.length === 0) {
+            showStatus('No successful backtests completed', 'error');
+            return;
+        }
         
         // Display results
         displayResults();
-        showStatus('✅ Multi-symbol backtest completed!', 'success');
+        showStatus(`✅ Completed ${currentResults.length} backtests in ${duration}s (${failures.length} failed)`, 'success');
         
     } catch (error) {
         console.error('Error running multi-symbol backtest:', error);

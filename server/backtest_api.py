@@ -14,6 +14,9 @@ import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
 import polars as pl
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from functools import partial
+import multiprocessing
 
 # Add parent directory to path to import window_sim
 sys.path.insert(0, str(Path(__file__).parent))
@@ -135,7 +138,9 @@ def run_backtest():
         "position_limit": 1,
         "fee_rate": 0.0003,
         "num_accounts": 1,
-        "start_date": "2024-01-01" (optional)
+        "start_date": "2024-01-01" (optional),
+        "include_plot": false (optional, default false),
+        "include_trades": false (optional, default false)
     }
     """
     try:
@@ -157,6 +162,10 @@ def run_backtest():
         fee_rate = float(params.get('fee_rate', 0.0003))
         num_accounts = int(params.get('num_accounts', 1))
         start_date = params.get('start_date')
+        
+        # Performance optimizations: allow skipping expensive operations
+        include_plot = params.get('include_plot', False)
+        include_trades = params.get('include_trades', False)
         
         print(f"DEBUG: Parsed start_date: {repr(start_date)}")
         
@@ -196,12 +205,18 @@ def run_backtest():
             verbose=False
         )
         
-        # Generate cumulative PnL plot as base64
+        # Generate cumulative PnL plot as base64 (OPTIONAL - expensive)
         plot_base64 = None
+        if include_plot and len(trades_df) > 0:
+            plot_base64 = generate_plot_base64(trades_df, symbol)
+        # Generate cumulative PnL plot as base64 (OPTIONAL - expensive)
+        plot_base64 = None
+        if include_plot and len(trades_df) > 0:
+            plot_base64 = generate_plot_base64(trades_df, symbol)
+        
+        # Extract cumulative PnL time series for aggregation
         cumulative_pnl_series = []
         if len(trades_df) > 0:
-            plot_base64 = generate_plot_base64(trades_df, symbol)
-            # Extract cumulative PnL time series for aggregation
             trades_sorted = trades_df.sort("exit_time")
             trades_sorted = trades_sorted.with_columns(
                 [pl.col("net_profit_dollars").cum_sum().alias("cumulative_pnl")]
@@ -217,12 +232,234 @@ def run_backtest():
             "success": True,
             "summary": summary,
             "num_trades": len(trades_df),
-            "plot": plot_base64,
-            "trades": trades_df.head(100).to_dicts() if len(trades_df) > 0 else [],  # First 100 trades
             "cumulative_pnl_series": cumulative_pnl_series  # Time series for aggregation
         }
         
+        # Add optional expensive data only if requested
+        if include_plot:
+            response["plot"] = plot_base64
+        if include_trades:
+            response["trades"] = trades_df.head(100).to_dicts() if len(trades_df) > 0 else []
+        
         return jsonify(response)
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+def process_single_symbol(symbol: str, data_dir: Path, params: dict) -> dict:
+    """
+    Worker function to process a single symbol backtest.
+    Designed to be called by ProcessPoolExecutor for parallel execution.
+    
+    Args:
+        symbol: Trading symbol (e.g., 'BTCUSDT')
+        data_dir: Path to data directory
+        params: Dictionary with backtest parameters
+        
+    Returns:
+        Dictionary with result or error information
+    """
+    try:
+        # Import here to avoid issues with multiprocessing
+        import polars as pl
+        import sys
+        from pathlib import Path
+        
+        # Re-import window_sim in worker process
+        sys.path.insert(0, str(Path(__file__).parent))
+        try:
+            from signal_utils import window_sim
+        except ImportError:
+            sys.path.insert(0, str(Path(__file__).parent.parent / 'src' / 'research'))
+            from signal_utils import window_sim
+        
+        # Find parquet file
+        matching_files = list(data_dir.glob(f"{symbol}_1m_*.parquet"))
+        
+        if not matching_files:
+            return {
+                "symbol": symbol,
+                "success": False,
+                "error": f"No data found for symbol {symbol}"
+            }
+        
+        # Use most recent file
+        parquet_file = str(sorted(matching_files)[-1])
+        
+        # Extract parameters
+        start_date = params.get('start_date')
+        up_threshold = params['up_threshold']
+        up_direction = params['up_direction']
+        down_threshold = params['down_threshold']
+        down_direction = params['down_direction']
+        detection_window = params['detection_window']
+        hold_window = params['hold_window']
+        position_size = params['position_size']
+        position_limit = params['position_limit']
+        fee_rate = params['fee_rate']
+        num_accounts = params['num_accounts']
+        
+        # Run simulation
+        trades_df, summary = window_sim.run_simulation_from_file(
+            parquet_file,
+            start_date,
+            up_threshold,
+            up_direction,
+            down_threshold,
+            down_direction,
+            detection_window,
+            hold_window,
+            position_size,
+            position_limit,
+            fee_rate,
+            num_accounts,
+            verbose=False
+        )
+        
+        # Extract cumulative PnL time series
+        cumulative_pnl_series = []
+        if len(trades_df) > 0:
+            trades_sorted = trades_df.sort("exit_time")
+            trades_sorted = trades_sorted.with_columns(
+                [pl.col("net_profit_dollars").cum_sum().alias("cumulative_pnl")]
+            )
+            cumulative_pnl_series = [
+                {"time": row["exit_time"].isoformat() if hasattr(row["exit_time"], 'isoformat') else str(row["exit_time"]), 
+                 "pnl": row["cumulative_pnl"]}
+                for row in trades_sorted.select(["exit_time", "cumulative_pnl"]).to_dicts()
+            ]
+        
+        return {
+            "symbol": symbol,
+            "success": True,
+            "summary": summary,
+            "num_trades": len(trades_df),
+            "cumulative_pnl_series": cumulative_pnl_series
+        }
+        
+    except Exception as e:
+        import traceback
+        return {
+            "symbol": symbol,
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
+@app.route('/api/backtest/batch', methods=['POST'])
+def run_batch_backtest():
+    """
+    Run backtests for multiple symbols with same parameters.
+    More efficient than calling /api/backtest multiple times.
+    
+    Expected JSON body:
+    {
+        "symbols": ["BTCUSDT", "ETHUSDT", ...],
+        "params": {
+            "up_threshold": 0.01,
+            "up_direction": "B",
+            "down_threshold": -0.02,
+            "down_direction": "S",
+            "detection_window": 30,
+            "hold_window": 30,
+            "position_size": 1000,
+            "position_limit": 1,
+            "fee_rate": 0.0003,
+            "num_accounts": 1,
+            "start_date": "2024-01-01" (optional)
+        }
+    }
+    """
+    try:
+        data = request.json
+        symbols = data.get('symbols', [])
+        params = data.get('params', {})
+        
+        if not symbols:
+            return jsonify({"success": False, "error": "No symbols provided"}), 400
+        
+        print(f"DEBUG: Batch backtest for {len(symbols)} symbols using parallel processing")
+        
+        # Extract and validate parameters
+        up_threshold = float(params.get('up_threshold'))
+        up_direction = params.get('up_direction', 'B')
+        down_threshold = float(params.get('down_threshold'))
+        down_direction = params.get('down_direction', 'S')
+        detection_window = int(params.get('detection_window'))
+        hold_window = int(params.get('hold_window'))
+        position_size = float(params.get('position_size'))
+        position_limit = int(params.get('position_limit', 1))
+        fee_rate = float(params.get('fee_rate', 0.0003))
+        num_accounts = int(params.get('num_accounts', 1))
+        start_date = params.get('start_date')
+        
+        # Validate inputs
+        if up_threshold <= 0:
+            return jsonify({"success": False, "error": "Up threshold must be positive"}), 400
+        if down_threshold >= 0:
+            return jsonify({"success": False, "error": "Down threshold must be negative"}), 400
+        
+        # Prepare parameters dict for worker function
+        worker_params = {
+            'up_threshold': up_threshold,
+            'up_direction': up_direction,
+            'down_threshold': down_threshold,
+            'down_direction': down_direction,
+            'detection_window': detection_window,
+            'hold_window': hold_window,
+            'position_size': position_size,
+            'position_limit': position_limit,
+            'fee_rate': fee_rate,
+            'num_accounts': num_accounts,
+            'start_date': start_date
+        }
+        
+        # Use ProcessPoolExecutor for true parallelism
+        # Number of workers = min(num_symbols, cpu_count)
+        max_workers = min(len(symbols), multiprocessing.cpu_count())
+        print(f"DEBUG: Using {max_workers} parallel workers")
+        
+        results = []
+        
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all jobs
+            future_to_symbol = {
+                executor.submit(process_single_symbol, symbol, DATA_DIR, worker_params): symbol
+                for symbol in symbols
+            }
+            
+            # Collect results as they complete
+            completed = 0
+            for future in as_completed(future_to_symbol):
+                symbol = future_to_symbol[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                    completed += 1
+                    print(f"DEBUG: Completed {completed}/{len(symbols)}: {symbol} - {result.get('num_trades', 0)} trades")
+                except Exception as e:
+                    import traceback
+                    print(f"ERROR: Exception processing {symbol}: {str(e)}")
+                    results.append({
+                        "symbol": symbol,
+                        "success": False,
+                        "error": str(e),
+                        "traceback": traceback.format_exc()
+                    })
+        
+        return jsonify({
+            "success": True,
+            "results": results,
+            "total_symbols": len(symbols),
+            "successful": sum(1 for r in results if r.get("success", False))
+        })
         
     except Exception as e:
         import traceback
@@ -285,27 +522,28 @@ def health_check():
 FRONTEND_DIR = Path('/app/frontend/backtest') if Path('/app/frontend/backtest').exists() else Path(__file__).parent.parent / 'frontend' / 'backtest'
 
 @app.route('/')
+@app.route('/index.html')
 def index():
-    """Serve the main backtest page."""
+    """Serve the main backtest page (multi-symbol)."""
     return send_file(FRONTEND_DIR / 'index.html')
 
 
-@app.route('/multi-symbol.html')
-def multi_symbol_page():
-    """Serve the multi-symbol backtest page."""
-    return send_file(FRONTEND_DIR / 'multi-symbol.html')
+@app.route('/single-symbol.html')
+def single_symbol_page():
+    """Serve the single-symbol backtest page."""
+    return send_file(FRONTEND_DIR / 'single-symbol.html')
 
 
-@app.route('/backtest.js')
-def backtest_js():
-    """Serve the backtest JavaScript."""
-    return send_file(FRONTEND_DIR / 'backtest.js', mimetype='application/javascript')
+@app.route('/index.js')
+def index_js():
+    """Serve the main (multi-symbol) JavaScript."""
+    return send_file(FRONTEND_DIR / 'index.js', mimetype='application/javascript')
 
 
-@app.route('/multi-symbol.js')
-def multi_symbol_js():
-    """Serve the multi-symbol JavaScript."""
-    return send_file(FRONTEND_DIR / 'multi-symbol.js', mimetype='application/javascript')
+@app.route('/single-symbol.js')
+def single_symbol_js():
+    """Serve the single-symbol JavaScript."""
+    return send_file(FRONTEND_DIR / 'single-symbol.js', mimetype='application/javascript')
 
 
 if __name__ == '__main__':

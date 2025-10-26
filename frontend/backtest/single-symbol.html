@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Strategy Backtest</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 95%;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+
+        .nav-links {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .nav-links a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            margin-right: 20px;
+        }
+
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-size: 0.9rem;
+        }
+
+        input, select {
+            padding: 10px;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results-section {
+            display: none;
+        }
+
+        .results-section.active {
+            display: block;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #3498db;
+        }
+
+        .metric-label {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .metric-value.positive {
+            color: #27ae60;
+        }
+
+        .metric-value.negative {
+            color: #e74c3c;
+        }
+
+        .plot-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .plot-container img {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .error-message {
+            background: #fee;
+            border: 2px solid #e74c3c;
+            color: #c0392b;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .info-box {
+            background: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        /* Table Styles */
+        .params-table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+
+        .params-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            font-size: 0.9rem;
+        }
+
+        .params-table th {
+            background: #3498db;
+            color: white;
+            padding: 12px 8px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+            line-height: 1.3;
+            border: 1px solid #2980b9;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .params-table td {
+            padding: 8px;
+            border: 1px solid #ecf0f1;
+            text-align: center;
+        }
+
+        .params-table input,
+        .params-table select {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        .params-table input:focus,
+        .params-table select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .params-table .direction-cell {
+            padding: 4px;
+        }
+
+        .params-table .direction-btn {
+            width: 100%;
+            padding: 6px 4px;
+            margin: 2px 0;
+            border: 1px solid #ecf0f1;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.75rem;
+        }
+
+        .params-table .direction-btn.selected {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+
+        .params-table .direction-btn:hover {
+            border-color: #3498db;
+        }
+
+        .params-table .action-cell {
+            white-space: nowrap;
+        }
+
+        .btn-sm {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 0 2px;
+        }
+
+        .btn-run {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-run:hover {
+            background: #229954;
+        }
+
+        .btn-run:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .btn-remove {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-remove:hover {
+            background: #c0392b;
+        }
+
+        .btn-add-row {
+            background: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 0;
+        }
+
+        .btn-add-row:hover {
+            background: #2980b9;
+        }
+
+        .status-cell {
+            font-size: 0.85rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .status-pending {
+            background: #ecf0f1;
+            color: #7f8c8d;
+        }
+
+        .status-running {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-complete {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Results Table */
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.9rem;
+        }
+
+        .results-table th {
+            background: #f8f9fa;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+            font-size: 0.85rem;
+        }
+
+        .results-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .results-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .metric-positive {
+            color: #27ae60;
+            font-weight: 600;
+        }
+
+        .metric-negative {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+
+        .plot-preview {
+            max-width: 150px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: transform 0.2s;
+        }
+
+        .plot-preview:hover {
+            transform: scale(1.05);
+        }
+
+        /* Modal for plot viewing */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+        }
+
+        .modal-content img {
+            max-width: 100%;
+            max-height: 90vh;
+            border-radius: 8px;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            color: white;
+            font-size: 32px;
+            cursor: pointer;
+            background: rgba(0, 0, 0, 0.5);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Trading Strategy Backtest</h1>
+            <p class="subtitle">Run multiple strategy tests simultaneously and compare results</p>
+            <div class="nav-links">
+                <a href="index.html">← 🎲 Multi-Symbol Mode</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Strategy Parameters</h2>
+            <div class="info-box">
+                <strong>How it works:</strong> Define events as up/down price movements within a detection window. 
+                When threshold is hit, enter position and hold for specified period. Add multiple rows to test different parameter combinations.
+            </div>
+
+            <div class="params-table-container">
+                <table class="params-table" id="paramsTable">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Up<br>Thr</th>
+                            <th>Up<br>Dir</th>
+                            <th>Dn<br>Thr</th>
+                            <th>Dn<br>Dir</th>
+                            <th>Detection<br>Window</th>
+                            <th>Hold<br>Window</th>
+                            <th>Position<br>Size</th>
+                            <th>Pos<br>Limit</th>
+                            <th>N<br>Accounts</th>
+                            <th>Start<br>Date</th>
+                            <th>Fee<br>Rate</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="paramsTableBody">
+                        <!-- Rows will be added dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <button class="btn-add-row" onclick="addParameterRow()">➕ Add Parameter Row</button>
+        </div>
+
+        <div id="resultsSection" class="results-section">
+            <div class="card">
+                <h2>Backtest Results</h2>
+                <div style="overflow-x: auto;">
+                    <table class="results-table" id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Parameters</th>
+                                <th>Gross<br>PnL</th>
+                                <th>Fees</th>
+                                <th>Net<br>PnL</th>
+                                <th>Net<br>ROI %</th>
+                                <th>Sharpe</th>
+                                <th>Max<br>DD %</th>
+                                <th>Trades</th>
+                                <th>Win<br>Rate %</th>
+                                <th>Avg Net<br>Profit</th>
+                                <th>Plot</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                            <!-- Results will be added dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="errorSection" class="card" style="display: none;">
+            <div class="error-message">
+                <h3>❌ Error</h3>
+                <p id="errorMessage"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for viewing plots -->
+    <div id="plotModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closePlotModal()">&times;</span>
+            <img id="modalPlotImage" src="" alt="PnL Chart">
+        </div>
+    </div>
+
+    <script src="single-symbol.js"></script>
+</body>
+</html>
