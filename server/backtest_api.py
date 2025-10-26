@@ -506,6 +506,125 @@ def generate_plot_base64(trades_df: pl.DataFrame, symbol: str) -> str:
     return img_base64
 
 
+@app.route('/api/daily-data', methods=['POST'])
+def get_daily_data():
+    """
+    Get daily OHLCV data for selected symbols from aggregate file.
+    
+    Expected JSON body:
+    {
+        "symbols": ["BTCUSDT", "ETHUSDT", ...],
+        "start_date": "2024-07-01" (optional),
+        "end_date": "2025-09-30" (optional)
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "data": {
+            "BTCUSDT": [
+                {
+                    "date": "2024-07-01T00:00:00",
+                    "open": 63000.5,
+                    "high": 64000.0,
+                    "low": 62500.0,
+                    "close": 63500.0,
+                    "volume": 1234.56
+                },
+                ...
+            ],
+            ...
+        },
+        "date_range": {"start": "2024-07-01", "end": "2025-09-30"}
+    }
+    """
+    try:
+        data = request.json
+        symbols = data.get('symbols', [])
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        
+        if not symbols:
+            return jsonify({"success": False, "error": "No symbols provided"}), 400
+        
+        # Find aggregate parquet file
+        agg_dir = Path('/app/data/klines_aggregate') if Path('/app/data/klines_aggregate').exists() else Path(__file__).parent.parent / 'data' / 'klines_aggregate'
+        
+        # Look for AGG_*.pq file
+        agg_files = list(agg_dir.glob('AGG_*.pq'))
+        
+        if not agg_files:
+            return jsonify({"success": False, "error": "No aggregate data file found"}), 404
+        
+        # Use most recent file (sort by filename which includes date)
+        agg_file = sorted(agg_files)[-1]
+        print(f"DEBUG: Using aggregate file: {agg_file}")
+        
+        # Read aggregate data
+        df = pl.read_parquet(agg_file)
+        
+        # Filter by symbols
+        df = df.filter(pl.col('symbol').is_in(symbols))
+        
+        # Filter by date range if provided
+        if start_date:
+            start_dt = pl.datetime(year=int(start_date[:4]), month=int(start_date[5:7]), day=int(start_date[8:10]))
+            df = df.filter(pl.col('open_time') >= start_dt)
+        
+        if end_date:
+            end_dt = pl.datetime(year=int(end_date[:4]), month=int(end_date[5:7]), day=int(end_date[8:10]))
+            df = df.filter(pl.col('open_time') <= end_dt)
+        
+        # Sort by symbol and time
+        df = df.sort(['symbol', 'open_time'])
+        
+        # Group by symbol and prepare response
+        result_data = {}
+        for symbol in symbols:
+            symbol_df = df.filter(pl.col('symbol') == symbol)
+            
+            if len(symbol_df) == 0:
+                result_data[symbol] = []
+                continue
+            
+            # Convert to list of dictionaries
+            symbol_data = [
+                {
+                    "date": row["open_time"].isoformat() if hasattr(row["open_time"], 'isoformat') else str(row["open_time"]),
+                    "open": row["open"],
+                    "high": row["high"],
+                    "low": row["low"],
+                    "close": row["close"],
+                    "volume": row["volume"]
+                }
+                for row in symbol_df.select(["open_time", "open", "high", "low", "close", "volume"]).to_dicts()
+            ]
+            result_data[symbol] = symbol_data
+        
+        # Get actual date range from data
+        actual_start = df["open_time"].min()
+        actual_end = df["open_time"].max()
+        
+        return jsonify({
+            "success": True,
+            "data": result_data,
+            "date_range": {
+                "start": actual_start.isoformat() if hasattr(actual_start, 'isoformat') else str(actual_start),
+                "end": actual_end.isoformat() if hasattr(actual_end, 'isoformat') else str(actual_end)
+            },
+            "total_symbols": len(symbols),
+            "file": agg_file.name
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint."""
@@ -522,6 +641,11 @@ def health_check():
 FRONTEND_DIR = Path('/app/frontend/backtest') if Path('/app/frontend/backtest').exists() else Path(__file__).parent.parent / 'frontend' / 'backtest'
 
 @app.route('/')
+def landing():
+    """Serve the landing page with links to all tools."""
+    return send_file(FRONTEND_DIR / 'landing.html')
+
+
 @app.route('/index.html')
 def index():
     """Serve the main backtest page (multi-symbol)."""
@@ -544,6 +668,18 @@ def index_js():
 def single_symbol_js():
     """Serve the single-symbol JavaScript."""
     return send_file(FRONTEND_DIR / 'single-symbol.js', mimetype='application/javascript')
+
+
+@app.route('/daily.html')
+def daily_page():
+    """Serve the daily data visualization page."""
+    return send_file(FRONTEND_DIR / 'daily.html')
+
+
+@app.route('/daily.js')
+def daily_js():
+    """Serve the daily data JavaScript."""
+    return send_file(FRONTEND_DIR / 'daily.js', mimetype='application/javascript')
 
 
 if __name__ == '__main__':

@@ -1,26 +1,30 @@
 // Multi-Symbol Backtest JavaScript
-const API_BASE_URL = 'http://localhost:5001';
+// Wrap in IIFE to avoid global namespace pollution
+(function() {
+    'use strict';
 
-let availableSymbols = [];
-let currentResults = [];
+    const API_BASE_URL = 'http://localhost:5001';
 
-// Fetch available symbols on page load
-async function fetchSymbols() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/symbols`);
-        const data = await response.json();
-        
-        if (data.success && data.symbols) {
-            availableSymbols = data.symbols;
-            console.log(`Loaded ${availableSymbols.length} available symbols`);
-        } else {
-            showStatus('Failed to load available symbols', 'error');
+    let availableSymbols = [];
+    let currentResults = [];
+
+    // Fetch available symbols on page load
+    async function fetchSymbols() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/symbols`);
+            const data = await response.json();
+            
+            if (data.success && data.symbols) {
+                availableSymbols = data.symbols;
+                console.log(`Loaded ${availableSymbols.length} available symbols`);
+            } else {
+                showStatus('Failed to load available symbols', 'error');
+            }
+        } catch (error) {
+            console.error('Error fetching symbols:', error);
+            showStatus('Error loading symbols: ' + error.message, 'error');
         }
-    } catch (error) {
-        console.error('Error fetching symbols:', error);
-        showStatus('Error loading symbols: ' + error.message, 'error');
     }
-}
 
 // Randomly select N symbols from available symbols
 function selectRandomSymbols(n) {
@@ -624,3 +628,5 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('backtestForm').addEventListener('submit', runMultiSymbolBacktest);
     document.getElementById('clearBtn').addEventListener('click', clearResults);
 });
+
+})(); // End IIFE

@@ -1,16 +1,20 @@
-// Configuration
-const API_BASE_URL = 'http://localhost:5001';
+// Wrap in IIFE to avoid global namespace pollution
+(function() {
+    'use strict';
 
-// State
-let availableSymbols = [];
-let rowCounter = 0;
-let backtestResults = [];
+    // Configuration
+    const API_BASE_URL = 'http://localhost:5001';
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadSymbols();
-    addParameterRow(); // Add initial row
-});
+    // State
+    let availableSymbols = [];
+    let rowCounter = 0;
+    let backtestResults = [];
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadSymbols();
+        addParameterRow(); // Add initial row
+    });
 
 // Load available symbols from API
 async function loadSymbols() {
@@ -116,7 +120,8 @@ function getRowParameters(rowId) {
         position_size: parseFloat(row.querySelector('.param-pos-size').value),
         position_limit: parseInt(row.querySelector('.param-pos-limit').value),
         num_accounts: parseInt(row.querySelector('.param-n-accounts').value),
-        fee_rate: parseFloat(row.querySelector('.param-fee-rate').value)
+        fee_rate: parseFloat(row.querySelector('.param-fee-rate').value),
+        include_plot: true  // Enable plot generation for single-symbol backtests
     };
     
     const startDate = row.querySelector('.param-start-date').value;
@@ -320,3 +325,13 @@ function showError(message) {
         document.getElementById('errorSection').style.display = 'none';
     }, 5000);
 }
+
+// Expose functions needed by HTML onclick handlers
+window.addParameterRow = addParameterRow;
+window.closePlotModal = closePlotModal;
+window.runBacktest = runBacktest;
+window.removeRow = removeRow;
+window.selectDirection = selectDirection;
+window.showPlotModal = showPlotModal;
+
+})(); // End IIFE
