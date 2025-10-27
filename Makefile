@@ -90,11 +90,20 @@ build-dev:
 
 # Run the development container, mounting the current directory and external data
 run-dev:
-	docker run -d --rm \
-		-v .:/workspace \
-		-v $(DATA_DIR):/workspace/data:ro \
-		--name $(DEV_CONTAINER_NAME) \
-		$(DEV_IMAGE_NAME) sleep infinity
+	@if [ -z "$(DATA_DIR)" ]; then \
+		echo "⚠️  DATA_DIR is not set. Running without data mount."; \
+		docker run -d --rm \
+			-v .:/workspace \
+			--name $(DEV_CONTAINER_NAME) \
+			$(DEV_IMAGE_NAME) sleep infinity; \
+	else \
+		echo "✅ Mounting DATA_DIR: $(DATA_DIR)"; \
+		docker run -d --rm \
+			-v .:/workspace \
+			-v $(DATA_DIR):/workspace/data:ro \
+			--name $(DEV_CONTAINER_NAME) \
+			$(DEV_IMAGE_NAME) sleep infinity; \
+	fi
 
 # Get a shell inside the running development container
 shell-dev:
