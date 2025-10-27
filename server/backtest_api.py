@@ -642,14 +642,14 @@ FRONTEND_DIR = Path('/app/frontend/backtest') if Path('/app/frontend/backtest').
 
 @app.route('/')
 def landing():
-    """Serve the landing page with links to all tools."""
-    return send_file(FRONTEND_DIR / 'landing.html')
-
-
-@app.route('/index.html')
-def index():
-    """Serve the main backtest page (multi-symbol)."""
+    """Serve the landing page (index.html)."""
     return send_file(FRONTEND_DIR / 'index.html')
+
+
+@app.route('/multisymbol.html')
+def multisymbol_page():
+    """Serve the multi-symbol backtest page."""
+    return send_file(FRONTEND_DIR / 'multisymbol.html')
 
 
 @app.route('/single-symbol.html')
@@ -658,10 +658,10 @@ def single_symbol_page():
     return send_file(FRONTEND_DIR / 'single-symbol.html')
 
 
-@app.route('/index.js')
-def index_js():
-    """Serve the main (multi-symbol) JavaScript."""
-    return send_file(FRONTEND_DIR / 'index.js', mimetype='application/javascript')
+@app.route('/multisymbol.js')
+def multisymbol_js():
+    """Serve the multi-symbol JavaScript."""
+    return send_file(FRONTEND_DIR / 'multisymbol.js', mimetype='application/javascript')
 
 
 @app.route('/single-symbol.js')

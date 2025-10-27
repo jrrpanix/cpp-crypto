@@ -3,9 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Symbol Backtest</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <title>Trading Strategy Platform</title>
     <style>
         * {
             margin: 0;
@@ -14,552 +12,230 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             padding: 20px;
         }
 
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
+            max-width: 1200px;
+            width: 100%;
         }
 
         .header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 20px;
-            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            text-align: center;
+            margin-bottom: 60px;
+            color: white;
         }
 
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 10px;
+        .header h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
         }
 
-        .subtitle {
-            color: #7f8c8d;
-            font-size: 1.1rem;
+        .header p {
+            font-size: 1.3rem;
+            opacity: 0.95;
+            font-weight: 300;
         }
 
-        .nav-links {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #e0e0e0;
-        }
-
-        .nav-links a {
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 500;
-            margin-right: 20px;
-            padding: 5px 12px;
-            border-radius: 5px;
-            transition: background 0.3s;
-        }
-
-        .nav-links a:hover {
-            background: #f0f0f0;
-            text-decoration: none;
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
         }
 
         .card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 25px;
+            background: white;
+            border-radius: 20px;
+            padding: 40px 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 25px 70px rgba(0, 0, 0, 0.4);
+        }
+
+        .card-icon {
+            font-size: 3.5rem;
             margin-bottom: 20px;
-            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            display: block;
         }
 
         .card h2 {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
             color: #2c3e50;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #667eea;
         }
 
-        .params-table-container {
-            overflow-x: auto;
-            margin-bottom: 20px;
-        }
-
-        .params-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            font-size: 0.9rem;
-        }
-
-        .params-table th {
-            background: #3498db;
-            color: white;
-            padding: 12px 8px;
-            text-align: center;
-            font-weight: 600;
-            font-size: 0.85rem;
-            line-height: 1.3;
-            border: 1px solid #2980b9;
-        }
-
-        .params-table td {
-            padding: 8px;
-            border: 1px solid #ecf0f1;
-            text-align: center;
-        }
-
-        .params-table input,
-        .params-table select {
-            width: 100%;
-            padding: 6px;
-            border: 1px solid #bdc3c7;
-            border-radius: 4px;
-            font-size: 0.85rem;
-        }
-
-        .params-table input:focus,
-        .params-table select:focus {
-            outline: none;
-            border-color: #3498db;
-        }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
+        .card p {
+            color: #7f8c8d;
+            line-height: 1.6;
+            font-size: 1.05rem;
             margin-bottom: 20px;
         }
 
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        label {
-            font-weight: 600;
-            color: #34495e;
-            margin-bottom: 8px;
-            font-size: 0.9rem;
-        }
-
-        input, select {
-            padding: 10px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 1rem;
-            transition: border-color 0.3s;
-        }
-
-        input:focus, select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
+        .card-features {
+            list-style: none;
             margin-top: 20px;
         }
 
-        button {
-            padding: 12px 30px;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
+        .card-features li {
+            padding: 8px 0;
+            color: #5a6c7d;
+            font-size: 0.95rem;
+            border-bottom: 1px solid #ecf0f1;
         }
 
-        .btn-primary {
+        .card-features li:last-child {
+            border-bottom: none;
+        }
+
+        .card-features li::before {
+            content: '✓';
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .card-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 30px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        .btn-primary:hover {
-            transform: translateY(-2px);
+        .card-link:hover {
+            transform: scale(1.05);
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
-        .btn-primary:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-secondary {
-            background: #95a5a6;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #7f8c8d;
-        }
-
-        #status {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 8px;
-            display: none;
-        }
-
-        #status.info {
-            background: #d1ecf1;
-            color: #0c5460;
-            display: block;
-        }
-
-        #status.success {
-            background: #d4edda;
-            color: #155724;
-            display: block;
-        }
-
-        #status.error {
-            background: #f8d7da;
-            color: #721c24;
-            display: block;
-        }
-
-        .results-section {
-            display: none;
-        }
-
-        .results-section.show {
-            display: block;
-        }
-
-        .aggregate-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            margin-bottom: 30px;
-            font-size: 0.85rem;
-        }
-
-        .aggregate-table th,
-        .aggregate-table td {
-            padding: 8px 10px;
+        .footer {
             text-align: center;
-            border: 1px solid #ecf0f1;
-        }
-
-        .aggregate-table th {
-            background: #34495e;
             color: white;
-            font-weight: 600;
-            font-size: 0.8rem;
-            line-height: 1.3;
-        }
-
-        .aggregate-table td {
-            background: white;
-            font-weight: 500;
-        }
-
-        .aggregate-table tr:hover td {
-            background: #f8f9fa;
-        }
-
-        .chart-container {
-            width: 100%;
-            height: 400px;
-            margin-top: 20px;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #ecf0f1;
-        }
-
-        .results-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            font-size: 0.85rem;
-        }
-
-        .results-table th {
-            background: #34495e;
-            color: white;
-            padding: 10px 6px;
-            text-align: center;
-            font-weight: 600;
-            cursor: pointer;
-            user-select: none;
-            position: relative;
-            border: 1px solid #2c3e50;
-            font-size: 0.8rem;
-        }
-
-        .results-table th:hover {
-            background: #415a77;
-        }
-
-        .results-table th.sortable::after {
-            content: ' ⇅';
-            opacity: 0.5;
-            font-size: 0.8em;
-        }
-
-        .results-table th.sort-asc::after {
-            content: ' ▲';
-            opacity: 1;
-        }
-
-        .results-table th.sort-desc::after {
-            content: ' ▼';
-            opacity: 1;
-        }
-
-        .results-table td {
-            padding: 8px 6px;
-            text-align: center;
-            border: 1px solid #ecf0f1;
-            font-size: 0.8rem;
-        }
-
-        .results-table tbody tr:hover {
-            background: #f8f9fa;
-        }
-
-        .positive {
-            color: #27ae60;
-            font-weight: 600;
-        }
-
-        .negative {
-            color: #e74c3c;
-            font-weight: 600;
-        }
-
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        .stat-label {
-            font-size: 0.9rem;
+            margin-top: 40px;
+            font-size: 0.95rem;
             opacity: 0.9;
-            margin-bottom: 5px;
         }
 
-        .stat-value {
-            font-size: 2rem;
-            font-weight: bold;
-        }
-
-        .symbol-results {
-            margin-top: 20px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        th {
-            background-color: #f8f9fa;
-            color: #2c3e50;
-            font-weight: 600;
-            position: sticky;
-            top: 0;
-        }
-
-        tr:hover {
-            background-color: #f8f9fa;
-        }
-
-        .positive {
-            color: #27ae60;
-            font-weight: 600;
-        }
-
-        .negative {
-            color: #e74c3c;
-            font-weight: 600;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 30px;
-            background: #e0e0e0;
-            border-radius: 15px;
-            overflow: hidden;
-            margin: 20px 0;
-            display: none;
-        }
-
-        .progress-bar.show {
-            display: block;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            width: 0%;
-            transition: width 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #667eea;
             color: white;
+            border-radius: 12px;
+            font-size: 0.75rem;
             font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 10px;
         }
 
-        .help-text {
-            font-size: 0.85rem;
-            color: #7f8c8d;
-            margin-top: 5px;
+        .badge.new {
+            background: #f093fb;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2.5rem;
+            }
+
+            .header p {
+                font-size: 1.1rem;
+            }
+
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎲 Multi-Symbol Strategy Backtest</h1>
-            <p class="subtitle">Test your strategy across multiple randomly selected symbols</p>
-            <div class="nav-links">
-                <a href="/">← Home</a>
-                <a href="single-symbol.html">📊 Single Symbol Mode</a>
-                <a href="daily.html">📈 Daily Market Data</a>
-            </div>
+            <h1>🚀 Trading Strategy Platform</h1>
+            <p>Comprehensive backtesting and analysis tools for algorithmic trading</p>
         </div>
 
-        <div class="card">
-            <h2>Strategy Parameters</h2>
-            <form id="backtestForm">
-                <div class="params-table-container">
-                    <table class="params-table">
-                        <thead>
-                            <tr>
-                                <th>Number of<br>Symbols</th>
-                                <th>Up Threshold<br>(%)</th>
-                                <th>Up<br>Direction</th>
-                                <th>Down Threshold<br>(%)</th>
-                                <th>Down<br>Direction</th>
-                                <th>Detection<br>Window</th>
-                                <th>Hold<br>Window</th>
-                                <th>Position<br>Size ($)</th>
-                                <th>Position<br>Limit</th>
-                                <th>Fee Rate<br>(%)</th>
-                                <th>Num<br>Accounts</th>
-                                <th>Start Date<br>(Optional)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><input type="number" id="numSymbols" value="5" min="1" required></td>
-                                <td><input type="number" id="upThreshold" step="0.01" value="1.0" required></td>
-                                <td>
-                                    <select id="upDirection" required>
-                                        <option value="B">Long</option>
-                                        <option value="S">Short</option>
-                                    </select>
-                                </td>
-                                <td><input type="number" id="downThreshold" step="0.01" value="-1.0" required></td>
-                                <td>
-                                    <select id="downDirection" required>
-                                        <option value="B">Long</option>
-                                        <option value="S" selected>Short</option>
-                                    </select>
-                                </td>
-                                <td><input type="number" id="detectionWindow" value="30" min="1" required></td>
-                                <td><input type="number" id="holdWindow" value="30" min="1" required></td>
-                                <td><input type="number" id="positionSize" step="any" value="1000" min="0.01" required></td>
-                                <td><input type="number" id="positionLimit" value="1" min="1" required></td>
-                                <td><input type="number" id="feeRate" step="0.0001" value="0.03" required></td>
-                                <td>
-                                    <select id="numAccounts" required>
-                                        <option value="1" selected>1</option>
-                                        <option value="2">2</option>
-                                    </select>
-                                </td>
-                                <td><input type="date" id="startDate"></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+        <div class="cards-grid">
+            <!-- Multi-Symbol Backtest -->
+            <a href="multisymbol.html" class="card">
+                <span class="card-icon">🎲</span>
+                <h2>Multi-Symbol Backtest <span class="badge">Parallel</span></h2>
+                <p>Test your trading strategy across multiple symbols simultaneously with parallel processing.</p>
+                <ul class="card-features">
+                    <li>Test 30-40 symbols in 6-7 seconds</li>
+                    <li>Parallel execution with 8 CPU cores</li>
+                    <li>Aggregate portfolio metrics</li>
+                    <li>Cumulative PnL visualization</li>
+                    <li>Sortable results table</li>
+                </ul>
+                <span class="card-link">Launch Multi-Symbol →</span>
+            </a>
 
-                <div class="button-group">
-                    <button type="submit" class="btn-primary" id="runBtn">Run Multi-Symbol Backtest</button>
-                    <button type="button" class="btn-secondary" id="clearBtn">Clear Results</button>
-                </div>
-            </form>
+            <!-- Single-Symbol Backtest -->
+            <a href="single-symbol.html" class="card">
+                <span class="card-icon">📊</span>
+                <h2>Single-Symbol Backtest</h2>
+                <p>Deep dive into a single symbol with multiple parameter variations and detailed charts.</p>
+                <ul class="card-features">
+                    <li>Multiple parameter rows</li>
+                    <li>Individual PnL plots</li>
+                    <li>Compare strategy variations</li>
+                    <li>Detailed trade analysis</li>
+                    <li>Performance metrics</li>
+                </ul>
+                <span class="card-link">Launch Single-Symbol →</span>
+            </a>
 
-            <div id="status"></div>
-            
-            <div class="progress-bar" id="progressBar">
-                <div class="progress-fill" id="progressFill">0%</div>
-            </div>
+            <!-- Daily Market Data -->
+            <a href="daily.html" class="card">
+                <span class="card-icon">📈</span>
+                <h2>Daily Market Data <span class="badge new">New</span></h2>
+                <p>Visualize daily price and volume data for multiple symbols from aggregate datasets.</p>
+                <ul class="card-features">
+                    <li>539 symbols available</li>
+                    <li>15+ months of daily data</li>
+                    <li>Multi-symbol comparison</li>
+                    <li>Price & volume charts</li>
+                    <li>Date range filtering</li>
+                </ul>
+                <span class="card-link">Launch Daily Data →</span>
+            </a>
         </div>
 
-        <div class="results-section" id="resultsSection">
-            <div class="card">
-                <h2>📊 Aggregate Results</h2>
-                <table class="aggregate-table" id="aggregateTable">
-                    <thead>
-                        <tr>
-                            <th>Total<br>Symbols</th>
-                            <th>Total<br>Trades</th>
-                            <th>Gross<br>PnL</th>
-                            <th>Total<br>Fees</th>
-                            <th>Net<br>PnL</th>
-                            <th>Avg PnL/<br>Symbol</th>
-                            <th>Avg PnL/<br>Trade</th>
-                            <th>Win<br>Rate</th>
-                            <th>Avg<br>Sharpe</th>
-                            <th>Profitable<br>Symbols</th>
-                        </tr>
-                    </thead>
-                    <tbody id="aggregateStats">
-                        <!-- Populated by JavaScript -->
-                    </tbody>
-                </table>
-                
-                <div class="chart-container">
-                    <canvas id="cumulativePnlChart"></canvas>
-                </div>
-            </div>
-
-            <div class="card">
-                <h2>📈 Individual Symbol Performance</h2>
-                <div class="symbol-results">
-                    <table class="results-table" id="symbolTable">
-                        <thead>
-                            <tr>
-                                <th class="sortable" data-column="rank">Rank</th>
-                                <th class="sortable" data-column="symbol">Symbol</th>
-                                <th class="sortable" data-column="trades">Trades</th>
-                                <th class="sortable" data-column="gross_pnl">Gross PnL</th>
-                                <th class="sortable" data-column="fees">Fees</th>
-                                <th class="sortable" data-column="net_pnl">Net PnL</th>
-                                <th class="sortable" data-column="roi">ROI (%)</th>
-                                <th class="sortable" data-column="win_rate">Win Rate (%)</th>
-                                <th class="sortable" data-column="winners">Winners</th>
-                                <th class="sortable" data-column="losers">Losers</th>
-                                <th class="sortable" data-column="sharpe">Sharpe</th>
-                            </tr>
-                        </thead>
-                        <tbody id="symbolTableBody">
-                            <!-- Populated by JavaScript -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+        <div class="footer">
+            <p>Built with Flask, Polars, and Chart.js | Running on Docker with parallel processing</p>
         </div>
     </div>
-
-    <script src="index.js"></script>
 </body>
 </html>
