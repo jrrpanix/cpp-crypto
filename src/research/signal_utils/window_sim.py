@@ -696,8 +696,8 @@ def run_simulation(
     summary["data_end_date"] = data_end_date
     summary["num_data_rows"] = num_rows
 
-    # Create cumulative PnL plot if we have trades
-    if len(trades_df) > 0 and symbol:
+    # Create cumulative PnL plot if we have trades and verbose mode is on
+    if len(trades_df) > 0 and symbol and verbose:
         plot_cumulative_pnl(trades_df, symbol)
 
     if verbose:

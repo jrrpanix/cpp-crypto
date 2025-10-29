@@ -3,7 +3,8 @@
     'use strict';
 
     // Configuration
-    const API_BASE_URL = 'http://localhost:5001';
+    // Use relative URL to work with any domain/port
+    const API_BASE_URL = window.location.origin;
 
     // State
     let availableSymbols = [];

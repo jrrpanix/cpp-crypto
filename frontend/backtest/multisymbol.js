@@ -3,7 +3,8 @@
 (function() {
     'use strict';
 
-    const API_BASE_URL = 'http://localhost:5001';
+    // Use relative URL to work with any domain/port
+    const API_BASE_URL = window.location.origin;
 
     let availableSymbols = [];
     let currentResults = [];
@@ -623,24 +624,41 @@ function clearResults() {
 
 // Initialize
 function init() {
-    fetchSymbols();
+    console.log('Initializing multi-symbol backtest page...');
+    
+    // Fetch symbols if not already loaded
+    if (availableSymbols.length === 0) {
+        fetchSymbols();
+    } else {
+        console.log(`Using cached ${availableSymbols.length} symbols`);
+    }
     
     const form = document.getElementById('backtestForm');
     const clearBtn = document.getElementById('clearBtn');
     
     if (form) {
+        // Remove any existing listener to avoid duplicates
+        form.removeEventListener('submit', runMultiSymbolBacktest);
         form.addEventListener('submit', runMultiSymbolBacktest);
+        console.log('Form submit listener attached');
+    } else {
+        console.error('Form not found!');
     }
+    
     if (clearBtn) {
+        clearBtn.removeEventListener('click', clearResults);
         clearBtn.addEventListener('click', clearResults);
+        console.log('Clear button listener attached');
     }
 }
 
 // Run initialization when DOM is ready or immediately if already loaded
 if (document.readyState === 'loading') {
+    console.log('DOM loading - will init on DOMContentLoaded');
     document.addEventListener('DOMContentLoaded', init);
 } else {
     // DOM is already ready, run init immediately
+    console.log('DOM already loaded - initializing immediately');
     init();
 }
 

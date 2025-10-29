@@ -205,6 +205,11 @@ run-backtest:
 	@echo "🚀 Starting backtest webapp (Flask serves all on port 5001)..."
 	docker-compose -f $(COMPOSE_FILE_BACKTEST) up -d --build
 
+# Restart backtest services without rebuilding (faster for code changes)
+restart-backtest:
+	@echo "🔄 Restarting backtest webapp (no rebuild)..."
+	docker-compose -f $(COMPOSE_FILE_BACKTEST) restart
+
 # Start backtest services with output visible
 run-backtest-verbose:
 	@echo "🚀 Starting backtest webapp with output..."

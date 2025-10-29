@@ -14,7 +14,7 @@ import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
 import polars as pl
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 import multiprocessing
 
@@ -436,38 +436,52 @@ def run_batch_backtest():
             'start_date': start_date
         }
         
-        # Use ProcessPoolExecutor for true parallelism
-        # Number of workers = min(num_symbols, cpu_count)
+        # Use ThreadPoolExecutor for compatibility with Flask
+        # (ProcessPoolExecutor has issues with spawn and Flask's request context)
         max_workers = min(len(symbols), multiprocessing.cpu_count())
-        print(f"DEBUG: Using {max_workers} parallel workers")
+        print(f"DEBUG: Using {max_workers} parallel workers (ThreadPool)", flush=True)
         
         results = []
+        executor = None
         
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        try:
+            print(f"DEBUG: Creating ThreadPoolExecutor...", flush=True)
+            executor = ThreadPoolExecutor(max_workers=max_workers)
+            print(f"DEBUG: Executor created, submitting {len(symbols)} jobs...", flush=True)
+            
             # Submit all jobs
             future_to_symbol = {
                 executor.submit(process_single_symbol, symbol, DATA_DIR, worker_params): symbol
                 for symbol in symbols
             }
+            print(f"DEBUG: All {len(future_to_symbol)} jobs submitted, waiting for completion...", flush=True)
             
             # Collect results as they complete
             completed = 0
             for future in as_completed(future_to_symbol):
                 symbol = future_to_symbol[future]
+                print(f"DEBUG: Future completed for {symbol}, getting result...", flush=True)
                 try:
-                    result = future.result()
+                    result = future.result(timeout=120)  # 2 minute timeout per symbol
                     results.append(result)
                     completed += 1
-                    print(f"DEBUG: Completed {completed}/{len(symbols)}: {symbol} - {result.get('num_trades', 0)} trades")
+                    print(f"DEBUG: Completed {completed}/{len(symbols)}: {symbol} - {result.get('num_trades', 0)} trades", flush=True)
                 except Exception as e:
                     import traceback
-                    print(f"ERROR: Exception processing {symbol}: {str(e)}")
+                    print(f"ERROR: Exception processing {symbol}: {str(e)}", flush=True)
+                    print(f"ERROR: Traceback: {traceback.format_exc()}", flush=True)
                     results.append({
                         "symbol": symbol,
                         "success": False,
                         "error": str(e),
                         "traceback": traceback.format_exc()
                     })
+        finally:
+            # Explicitly shutdown and cleanup the executor
+            if executor is not None:
+                print(f"DEBUG: Shutting down executor with {max_workers} workers", flush=True)
+                executor.shutdown(wait=True, cancel_futures=False)
+                print(f"DEBUG: Executor shutdown complete", flush=True)
         
         return jsonify({
             "success": True,
