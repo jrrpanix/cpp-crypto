@@ -14,8 +14,9 @@ RUN cd /workspace && uv pip install --system --no-cache .
 # Copy API server
 COPY server/backtest_api.py .
 
-# Create signal_utils directory structure (will be mounted via volume)
-RUN mkdir -p /app/signal_utils
+# Copy research modules (signal_utils and data_utils)
+COPY src/research/signal_utils /app/signal_utils
+COPY src/research/data_utils /app/data_utils
 
 # Set Python path
 ENV PYTHONPATH=/app

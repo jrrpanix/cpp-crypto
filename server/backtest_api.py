@@ -18,14 +18,29 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from functools import partial
 import multiprocessing
 
-# Add parent directory to path to import window_sim
+# Add paths for module imports
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, '/app/data_utils')  # Docker path for data_utils
+sys.path.insert(0, str(Path(__file__).parent / 'data_utils'))  # Local fallback
+
+# Add parent directory to path to import window_sim
 try:
     from signal_utils import window_sim
 except ImportError:
     # Fallback for local development
     sys.path.insert(0, str(Path(__file__).parent.parent / 'src' / 'research'))
     from signal_utils import window_sim
+
+# Import calc_adv - should work now with paths set
+calc_adv_module = None
+try:
+    # Try direct import (should work with paths above)
+    import calc_adv as calc_adv_module
+    print("✅ calc_adv module loaded successfully")
+except ImportError as e:
+    print(f"⚠️  Warning: calc_adv module not found: {e}")
+    print(f"   Python path: {sys.path[:5]}")
+    calc_adv_module = None
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend access
@@ -625,6 +640,118 @@ def get_daily_data():
         }), 500
 
 
+@app.route('/api/calculate-adv', methods=['POST'])
+def calculate_adv():
+    """
+    Calculate Average Daily Volume (ADV) for top symbols.
+    
+    Expected JSON body:
+    {
+        "units": "months" or "weeks",
+        "interval": 1-12,
+        "top_n": 1-100
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "data": [
+            {
+                "begin_date": "2024-07-01",
+                "end_date": "2024-07-31",
+                "symbol": "BTCUSDT",
+                "adv": 1234567890.50,
+                "weight": 0.45
+            },
+            ...
+        ]
+    }
+    """
+    try:
+        data = request.json
+        units = data.get('units', 'months')
+        interval = int(data.get('interval', 1))
+        top_n = int(data.get('top_n', 10))
+        
+        # Validate inputs
+        if units not in ['months', 'weeks']:
+            return jsonify({"success": False, "error": "units must be 'months' or 'weeks'"}), 400
+        
+        if interval < 1 or interval > 12:
+            return jsonify({"success": False, "error": "interval must be between 1 and 12"}), 400
+        
+        if top_n < 1 or top_n > 100:
+            return jsonify({"success": False, "error": "top_n must be between 1 and 100"}), 400
+        
+        # Find aggregate parquet file
+        agg_dir = Path('/workspace/data/klines_aggregate') if Path('/workspace/data/klines_aggregate').exists() else Path('/app/data/klines_aggregate') if Path('/app/data/klines_aggregate').exists() else Path(__file__).parent.parent / 'data' / 'klines_aggregate'
+        
+        # Look for AGG_*.pq file
+        agg_files = list(agg_dir.glob('AGG_*.pq'))
+        
+        if not agg_files:
+            return jsonify({"success": False, "error": "No aggregate data file found"}), 404
+        
+        # Use most recent file (sort by filename which includes date)
+        agg_file = sorted(agg_files)[-1]
+        print(f"DEBUG: Using aggregate file for ADV: {agg_file}")
+        
+        # Read aggregate data
+        df = pl.read_parquet(agg_file)
+        
+        # Filter to USDT symbols (default behavior)
+        df = df.filter(pl.col('symbol').str.ends_with('USDT'))
+        
+        print(f"DEBUG: Calculating {interval}-{units} ADV for top {top_n} symbols...")
+        print(f"DEBUG: Input data: {len(df)} rows, {df['symbol'].n_unique()} unique symbols")
+        
+        # Check if calc_adv module is available
+        if calc_adv_module is None:
+            return jsonify({
+                "success": False,
+                "error": "calc_adv module not available. Please check server logs."
+            }), 500
+        
+        # Calculate ADV using calc_adv module
+        result_df = calc_adv_module.calculate_adv(
+            df=df,
+            interval=interval,
+            units=units,
+            top_n=top_n
+        )
+        
+        print(f"DEBUG: Result: {len(result_df)} rows")
+        
+        # Convert to list of dictionaries for JSON response
+        result_data = []
+        for row in result_df.to_dicts():
+            result_data.append({
+                "begin_date": row["begin_date"].isoformat() if hasattr(row["begin_date"], 'isoformat') else str(row["begin_date"]),
+                "end_date": row["end_date"].isoformat() if hasattr(row["end_date"], 'isoformat') else str(row["end_date"]),
+                "symbol": row["symbol"],
+                "adv": float(row["adv"]),
+                "weight": float(row["weight"])
+            })
+        
+        return jsonify({
+            "success": True,
+            "data": result_data,
+            "total_periods": len(set(r["begin_date"] for r in result_data)),
+            "total_symbols": len(set(r["symbol"] for r in result_data)),
+            "file": agg_file.name
+        })
+        
+    except Exception as e:
+        import traceback
+        print(f"ERROR: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint."""
@@ -680,6 +807,18 @@ def daily_page():
 def daily_js():
     """Serve the daily data JavaScript."""
     return send_file(FRONTEND_DIR / 'daily.js', mimetype='application/javascript')
+
+
+@app.route('/adv.html')
+def adv_page():
+    """Serve the ADV analysis page."""
+    return send_file(FRONTEND_DIR / 'adv.html')
+
+
+@app.route('/adv.js')
+def adv_js():
+    """Serve the ADV analysis JavaScript."""
+    return send_file(FRONTEND_DIR / 'adv.js', mimetype='application/javascript')
 
 
 if __name__ == '__main__':
