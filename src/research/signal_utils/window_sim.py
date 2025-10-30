@@ -263,12 +263,13 @@ def simulate_trades(
             accepted_with_count = check_count
                 
         else:
-            # Multiple accounts logic: original behavior
+            # Multiple accounts logic: track long and short separately
             # Close any positions that have already exited
             open_positions = [(e_idx, x_idx, d) for e_idx, x_idx, d in open_positions if x_idx > entry_idx]
             
-            # Check position limit - reject trade if at limit
-            if len(open_positions) >= position_limit:
+            # Check position limit by direction - each account has its own limit
+            same_direction_positions = [p for p in open_positions if p[2] == trade_direction]
+            if len(same_direction_positions) >= position_limit:
                 if signal_type == "UP":
                     rejected_up_signals += 1
                 else:

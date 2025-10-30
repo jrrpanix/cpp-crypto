@@ -172,6 +172,7 @@ async function calculateADV() {
     const units = document.getElementById('units').value;
     const interval = parseInt(document.getElementById('interval').value);
     const topN = parseInt(document.getElementById('topN').value);
+    const dropN = parseInt(document.getElementById('dropN').value) || 0;
     
     // Validate inputs
     if (interval < 1 || interval > 12) {
@@ -179,8 +180,13 @@ async function calculateADV() {
         return;
     }
     
-    if (topN < 1 || topN > 100) {
-        showError('Top N must be between 1 and 100');
+    if (topN < 1 || topN > 1000) {
+        showError('Top N must be between 1 and 1000');
+        return;
+    }
+    
+    if (dropN < 0 || dropN >= topN) {
+        showError(`Drop N must be between 0 and ${topN - 1}`);
         return;
     }
     
@@ -196,7 +202,8 @@ async function calculateADV() {
             body: JSON.stringify({
                 units: units,
                 interval: interval,
-                top_n: topN
+                top_n: topN,
+                drop_n: dropN
             })
         });
         

@@ -663,7 +663,8 @@ def calculate_adv():
     {
         "units": "months" or "weeks",
         "interval": 1-12,
-        "top_n": 1-100
+        "top_n": 1-100,
+        "drop_n": 0-99 (optional, default 0)
     }
     
     Returns:
@@ -675,6 +676,7 @@ def calculate_adv():
                 "end_date": "2024-07-31",
                 "symbol": "BTCUSDT",
                 "adv": 1234567890.50,
+                "rank": 11,
                 "weight": 0.45
             },
             ...
@@ -686,6 +688,7 @@ def calculate_adv():
         units = data.get('units', 'months')
         interval = int(data.get('interval', 1))
         top_n = int(data.get('top_n', 10))
+        drop_n = int(data.get('drop_n', 0))
         
         # Validate inputs
         if units not in ['months', 'weeks']:
@@ -694,8 +697,11 @@ def calculate_adv():
         if interval < 1 or interval > 12:
             return jsonify({"success": False, "error": "interval must be between 1 and 12"}), 400
         
-        if top_n < 1 or top_n > 100:
-            return jsonify({"success": False, "error": "top_n must be between 1 and 100"}), 400
+        if top_n < 1 or top_n > 500:
+            return jsonify({"success": False, "error": "top_n must be between 1 and 500"}), 400
+        
+        if drop_n < 0 or drop_n >= top_n:
+            return jsonify({"success": False, "error": f"drop_n must be between 0 and {top_n - 1}"}), 400
         
         # Find aggregate parquet file
         agg_dir = Path('/workspace/data/klines_aggregate') if Path('/workspace/data/klines_aggregate').exists() else Path('/app/data/klines_aggregate') if Path('/app/data/klines_aggregate').exists() else Path(__file__).parent.parent / 'data' / 'klines_aggregate'
@@ -716,7 +722,11 @@ def calculate_adv():
         # Filter to USDT symbols (default behavior)
         df = df.filter(pl.col('symbol').str.ends_with('USDT'))
         
-        print(f"DEBUG: Calculating {interval}-{units} ADV for top {top_n} symbols...")
+        if drop_n > 0:
+            remaining = top_n - drop_n
+            print(f"DEBUG: Calculating {interval}-{units} ADV for top {top_n}, dropping top {drop_n}, keeping ranks {drop_n + 1}-{top_n} ({remaining} symbols)...")
+        else:
+            print(f"DEBUG: Calculating {interval}-{units} ADV for top {top_n} symbols...")
         print(f"DEBUG: Input data: {len(df)} rows, {df['symbol'].n_unique()} unique symbols")
         
         # Check if calc_adv module is available
@@ -731,7 +741,8 @@ def calculate_adv():
             df=df,
             interval=interval,
             units=units,
-            top_n=top_n
+            top_n=top_n,
+            drop_n=drop_n
         )
         
         print(f"DEBUG: Result: {len(result_df)} rows")
@@ -739,20 +750,25 @@ def calculate_adv():
         # Convert to list of dictionaries for JSON response
         result_data = []
         for row in result_df.to_dicts():
-            result_data.append({
+            item = {
                 "begin_date": row["begin_date"].isoformat() if hasattr(row["begin_date"], 'isoformat') else str(row["begin_date"]),
                 "end_date": row["end_date"].isoformat() if hasattr(row["end_date"], 'isoformat') else str(row["end_date"]),
                 "symbol": row["symbol"],
                 "adv": float(row["adv"]),
                 "weight": float(row["weight"])
-            })
+            }
+            # Add rank if present (will be present when top_n is specified)
+            if "rank" in row:
+                item["rank"] = int(row["rank"])
+            result_data.append(item)
         
         return jsonify({
             "success": True,
             "data": result_data,
             "total_periods": len(set(r["begin_date"] for r in result_data)),
             "total_symbols": len(set(r["symbol"] for r in result_data)),
-            "file": agg_file.name
+            "file": agg_file.name,
+            "drop_n": drop_n
         })
         
     except Exception as e:

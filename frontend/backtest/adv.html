@@ -470,6 +470,7 @@
                             <th>Time Units</th>
                             <th>Interval</th>
                             <th>Top N Symbols</th>
+                            <th>Drop Top N</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -485,7 +486,10 @@
                                 <input type="number" id="interval" min="1" max="12" value="1" placeholder="1-12">
                             </td>
                             <td>
-                                <input type="number" id="topN" min="1" max="100" value="10" placeholder="1-100">
+                                <input type="number" id="topN" min="1" max="500" value="10" placeholder="1-500">
+                            </td>
+                            <td>
+                                <input type="number" id="dropN" min="0" max="500" value="0" placeholder="0-500">
                             </td>
                             <td>
                                 <button id="calculateBtn" onclick="calculateADV()">Calculate ADV</button>

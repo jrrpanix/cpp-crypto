@@ -23,7 +23,8 @@ def calculate_adv(
     units: str = "months",
     start_of_month: bool = False,
     index_start_day: str = None,
-    top_n: int = None
+    top_n: int = None,
+    drop_n: int = 0
 ) -> pl.DataFrame:
     """
     Calculate Average Daily Volume over intervals.
@@ -35,10 +36,12 @@ def calculate_adv(
         start_of_month: If True, align week intervals to start of month (default: False for rolling)
         index_start_day: Day of week to start intervals (monday, tuesday, etc.). Overrides start_of_month.
         top_n: If specified, keep only top N symbols by ADV per interval and add weights
+        drop_n: If specified with top_n, drop the top drop_n symbols before calculating weights (default: 0)
         
     Returns:
-        DataFrame with columns: begin_date, end_date, symbol, adv, [weight]
+        DataFrame with columns: begin_date, end_date, symbol, adv, [rank], [weight]
         Weight column is added if top_n is specified
+        Rank shows original ranking (1 = highest ADV, even if dropped)
     """
     # Add year and month columns for grouping
     df = df.with_columns([
@@ -47,9 +50,9 @@ def calculate_adv(
     ])
     
     if units == "months":
-        return _calculate_adv_months(df, interval, top_n)
+        return _calculate_adv_months(df, interval, top_n, drop_n)
     elif units == "weeks":
-        return _calculate_adv_weeks(df, interval, start_of_month, index_start_day, top_n)
+        return _calculate_adv_weeks(df, interval, start_of_month, index_start_day, top_n, drop_n)
     else:
         raise ValueError(f"Invalid units: {units}. Must be 'months' or 'weeks'")
 
@@ -57,7 +60,8 @@ def calculate_adv(
 def _calculate_adv_months(
     df: pl.DataFrame,
     interval_months: int,
-    top_n: int = None
+    top_n: int = None,
+    drop_n: int = 0
 ) -> pl.DataFrame:
     """Calculate ADV using month-based intervals."""
     
@@ -168,7 +172,7 @@ def _calculate_adv_months(
              pl.col("end_date").dt.strftime("%Y-%m-%d")).alias("interval_id")
         ])
         
-        # For each interval, rank symbols by ADV and keep top N
+        # For each interval, rank symbols by ADV
         result = result.with_columns([
             pl.col("adv").rank(method="ordinal", descending=True)
             .over("interval_id")
@@ -178,19 +182,24 @@ def _calculate_adv_months(
         # Filter to top N
         result = result.filter(pl.col("rank") <= top_n)
         
-        # Calculate weights: weight_i = adv_i / sum(top N adv) for each interval
+        # If drop_n is specified, drop the top drop_n symbols
+        if drop_n > 0:
+            # Filter out ranks 1 through drop_n
+            result = result.filter(pl.col("rank") > drop_n)
+        
+        # Calculate weights: weight_i = adv_i / sum(remaining adv) for each interval
         result = result.with_columns([
             (pl.col("adv") / pl.col("adv").sum().over("interval_id")).alias("weight")
         ])
         
-        # Drop temporary columns
-        result = result.drop(["interval_id", "rank", "year", "month"])
+        # Drop temporary interval_id column
+        result = result.drop(["interval_id", "year", "month"])
         
-        # Sort by begin_date, then by adv descending
-        result = result.sort(["begin_date", "adv"], descending=[False, True])
+        # Sort by begin_date, then by rank
+        result = result.sort(["begin_date", "rank"])
         
-        # Reorder columns with weight
-        result = result.select(["begin_date", "end_date", "symbol", "adv", "weight"])
+        # Reorder columns with weight and rank
+        result = result.select(["begin_date", "end_date", "symbol", "adv", "rank", "weight"])
     else:
         # Drop year and month columns
         result = result.drop(["year", "month"])
@@ -209,7 +218,8 @@ def _calculate_adv_weeks(
     interval_weeks: int,
     start_of_month: bool = False,
     index_start_day: str = None,
-    top_n: int = None
+    top_n: int = None,
+    drop_n: int = 0
 ) -> pl.DataFrame:
     """
     Calculate ADV using week-based intervals.
@@ -220,6 +230,7 @@ def _calculate_adv_weeks(
         start_of_month: If True, align intervals to start of month; if False, use rolling intervals
         index_start_day: Day of week to start intervals (monday, tuesday, etc.). Overrides start_of_month.
         top_n: If specified, keep only top N symbols per interval
+        drop_n: If specified with top_n, drop the top drop_n symbols before calculating weights (default: 0)
     """
     from datetime import date, timedelta
     
@@ -324,7 +335,7 @@ def _calculate_adv_weeks(
              pl.col("end_date").dt.strftime("%Y-%m-%d")).alias("interval_id")
         ])
         
-        # For each interval, rank symbols by ADV and keep top N
+        # For each interval, rank symbols by ADV
         result = result.with_columns([
             pl.col("adv").rank(method="ordinal", descending=True)
             .over("interval_id")
@@ -334,19 +345,24 @@ def _calculate_adv_weeks(
         # Filter to top N
         result = result.filter(pl.col("rank") <= top_n)
         
-        # Calculate weights: weight_i = adv_i / sum(top N adv) for each interval
+        # If drop_n is specified, drop the top drop_n symbols
+        if drop_n > 0:
+            # Filter out ranks 1 through drop_n
+            result = result.filter(pl.col("rank") > drop_n)
+        
+        # Calculate weights: weight_i = adv_i / sum(remaining adv) for each interval
         result = result.with_columns([
             (pl.col("adv") / pl.col("adv").sum().over("interval_id")).alias("weight")
         ])
         
-        # Drop temporary columns
-        result = result.drop(["interval_id", "rank"])
+        # Drop temporary interval_id column
+        result = result.drop(["interval_id"])
         
-        # Sort by begin_date, then by adv descending
-        result = result.sort(["begin_date", "adv"], descending=[False, True])
+        # Sort by begin_date, then by rank
+        result = result.sort(["begin_date", "rank"])
         
-        # Reorder columns with weight
-        result = result.select(["begin_date", "end_date", "symbol", "adv", "weight"])
+        # Reorder columns with weight and rank
+        result = result.select(["begin_date", "end_date", "symbol", "adv", "rank", "weight"])
     else:
         # Sort by begin_date, then by adv descending
         result = result.sort(["begin_date", "adv"], descending=[False, True])
@@ -592,6 +608,13 @@ Examples:
         help="Keep only top N symbols by ADV per interval and calculate weights"
     )
     parser.add_argument(
+        "--drop-n",
+        type=int,
+        default=0,
+        help="Drop the top N symbols before calculating weights (default: 0). "
+             "Requires --nsymbols. Example: --nsymbols 50 --drop-n 10 gives you ranks 11-50 (40 symbols)."
+    )
+    parser.add_argument(
         "--plot",
         action="store_true",
         help="Generate visualization plots of ADV over time"
@@ -626,6 +649,19 @@ Examples:
         print(f"❌ Error: nsymbols must be at least 1")
         return
     
+    # Validate drop_n
+    if args.drop_n < 0:
+        print(f"❌ Error: drop-n must be non-negative")
+        return
+    
+    if args.drop_n > 0 and args.nsymbols is None:
+        print(f"❌ Error: --drop-n requires --nsymbols to be specified")
+        return
+    
+    if args.drop_n > 0 and args.nsymbols is not None and args.drop_n >= args.nsymbols:
+        print(f"❌ Error: drop-n ({args.drop_n}) must be less than nsymbols ({args.nsymbols})")
+        return
+    
     print(f"📖 Reading data from: {input_path.name}")
     
     # Read the aggregate file
@@ -654,12 +690,16 @@ Examples:
         units_label = "week" if args.interval == 1 else "weeks"
     
     if args.nsymbols:
-        print(f"\n📊 Calculating {args.interval}-{units_label} ADV (top {args.nsymbols} symbols per interval)...")
+        if args.drop_n > 0:
+            remaining_symbols = args.nsymbols - args.drop_n
+            print(f"\n📊 Calculating {args.interval}-{units_label} ADV (top {args.nsymbols}, dropping top {args.drop_n}, keeping ranks {args.drop_n + 1}-{args.nsymbols}: {remaining_symbols} symbols)...")
+        else:
+            print(f"\n📊 Calculating {args.interval}-{units_label} ADV (top {args.nsymbols} symbols per interval)...")
     else:
         print(f"\n📊 Calculating {args.interval}-{units_label} ADV...")
     
     try:
-        result = calculate_adv(df, args.interval, args.units, args.start_of_month, args.index_start_day, args.nsymbols)
+        result = calculate_adv(df, args.interval, args.units, args.start_of_month, args.index_start_day, args.nsymbols, args.drop_n)
     except Exception as e:
         print(f"❌ Error calculating ADV: {e}")
         import traceback
@@ -670,7 +710,10 @@ Examples:
     print(f"   Total periods: {len(result):,}")
     
     if args.nsymbols:
-        print(f"   Filtered to top {args.nsymbols} symbols per interval")
+        if args.drop_n > 0:
+            print(f"   Filtered to ranks {args.drop_n + 1}-{args.nsymbols} (dropped top {args.drop_n})")
+        else:
+            print(f"   Filtered to top {args.nsymbols} symbols per interval")
         print(f"   Weights calculated (sum to 1.0 per interval)")
     
     # Generate plots if requested
@@ -741,7 +784,11 @@ Examples:
         
         # Generate output filename based on computation type
         if args.nsymbols:
-            output_filename = f"WEIGHTS_{args.nsymbols}_{args.interval}_{units_suffix}{date_suffix}.pq"
+            if args.drop_n > 0:
+                # Include drop_n in filename: WEIGHTS_50_DROP10_1_MONTH_...
+                output_filename = f"WEIGHTS_{args.nsymbols}_DROP{args.drop_n}_{args.interval}_{units_suffix}{date_suffix}.pq"
+            else:
+                output_filename = f"WEIGHTS_{args.nsymbols}_{args.interval}_{units_suffix}{date_suffix}.pq"
         else:
             output_filename = f"ADV_{args.interval}_{units_suffix}{date_suffix}.pq"
         
