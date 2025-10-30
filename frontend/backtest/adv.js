@@ -141,7 +141,8 @@ function displayResults(data) {
                 // Strip USDT suffix from symbol
                 const symbol = symbolData.symbol.replace(/USDT$/, '');
                 const adv = formatLargeNumber(symbolData.adv);
-                const weight = (symbolData.weight * 100).toFixed(0);
+                // Format weight with 5 decimal places for precision
+                const weight = symbolData.weight.toFixed(5);
                 
                 rowHTML += `
                     <td class="rank-${rank}">
@@ -149,7 +150,7 @@ function displayResults(data) {
                             <span class="cell-rank">${rank}</span>
                             <span class="cell-symbol">${symbol}</span>
                             <span class="cell-adv">$${adv}</span>
-                            <span class="cell-weight">.${weight}</span>
+                            <span class="cell-weight">${weight}</span>
                         </div>
                     </td>
                 `;
