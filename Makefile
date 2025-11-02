@@ -97,10 +97,10 @@ run-dev:
 			--name $(DEV_CONTAINER_NAME) \
 			$(DEV_IMAGE_NAME) sleep infinity; \
 	else \
-		echo "✅ Mounting DATA_DIR: $(DATA_DIR)"; \
+		echo "✅ Mounting DATA_DIR: $(DATA_DIR) (read-write for downloads)"; \
 		docker run -d --rm \
 			-v .:/workspace \
-			-v $(DATA_DIR):/workspace/data:ro \
+			-v $(DATA_DIR):/workspace/data \
 			--name $(DEV_CONTAINER_NAME) \
 			$(DEV_IMAGE_NAME) sleep infinity; \
 	fi
