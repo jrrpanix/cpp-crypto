@@ -11,6 +11,8 @@
 
     let priceChart = null;
     let volumeChart = null;
+    let rawData = null; // Store raw data for re-rendering with different scales
+    let currentSymbols = null;
 
     // Color palette for multiple symbols
     const CHART_COLORS = [
@@ -144,6 +146,13 @@ async function loadData() {
         // Display info
         showInfo(result, selectedSymbols);
         
+        // Display performance table
+        showPerformanceTable(result.data, selectedSymbols);
+        
+        // Store raw data for re-rendering
+        rawData = result.data;
+        currentSymbols = selectedSymbols;
+        
         // Update charts
         updateCharts(result.data, selectedSymbols);
         
@@ -155,6 +164,28 @@ async function loadData() {
     } finally {
         loadBtn.disabled = false;
     }
+}
+
+/**
+ * Update price scale when dropdown changes
+ */
+function updatePriceScale() {
+    if (rawData && currentSymbols) {
+        updateCharts(rawData, currentSymbols);
+    }
+}
+
+/**
+ * Normalize price data to start at 100
+ */
+function normalizePrices(data) {
+    if (!data || data.length === 0) return [];
+    
+    const firstPrice = data[0].y;
+    return data.map(point => ({
+        x: point.x,
+        y: (point.y / firstPrice) * 100
+    }));
 }
 
 /**
@@ -173,6 +204,8 @@ function updateCharts(data, symbols) {
     const priceDatasets = [];
     const volumeDatasets = [];
     
+    const priceScale = document.getElementById('priceScale').value;
+    
     symbols.forEach((symbol, index) => {
         const symbolData = data[symbol] || [];
         
@@ -183,13 +216,21 @@ function updateCharts(data, symbols) {
         
         const color = CHART_COLORS[index % CHART_COLORS.length];
         
+        // Prepare price data
+        let priceData = symbolData.map(d => ({
+            x: new Date(d.date),
+            y: d.close
+        }));
+        
+        // Apply normalization if selected
+        if (priceScale === 'normalized') {
+            priceData = normalizePrices(priceData);
+        }
+        
         // Price dataset (closing prices)
         priceDatasets.push({
             label: symbol,
-            data: symbolData.map(d => ({
-                x: new Date(d.date),
-                y: d.close
-            })),
+            data: priceData,
             borderColor: color,
             backgroundColor: color + '20',
             borderWidth: 2,
@@ -198,12 +239,12 @@ function updateCharts(data, symbols) {
             tension: 0.1
         });
         
-        // Volume dataset
+        // Volume dataset (use quote_volume for dollar volume)
         volumeDatasets.push({
             label: symbol,
             data: symbolData.map(d => ({
                 x: new Date(d.date),
-                y: d.volume
+                y: d.quote_volume || d.volume  // Use quote_volume (dollar volume) if available
             })),
             backgroundColor: color + '80',
             borderColor: color,
@@ -233,7 +274,12 @@ function updateCharts(data, symbols) {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `${context.dataset.label}: $${context.parsed.y.toFixed(2)}`;
+                            const value = context.parsed.y;
+                            if (priceScale === 'normalized') {
+                                const percentChange = ((value - 100) / 100 * 100).toFixed(2);
+                                return `${context.dataset.label}: ${value.toFixed(2)} (${percentChange > 0 ? '+' : ''}${percentChange}%)`;
+                            }
+                            return `${context.dataset.label}: $${value.toFixed(2)}`;
                         }
                     }
                 }
@@ -253,13 +299,17 @@ function updateCharts(data, symbols) {
                     }
                 },
                 y: {
+                    type: priceScale === 'log' ? 'logarithmic' : 'linear',
                     beginAtZero: false,
                     title: {
                         display: true,
-                        text: 'Price (USD)'
+                        text: priceScale === 'normalized' ? 'Normalized Price (Start = 100)' : 'Price (USD)'
                     },
                     ticks: {
                         callback: function(value) {
+                            if (priceScale === 'normalized') {
+                                return value.toFixed(2);
+                            }
                             return '$' + value.toFixed(2);
                         }
                     }
@@ -290,7 +340,15 @@ function updateCharts(data, symbols) {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `${context.dataset.label}: ${context.parsed.y.toLocaleString()} units`;
+                            const value = context.parsed.y;
+                            if (value >= 1e9) {
+                                return `${context.dataset.label}: $${(value / 1e9).toFixed(2)}B`;
+                            } else if (value >= 1e6) {
+                                return `${context.dataset.label}: $${(value / 1e6).toFixed(2)}M`;
+                            } else if (value >= 1e3) {
+                                return `${context.dataset.label}: $${(value / 1e3).toFixed(2)}K`;
+                            }
+                            return `${context.dataset.label}: $${value.toFixed(0)}`;
                         }
                     }
                 }
@@ -314,16 +372,18 @@ function updateCharts(data, symbols) {
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: 'Volume'
+                        text: 'Volume (USD)'
                     },
                     ticks: {
                         callback: function(value) {
-                            if (value >= 1e6) {
-                                return (value / 1e6).toFixed(1) + 'M';
+                            if (value >= 1e9) {
+                                return '$' + (value / 1e9).toFixed(2) + 'B';
+                            } else if (value >= 1e6) {
+                                return '$' + (value / 1e6).toFixed(1) + 'M';
                             } else if (value >= 1e3) {
-                                return (value / 1e3).toFixed(1) + 'K';
+                                return '$' + (value / 1e3).toFixed(1) + 'K';
                             }
-                            return value;
+                            return '$' + value.toFixed(0);
                         }
                     },
                     stacked: false
@@ -333,6 +393,81 @@ function updateCharts(data, symbols) {
     });
     
     console.log('Charts updated successfully');
+}
+
+/**
+ * Show performance table with key metrics
+ */
+function showPerformanceTable(data, symbols) {
+    const tableDiv = document.getElementById('performanceTable');
+    const tbody = document.querySelector('#perfTableContent tbody');
+    
+    tbody.innerHTML = '';
+    
+    // Calculate metrics for each symbol
+    const metrics = symbols.map(symbol => {
+        const symbolData = data[symbol] || [];
+        
+        if (symbolData.length === 0) {
+            return null;
+        }
+        
+        const startPrice = symbolData[0].close;
+        const endPrice = symbolData[symbolData.length - 1].close;
+        const priceChange = endPrice - startPrice;
+        const returnPct = (priceChange / startPrice) * 100;
+        
+        // Calculate average daily volume (quote_volume in USD)
+        const totalVolume = symbolData.reduce((sum, d) => sum + (d.quote_volume || d.volume * d.close || 0), 0);
+        const avgDailyVolume = totalVolume / symbolData.length;
+        
+        return {
+            symbol,
+            startPrice,
+            endPrice,
+            priceChange,
+            returnPct,
+            avgDailyVolume
+        };
+    }).filter(m => m !== null);
+    
+    // Sort by return percentage (descending)
+    metrics.sort((a, b) => b.returnPct - a.returnPct);
+    
+    // Populate table rows
+    metrics.forEach(m => {
+        const row = document.createElement('tr');
+        
+        const returnClass = m.returnPct >= 0 ? 'positive' : 'negative';
+        const returnSign = m.returnPct >= 0 ? '+' : '';
+        
+        row.innerHTML = `
+            <td class="symbol-cell">${m.symbol}</td>
+            <td class="number-cell">$${m.startPrice.toFixed(2)}</td>
+            <td class="number-cell">$${m.endPrice.toFixed(2)}</td>
+            <td class="number-cell ${returnClass}">${returnSign}$${m.priceChange.toFixed(2)}</td>
+            <td class="number-cell ${returnClass}">${returnSign}${m.returnPct.toFixed(2)}%</td>
+            <td class="number-cell">${formatVolume(m.avgDailyVolume)}</td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+    
+    tableDiv.style.display = 'block';
+}
+
+/**
+ * Format volume for display
+ */
+function formatVolume(value) {
+    if (value >= 1e9) {
+        return '$' + (value / 1e9).toFixed(2) + 'B';
+    } else if (value >= 1e6) {
+        return '$' + (value / 1e6).toFixed(1) + 'M';
+    } else if (value >= 1e3) {
+        return '$' + (value / 1e3).toFixed(1) + 'K';
+    }
+    return '$' + value.toFixed(0);
 }
 
 /**
@@ -378,8 +513,9 @@ function showStatus(type, message) {
     }
 }
 
-// Expose loadData to global scope for HTML onclick handler
+// Expose functions to global scope for HTML onclick handlers
 window.loadData = loadData;
+window.updatePriceScale = updatePriceScale;
 
 // Run initialization when DOM is ready or immediately if already loaded
 if (document.readyState === 'loading') {

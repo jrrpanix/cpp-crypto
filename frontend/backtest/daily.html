@@ -54,7 +54,7 @@
             background: #f8f9fa;
             border-radius: 8px;
             display: grid;
-            grid-template-columns: 1fr 1fr auto;
+            grid-template-columns: 1fr 1fr 1fr auto;
             gap: 15px;
             align-items: end;
         }
@@ -164,6 +164,63 @@
             color: #666;
             margin-top: 5px;
         }
+        
+        .performance-table {
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e1e4e8;
+            font-size: 0.9rem;
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .positive {
+            color: #22c55e;
+            font-weight: 600;
+        }
+        
+        .negative {
+            color: #ef4444;
+            font-weight: 600;
+        }
+        
+        .symbol-cell {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .number-cell {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+        }
     </style>
 </head>
 <body>
@@ -196,11 +253,40 @@
                 </select>
             </div>
             
+            <div class="control-group">
+                <label for="priceScale">Price Display:</label>
+                <select id="priceScale" onchange="updatePriceScale()">
+                    <option value="absolute">Absolute Prices</option>
+                    <option value="normalized">Normalized (Start at 100)</option>
+                    <option value="log">Log Scale</option>
+                </select>
+                <div class="help-text">Use normalized to compare returns</div>
+            </div>
+            
             <button id="loadBtn" onclick="loadData()">Load Data</button>
         </div>
         
         <div id="status"></div>
         <div id="info" class="info-bar" style="display: none;"></div>
+        
+        <div id="performanceTable" class="performance-table" style="display: none;">
+            <h3 style="margin: 0 0 15px 0; color: #333;">📊 Performance Summary</h3>
+            <table id="perfTableContent">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th class="number-cell">Start Price</th>
+                        <th class="number-cell">End Price</th>
+                        <th class="number-cell">Change</th>
+                        <th class="number-cell">Return (%)</th>
+                        <th class="number-cell">Avg Daily Volume</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
         
         <div class="chart-container">
             <h3 style="margin: 0 0 15px 0; color: #333;">Daily Closing Prices</h3>
@@ -210,7 +296,7 @@
         </div>
         
         <div class="chart-container">
-            <h3 style="margin: 0 0 15px 0; color: #333;">Daily Volume</h3>
+            <h3 style="margin: 0 0 15px 0; color: #333;">Daily Volume (USD)</h3>
             <div class="chart-wrapper">
                 <canvas id="volumeChart"></canvas>
             </div>
