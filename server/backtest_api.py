@@ -23,13 +23,15 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, '/app/data_utils')  # Docker path for data_utils
 sys.path.insert(0, str(Path(__file__).parent / 'data_utils'))  # Local fallback
 
-# Add parent directory to path to import window_sim
+# Add parent directory to path to import window_sim and daily_sim
 try:
     from signal_utils import window_sim
+    from signal_utils import daily_sim
 except ImportError:
     # Fallback for local development
     sys.path.insert(0, str(Path(__file__).parent.parent / 'src' / 'research'))
     from signal_utils import window_sim
+    from signal_utils import daily_sim
 
 # Import calc_adv - should work now with paths set
 calc_adv_module = None
@@ -73,6 +75,29 @@ def find_data_directory():
     return default
 
 DATA_DIR = find_data_directory()
+
+# Configure daily data directory
+def find_daily_data_directory():
+    """Find the daily data directory by checking common locations."""
+    possible_paths = [
+        Path('/workspace/data/klines_daily'),  # Container workspace
+        Path('/app/data/klines_daily'),  # Docker mount
+        Path(__file__).parent.parent / 'data' / 'klines_daily',  # Local
+    ]
+    
+    for path in possible_paths:
+        if path.exists() and path.is_dir():
+            # Check if it has parquet files
+            if list(path.glob('*_daily_*.parquet')):
+                print(f"📅 Using daily data directory: {path}")
+                return path
+    
+    # Default fallback
+    default = Path('/workspace/data/klines_daily')
+    print(f"⚠️  No daily data directory found, using default: {default}")
+    return default
+
+DAILY_DATA_DIR = find_daily_data_directory()
 
 @app.route('/api/symbols', methods=['GET'])
 def get_symbols():
@@ -499,6 +524,360 @@ def run_batch_backtest():
         }), 500
 
 
+# ============================================================================
+# Daily Backtest API Endpoints
+# ============================================================================
+
+@app.route('/api/daily-symbols', methods=['GET'])
+def get_daily_symbols():
+    """Get list of available symbols from daily parquet files."""
+    try:
+        # Find all daily parquet files
+        parquet_files = list(DAILY_DATA_DIR.glob("*_daily_*.parquet"))
+        
+        # Extract unique symbols
+        symbols = set()
+        for file in parquet_files:
+            # Extract symbol from filename (e.g., BTCUSDT_daily_2024-01_2025-10.parquet)
+            filename = file.stem
+            symbol = filename.split('_daily_')[0]
+            symbols.add(symbol)
+        
+        return jsonify({
+            "success": True,
+            "symbols": sorted(list(symbols))
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route('/api/daily-backtest', methods=['POST'])
+def run_daily_backtest():
+    """
+    Run daily backtest with provided parameters.
+    
+    Expected JSON body:
+    {
+        "symbol": "BTCUSDT",
+        "up_threshold": 0.10,
+        "up_direction": "B",
+        "down_threshold": -999,
+        "down_direction": "S",
+        "detection_window": 5,
+        "hold_window": 10,
+        "position_size": 10000,
+        "position_limit": 1,
+        "fee_rate": 0.001,
+        "num_accounts": 1,
+        "start_date": "2024-01-01" (optional)
+    }
+    """
+    try:
+        # Get parameters from request
+        params = request.json
+        
+        print(f"DEBUG: Received daily backtest request for symbol: {params.get('symbol')}")
+        
+        symbol = params.get('symbol')
+        up_threshold = float(params.get('up_threshold'))
+        up_direction = params.get('up_direction', 'B')
+        down_threshold = float(params.get('down_threshold'))
+        down_direction = params.get('down_direction', 'S')
+        detection_window = int(params.get('detection_window'))
+        hold_window = int(params.get('hold_window'))
+        position_size = float(params.get('position_size'))
+        position_limit = int(params.get('position_limit', 1))
+        fee_rate = float(params.get('fee_rate', 0.001))
+        num_accounts = int(params.get('num_accounts', 1))
+        start_date = params.get('start_date')
+        
+        # Find parquet file(s) with wildcard pattern
+        matching_files = sorted(DAILY_DATA_DIR.glob(f"{symbol}_daily_*.parquet"))
+        
+        if not matching_files:
+            return jsonify({
+                "success": False,
+                "error": f"No daily data found for symbol {symbol}"
+            }), 404
+        
+        # Use most recent file
+        parquet_file = str(matching_files[-1])
+        
+        # Run simulation using daily_sim module
+        trades_df, summary = daily_sim.run_simulation_from_file(
+            parquet_file,
+            start_date,
+            up_threshold,
+            down_threshold,
+            detection_window,
+            hold_window,
+            position_size,
+            position_limit,
+            fee_rate,
+            num_accounts,
+            up_direction,
+            down_direction
+        )
+        
+        # Extract cumulative PnL time series for aggregation
+        cumulative_pnl_series = []
+        if len(trades_df) > 0:
+            trades_sorted = trades_df.sort("exit_time")
+            trades_sorted = trades_sorted.with_columns(
+                [pl.col("net_profit_dollars").cum_sum().alias("cumulative_pnl")]
+            )
+            cumulative_pnl_series = [
+                {"time": row["exit_time"].isoformat() if hasattr(row["exit_time"], 'isoformat') else str(row["exit_time"]), 
+                 "pnl": row["cumulative_pnl"]}
+                for row in trades_sorted.select(["exit_time", "cumulative_pnl"]).to_dicts()
+            ]
+        
+        # Prepare response
+        response = {
+            "success": True,
+            "summary": summary,
+            "num_trades": len(trades_df),
+            "cumulative_pnl_series": cumulative_pnl_series
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+def process_single_daily_symbol(symbol: str, data_dir: Path, params: dict) -> dict:
+    """
+    Worker function to process a single symbol daily backtest.
+    Designed to be called by ThreadPoolExecutor for parallel execution.
+    
+    Args:
+        symbol: Trading symbol (e.g., 'BTCUSDT')
+        data_dir: Path to daily data directory
+        params: Dictionary with backtest parameters
+        
+    Returns:
+        Dictionary with result or error information
+    """
+    try:
+        # Import here to avoid issues with multiprocessing
+        import polars as pl
+        import sys
+        from pathlib import Path
+        
+        # Re-import daily_sim in worker process
+        sys.path.insert(0, str(Path(__file__).parent))
+        try:
+            from signal_utils import daily_sim
+        except ImportError:
+            sys.path.insert(0, str(Path(__file__).parent.parent / 'src' / 'research'))
+            from signal_utils import daily_sim
+        
+        # Find parquet file(s) with wildcard pattern
+        matching_files = sorted(data_dir.glob(f"{symbol}_daily_*.parquet"))
+        
+        if not matching_files:
+            return {
+                "symbol": symbol,
+                "success": False,
+                "error": f"No daily data found for symbol {symbol}"
+            }
+        
+        # Use most recent file
+        parquet_file = str(matching_files[-1])
+        
+        # Extract parameters
+        start_date = params.get('start_date')
+        up_threshold = params['up_threshold']
+        up_direction = params['up_direction']
+        down_threshold = params['down_threshold']
+        down_direction = params['down_direction']
+        detection_window = params['detection_window']
+        hold_window = params['hold_window']
+        position_size = params['position_size']
+        position_limit = params['position_limit']
+        fee_rate = params['fee_rate']
+        num_accounts = params['num_accounts']
+        
+        # Run simulation
+        trades_df, summary = daily_sim.run_simulation_from_file(
+            parquet_file,
+            start_date,
+            up_threshold,
+            down_threshold,
+            detection_window,
+            hold_window,
+            position_size,
+            position_limit,
+            fee_rate,
+            num_accounts,
+            up_direction,
+            down_direction
+        )
+        
+        # Extract cumulative PnL time series
+        cumulative_pnl_series = []
+        if len(trades_df) > 0:
+            trades_sorted = trades_df.sort("exit_time")
+            trades_sorted = trades_sorted.with_columns(
+                [pl.col("net_profit_dollars").cum_sum().alias("cumulative_pnl")]
+            )
+            cumulative_pnl_series = [
+                {"time": row["exit_time"].isoformat() if hasattr(row["exit_time"], 'isoformat') else str(row["exit_time"]), 
+                 "pnl": row["cumulative_pnl"]}
+                for row in trades_sorted.select(["exit_time", "cumulative_pnl"]).to_dicts()
+            ]
+        
+        return {
+            "symbol": symbol,
+            "success": True,
+            "summary": summary,
+            "num_trades": len(trades_df),
+            "cumulative_pnl_series": cumulative_pnl_series
+        }
+        
+    except Exception as e:
+        import traceback
+        return {
+            "symbol": symbol,
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
+@app.route('/api/daily-backtest/batch', methods=['POST'])
+def run_batch_daily_backtest():
+    """
+    Run daily backtests for multiple symbols with same parameters.
+    More efficient than calling /api/daily-backtest multiple times.
+    
+    Expected JSON body:
+    {
+        "symbols": ["BTCUSDT", "ETHUSDT", ...],
+        "params": {
+            "up_threshold": 0.10,
+            "up_direction": "B",
+            "down_threshold": -999,
+            "down_direction": "S",
+            "detection_window": 5,
+            "hold_window": 10,
+            "position_size": 10000,
+            "position_limit": 1,
+            "fee_rate": 0.001,
+            "num_accounts": 1,
+            "start_date": "2024-01-01" (optional)
+        }
+    }
+    """
+    try:
+        data = request.json
+        symbols = data.get('symbols', [])
+        params = data.get('params', {})
+        
+        if not symbols:
+            return jsonify({"success": False, "error": "No symbols provided"}), 400
+        
+        print(f"DEBUG: Batch daily backtest for {len(symbols)} symbols using parallel processing")
+        
+        # Extract and validate parameters
+        up_threshold = float(params.get('up_threshold'))
+        up_direction = params.get('up_direction', 'B')
+        down_threshold = float(params.get('down_threshold'))
+        down_direction = params.get('down_direction', 'S')
+        detection_window = int(params.get('detection_window'))
+        hold_window = int(params.get('hold_window'))
+        position_size = float(params.get('position_size'))
+        position_limit = int(params.get('position_limit', 1))
+        fee_rate = float(params.get('fee_rate', 0.001))
+        num_accounts = int(params.get('num_accounts', 1))
+        start_date = params.get('start_date')
+        
+        # Prepare parameters dict for worker function
+        worker_params = {
+            'up_threshold': up_threshold,
+            'up_direction': up_direction,
+            'down_threshold': down_threshold,
+            'down_direction': down_direction,
+            'detection_window': detection_window,
+            'hold_window': hold_window,
+            'position_size': position_size,
+            'position_limit': position_limit,
+            'fee_rate': fee_rate,
+            'num_accounts': num_accounts,
+            'start_date': start_date
+        }
+        
+        # Use ThreadPoolExecutor for compatibility with Flask
+        max_workers = min(len(symbols), multiprocessing.cpu_count())
+        print(f"DEBUG: Using {max_workers} parallel workers (ThreadPool) for daily backtests", flush=True)
+        
+        results = []
+        executor = None
+        
+        try:
+            print(f"DEBUG: Creating ThreadPoolExecutor...", flush=True)
+            executor = ThreadPoolExecutor(max_workers=max_workers)
+            print(f"DEBUG: Executor created, submitting {len(symbols)} daily jobs...", flush=True)
+            
+            # Submit all jobs
+            future_to_symbol = {
+                executor.submit(process_single_daily_symbol, symbol, DAILY_DATA_DIR, worker_params): symbol
+                for symbol in symbols
+            }
+            print(f"DEBUG: All {len(future_to_symbol)} jobs submitted, waiting for completion...", flush=True)
+            
+            # Collect results as they complete
+            completed = 0
+            for future in as_completed(future_to_symbol):
+                symbol = future_to_symbol[future]
+                print(f"DEBUG: Future completed for {symbol}, getting result...", flush=True)
+                try:
+                    result = future.result(timeout=120)  # 2 minute timeout per symbol
+                    results.append(result)
+                    completed += 1
+                    print(f"DEBUG: Completed {completed}/{len(symbols)}: {symbol} - {result.get('num_trades', 0)} trades", flush=True)
+                except Exception as e:
+                    import traceback
+                    print(f"ERROR: Exception processing {symbol}: {str(e)}", flush=True)
+                    print(f"ERROR: Traceback: {traceback.format_exc()}", flush=True)
+                    results.append({
+                        "symbol": symbol,
+                        "success": False,
+                        "error": str(e),
+                        "traceback": traceback.format_exc()
+                    })
+        finally:
+            # Explicitly shutdown and cleanup the executor
+            if executor is not None:
+                print(f"DEBUG: Shutting down executor with {max_workers} workers", flush=True)
+                executor.shutdown(wait=True, cancel_futures=False)
+                print(f"DEBUG: Executor shutdown complete", flush=True)
+        
+        return jsonify({
+            "success": True,
+            "results": results,
+            "total_symbols": len(symbols),
+            "successful": sum(1 for r in results if r.get("success", False))
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 def generate_plot_base64(trades_df: pl.DataFrame, symbol: str) -> str:
     """Generate cumulative PnL plot and return as base64 string."""
     # Sort by exit time
@@ -849,6 +1228,18 @@ def adv_page():
 def adv_js():
     """Serve the ADV analysis JavaScript."""
     return send_file(FRONTEND_DIR / 'adv.js', mimetype='application/javascript')
+
+
+@app.route('/daily-multisymbol.html')
+def daily_multisymbol_page():
+    """Serve the daily multi-symbol backtest page."""
+    return send_file(FRONTEND_DIR / 'daily-multisymbol.html')
+
+
+@app.route('/daily-multisymbol.js')
+def daily_multisymbol_js():
+    """Serve the daily multi-symbol JavaScript."""
+    return send_file(FRONTEND_DIR / 'daily-multisymbol.js', mimetype='application/javascript')
 
 
 if __name__ == '__main__':
