@@ -13,12 +13,15 @@
     let volumeChart = null;
     let rawData = null; // Store raw data for re-rendering with different scales
     let currentSymbols = null;
+    let allAvailableSymbols = []; // Store all symbols for search
+    let selectedSymbolsSet = new Set(); // Track manually selected symbols
 
-    // Color palette for multiple symbols
+    // Color palette for multiple symbols (15 colors for 15 symbols)
     const CHART_COLORS = [
         '#667eea', '#764ba2', '#f093fb', '#4facfe', 
         '#43e97b', '#fa709a', '#30cfd0', '#a8edea',
-        '#ff6b6b', '#4ecdc4', '#45b7d1', '#f7b731'
+        '#ff6b6b', '#4ecdc4', '#45b7d1', '#f7b731',
+        '#5f27cd', '#00d2d3', '#ff9ff3'
     ];
 
     /**
@@ -27,6 +30,7 @@
     async function init() {
         console.log('Initializing daily data page...');
         await loadAvailableSymbols();
+        setupSearchHandlers();
     }
 
 /**
@@ -41,6 +45,9 @@ async function loadAvailableSymbols() {
             showStatus('error', `Failed to load symbols: ${data.error}`);
             return;
         }
+        
+        // Store all symbols for search
+        allAvailableSymbols = data.symbols;
         
         const symbolSelect = document.getElementById('symbols');
         symbolSelect.innerHTML = '';
@@ -81,21 +88,136 @@ async function loadAvailableSymbols() {
 }
 
 /**
+ * Setup search input handlers
+ */
+function setupSearchHandlers() {
+    const searchInput = document.getElementById('symbolSearchInput');
+    const suggestionsDiv = document.getElementById('searchSuggestions');
+    
+    searchInput.addEventListener('input', function(e) {
+        const query = e.target.value.toUpperCase().trim();
+        
+        if (query.length === 0) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+        
+        // Filter symbols that match the query
+        const matches = allAvailableSymbols.filter(symbol => 
+            symbol.toUpperCase().includes(query)
+        ).slice(0, 10); // Limit to 10 suggestions
+        
+        if (matches.length === 0) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+        
+        // Display suggestions
+        suggestionsDiv.innerHTML = matches.map(symbol => 
+            `<div class="suggestion-item" onclick="addSymbol('${symbol}')">${symbol}</div>`
+        ).join('');
+        suggestionsDiv.style.display = 'block';
+    });
+    
+    // Close suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+    
+    // Add symbol on Enter key
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            const query = e.target.value.toUpperCase().trim();
+            if (allAvailableSymbols.includes(query)) {
+                addSymbol(query);
+                e.target.value = '';
+                suggestionsDiv.style.display = 'none';
+            }
+        }
+    });
+}
+
+/**
+ * Add a symbol to the selected list
+ */
+function addSymbol(symbol) {
+    if (selectedSymbolsSet.has(symbol)) {
+        showStatus('error', `${symbol} is already selected`);
+        return;
+    }
+    
+    if (selectedSymbolsSet.size >= 15) {
+        showStatus('error', 'Maximum 15 symbols allowed for optimal visualization');
+        return;
+    }
+    
+    selectedSymbolsSet.add(symbol);
+    updateSelectedSymbolsDisplay();
+    
+    // Clear search input
+    document.getElementById('symbolSearchInput').value = '';
+    document.getElementById('searchSuggestions').style.display = 'none';
+}
+
+/**
+ * Remove a symbol from the selected list
+ */
+function removeSymbol(symbol) {
+    selectedSymbolsSet.delete(symbol);
+    updateSelectedSymbolsDisplay();
+}
+
+/**
+ * Clear all selected symbols
+ */
+function clearSelectedSymbols() {
+    selectedSymbolsSet.clear();
+    updateSelectedSymbolsDisplay();
+}
+
+/**
+ * Update the display of selected symbols
+ */
+function updateSelectedSymbolsDisplay() {
+    const displayDiv = document.getElementById('selectedSymbolsDisplay');
+    
+    if (selectedSymbolsSet.size === 0) {
+        displayDiv.innerHTML = '<span style="color: #999; font-size: 0.9rem;">No symbols selected. Search and add symbols above.</span>';
+        return;
+    }
+    
+    displayDiv.innerHTML = Array.from(selectedSymbolsSet).map(symbol => 
+        `<span class="symbol-tag">
+            ${symbol}
+            <span class="remove-btn" onclick="removeSymbol('${symbol}')">✕</span>
+        </span>`
+    ).join('');
+}
+
+/**
  * Load data for selected symbols
  */
 async function loadData() {
+    // Get symbols from both search/add and traditional select
     const symbolSelect = document.getElementById('symbols');
-    const selectedSymbols = Array.from(symbolSelect.selectedOptions).map(opt => opt.value);
+    const selectSymbols = Array.from(symbolSelect.selectedOptions).map(opt => opt.value);
     
-    if (selectedSymbols.length === 0) {
-        showStatus('error', 'Please select at least one symbol');
+    // Combine with manually added symbols
+    const allSymbols = [...new Set([...selectedSymbolsSet, ...selectSymbols])];
+    
+    if (allSymbols.length === 0) {
+        showStatus('error', 'Please select at least one symbol (search & add, or select from list)');
         return;
     }
     
-    if (selectedSymbols.length > 10) {
-        showStatus('error', 'Please select at most 10 symbols for optimal visualization');
+    if (allSymbols.length > 15) {
+        showStatus('error', 'Please select at most 15 symbols for optimal visualization');
         return;
     }
+    
+    const selectedSymbols = allSymbols;
     
     const dateRange = document.getElementById('dateRange').value;
     const loadBtn = document.getElementById('loadBtn');
@@ -513,9 +635,298 @@ function showStatus(type, message) {
     }
 }
 
-// Expose functions to global scope for HTML onclick handlers
-window.loadData = loadData;
-window.updatePriceScale = updatePriceScale;
+    // Expose functions to global scope for onclick handlers
+    window.loadData = loadData;
+    window.updatePriceScale = updatePriceScale;
+    window.loadTopPerformers = loadTopPerformers;
+    window.loadBottomPerformers = loadBottomPerformers;
+    window.addSymbol = addSymbol;
+    window.removeSymbol = removeSymbol;
+    window.clearSelectedSymbols = clearSelectedSymbols;
+
+/**
+ * Load top performing coins
+ */
+async function loadTopPerformers() {
+    // Get Top N from input field
+    const topN = parseInt(document.getElementById('topN').value) || 10;
+    
+    if (topN < 1 || topN > 50) {
+        showStatus('error', 'Please enter a number between 1 and 50 for Top N');
+        return;
+    }
+    
+    // Use the currently selected date range
+    const period = document.getElementById('dateRange').value;
+    
+    showStatus('loading', `Loading top ${topN} performers for ${period === 'all' ? 'all time' : period}...`);
+    
+    try {
+        // Calculate exact date range
+        let startDate = null;
+        let endDate = null;
+        let cutoffDate = null;
+        
+        if (period !== 'all') {
+            const now = new Date();
+            endDate = now.toISOString().split('T')[0];
+            
+            const daysBack = {
+                '1m': 30,
+                '3m': 90,
+                '6m': 180,
+                '1y': 365
+            }[period];
+            
+            const startDateTime = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+            startDate = startDateTime.toISOString().split('T')[0];
+            cutoffDate = new Date(startDate);
+        }
+        
+        // Fetch all available symbols first
+        const symbolsResponse = await fetch(`${API_BASE}/symbols`);
+        const symbolsData = await symbolsResponse.json();
+        
+        if (!symbolsData.success) {
+            showStatus('error', `Failed to load symbols: ${symbolsData.error}`);
+            return;
+        }
+        
+        const allSymbols = symbolsData.symbols;
+        
+        // Fetch data for all symbols to calculate performance
+        const response = await fetch(`${API_BASE}/daily-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                symbols: allSymbols,
+                start_date: startDate,
+                end_date: endDate
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            showStatus('error', `Failed to load data: ${data.error}`);
+            return;
+        }
+        
+        // Calculate returns for each symbol
+        const performances = [];
+        
+        for (const symbol in data.data) {
+            let symbolData = data.data[symbol];
+            if (symbolData.length < 2) continue; // Need at least 2 data points
+            
+            // Filter data to exact date range if specified
+            if (cutoffDate) {
+                symbolData = symbolData.filter(d => new Date(d.date) >= cutoffDate);
+            }
+            
+            if (symbolData.length < 2) continue; // Still need at least 2 points after filtering
+            
+            const startPrice = symbolData[0].close;
+            const endPrice = symbolData[symbolData.length - 1].close;
+            const returnPct = ((endPrice - startPrice) / startPrice) * 100;
+            
+            performances.push({
+                symbol: symbol,
+                returnPct: returnPct,
+                startPrice: startPrice,
+                endPrice: endPrice,
+                startDate: symbolData[0].date,
+                endDate: symbolData[symbolData.length - 1].date,
+                dataPoints: symbolData.length
+            });
+        }
+        
+        // Sort by return percentage (descending)
+        performances.sort((a, b) => b.returnPct - a.returnPct);
+        
+        // Get top N
+        const topPerformers = performances.slice(0, topN);
+        const topSymbols = topPerformers.map(p => p.symbol);
+        
+        // Clear previous selections and add top performers to search feature
+        clearSelectedSymbols();
+        topSymbols.forEach(symbol => selectedSymbolsSet.add(symbol));
+        updateSelectedSymbolsDisplay();
+        
+        // Also clear the traditional select
+        const symbolSelect = document.getElementById('symbols');
+        Array.from(symbolSelect.options).forEach(option => {
+            option.selected = false;
+        });
+        
+        // Set price scale to normalized for better comparison
+        document.getElementById('priceScale').value = 'normalized';
+        
+        // Show info about top performers
+        const periodLabel = period === 'all' ? 'all time' : 
+                           period === '1m' ? 'last month' :
+                           period === '3m' ? 'last 3 months' :
+                           period === '6m' ? 'last 6 months' :
+                           period === '1y' ? 'last year' : period;
+        
+        const infoText = `Top ${topN} performers (${periodLabel}): ` + 
+            topPerformers.slice(0, 5).map(p => 
+                `${p.symbol} (${p.returnPct > 0 ? '+' : ''}${p.returnPct.toFixed(1)}%)`
+            ).join(', ') +
+            (topN > 5 ? ` and ${topN - 5} more...` : '');
+        
+        showStatus('success', infoText);
+        
+        // Automatically load the data
+        await loadData();
+        
+    } catch (error) {
+        console.error('Error loading top performers:', error);
+        showStatus('error', `Error: ${error.message}`);
+    }
+}
+
+/**
+ * Load bottom performing (worst) coins
+ */
+async function loadBottomPerformers() {
+    // Get Top N from input field (reuse for bottom N)
+    const topN = parseInt(document.getElementById('topN').value) || 10;
+    
+    if (topN < 1 || topN > 50) {
+        showStatus('error', 'Please enter a number between 1 and 50 for Top N');
+        return;
+    }
+    
+    // Use the currently selected date range
+    const period = document.getElementById('dateRange').value;
+    
+    showStatus('loading', `Loading bottom ${topN} performers for ${period === 'all' ? 'all time' : period}...`);
+    
+    try {
+        // Calculate exact date range
+        let startDate = null;
+        let endDate = null;
+        let cutoffDate = null;
+        
+        if (period !== 'all') {
+            const now = new Date();
+            endDate = now.toISOString().split('T')[0];
+            
+            const daysBack = {
+                '1m': 30,
+                '3m': 90,
+                '6m': 180,
+                '1y': 365
+            }[period];
+            
+            const startDateTime = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+            startDate = startDateTime.toISOString().split('T')[0];
+            cutoffDate = new Date(startDate);
+        }
+        
+        // Fetch all available symbols first
+        const symbolsResponse = await fetch(`${API_BASE}/symbols`);
+        const symbolsData = await symbolsResponse.json();
+        
+        if (!symbolsData.success) {
+            showStatus('error', `Failed to load symbols: ${symbolsData.error}`);
+            return;
+        }
+        
+        const allSymbols = symbolsData.symbols;
+        
+        // Fetch data for all symbols to calculate performance
+        const response = await fetch(`${API_BASE}/daily-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                symbols: allSymbols,
+                start_date: startDate,
+                end_date: endDate
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            showStatus('error', `Failed to load data: ${data.error}`);
+            return;
+        }
+        
+        // Calculate returns for each symbol
+        const performances = [];
+        
+        for (const symbol in data.data) {
+            let symbolData = data.data[symbol];
+            if (symbolData.length < 2) continue; // Need at least 2 data points
+            
+            // Filter data to exact date range if specified
+            if (cutoffDate) {
+                symbolData = symbolData.filter(d => new Date(d.date) >= cutoffDate);
+            }
+            
+            if (symbolData.length < 2) continue; // Still need at least 2 points after filtering
+            
+            const startPrice = symbolData[0].close;
+            const endPrice = symbolData[symbolData.length - 1].close;
+            const returnPct = ((endPrice - startPrice) / startPrice) * 100;
+            
+            performances.push({
+                symbol: symbol,
+                returnPct: returnPct,
+                startPrice: startPrice,
+                endPrice: endPrice,
+                startDate: symbolData[0].date,
+                endDate: symbolData[symbolData.length - 1].date,
+                dataPoints: symbolData.length
+            });
+        }
+        
+        // Sort by return percentage (ascending for bottom performers)
+        performances.sort((a, b) => a.returnPct - b.returnPct);
+        
+        // Get bottom N
+        const bottomPerformers = performances.slice(0, topN);
+        const bottomSymbols = bottomPerformers.map(p => p.symbol);
+        
+        // Clear previous selections and add bottom performers to search feature
+        clearSelectedSymbols();
+        bottomSymbols.forEach(symbol => selectedSymbolsSet.add(symbol));
+        updateSelectedSymbolsDisplay();
+        
+        // Also clear the traditional select
+        const symbolSelect = document.getElementById('symbols');
+        Array.from(symbolSelect.options).forEach(option => {
+            option.selected = false;
+        });
+        
+        // Set price scale to normalized for better comparison
+        document.getElementById('priceScale').value = 'normalized';
+        
+        // Show info about bottom performers
+        const periodLabel = period === 'all' ? 'all time' : 
+                           period === '1m' ? 'last month' :
+                           period === '3m' ? 'last 3 months' :
+                           period === '6m' ? 'last 6 months' :
+                           period === '1y' ? 'last year' : period;
+        
+        const infoText = `Bottom ${topN} performers (${periodLabel}): ` + 
+            bottomPerformers.slice(0, 5).map(p => 
+                `${p.symbol} (${p.returnPct > 0 ? '+' : ''}${p.returnPct.toFixed(1)}%)`
+            ).join(', ') +
+            (topN > 5 ? ` and ${topN - 5} more...` : '');
+        
+        showStatus('success', infoText);
+        
+        // Automatically load the data
+        await loadData();
+        
+    } catch (error) {
+        console.error('Error loading bottom performers:', error);
+        showStatus('error', `Error: ${error.message}`);
+    }
+}
 
 // Run initialization when DOM is ready or immediately if already loaded
 if (document.readyState === 'loading') {

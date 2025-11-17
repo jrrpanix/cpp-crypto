@@ -53,10 +53,102 @@
             padding: 20px;
             background: #f8f9fa;
             border-radius: 8px;
+        }
+        
+        .controls-row {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr auto;
+            grid-template-columns: 1fr 1fr 1fr auto auto auto auto;
             gap: 15px;
             align-items: end;
+            margin-bottom: 15px;
+        }
+        
+        .search-section {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .search-input-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .selected-symbols {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            min-height: 40px;
+            border: 1px solid #ddd;
+        }
+        
+        .symbol-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .symbol-tag .remove-btn {
+            margin-left: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            opacity: 0.8;
+        }
+        
+        .symbol-tag .remove-btn:hover {
+            opacity: 1;
+        }
+        
+        #symbolSearchInput {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #2196f3;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+        
+        #symbolSearchInput:focus {
+            outline: none;
+            border-color: #1976d2;
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+        }
+        
+        .search-suggestions {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            width: 100%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .suggestion-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .suggestion-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .suggestion-item:last-child {
+            border-bottom: none;
         }
         
         .control-group {
@@ -93,6 +185,22 @@
             font-weight: 600;
             font-size: 1rem;
             transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button.secondary {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        }
+        
+        button.secondary:hover {
+            box-shadow: 0 5px 15px rgba(34, 197, 94, 0.4);
+        }
+        
+        button.tertiary {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        
+        button.tertiary:hover {
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4);
         }
         
         button:hover {
@@ -234,36 +342,67 @@
         </div>
         
         <div class="controls">
-            <div class="control-group">
-                <label for="symbols">Select Symbols:</label>
-                <select id="symbols" multiple>
-                    <!-- Populated by JavaScript -->
-                </select>
-                <div class="help-text">Hold Ctrl/Cmd to select multiple</div>
+            <div class="search-section">
+                <div class="search-input-group">
+                    <label>🔍 Search & Add Symbols:</label>
+                    <div style="position: relative;">
+                        <input type="text" id="symbolSearchInput" placeholder="Type symbol name (e.g., XRPUSDT, ZECUSDT)..." autocomplete="off">
+                        <div id="searchSuggestions" class="search-suggestions" style="display: none;"></div>
+                    </div>
+                    <div class="help-text">Type to search, click to add</div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button onclick="clearSelectedSymbols()" style="padding: 8px 20px; background: #dc2626;">Clear All</button>
+                </div>
             </div>
             
-            <div class="control-group">
-                <label for="dateRange">Date Range:</label>
-                <select id="dateRange">
-                    <option value="all">All Available Data</option>
-                    <option value="1m">Last Month</option>
-                    <option value="3m">Last 3 Months</option>
-                    <option value="6m">Last 6 Months</option>
-                    <option value="1y">Last Year</option>
-                </select>
+            <div style="margin-top: 15px;">
+                <label style="font-weight: 600; margin-bottom: 8px; display: block; color: #555;">Selected Symbols:</label>
+                <div id="selectedSymbolsDisplay" class="selected-symbols">
+                    <span style="color: #999; font-size: 0.9rem;">No symbols selected. Search and add symbols above.</span>
+                </div>
             </div>
             
-            <div class="control-group">
-                <label for="priceScale">Price Display:</label>
-                <select id="priceScale" onchange="updatePriceScale()">
-                    <option value="absolute">Absolute Prices</option>
-                    <option value="normalized">Normalized (Start at 100)</option>
-                    <option value="log">Log Scale</option>
-                </select>
-                <div class="help-text">Use normalized to compare returns</div>
+            <div class="controls-row" style="margin-top: 15px;">
+                <div class="control-group">
+                    <label for="symbols">Or Browse All Symbols:</label>
+                    <select id="symbols" multiple>
+                        <!-- Populated by JavaScript -->
+                    </select>
+                    <div class="help-text">Hold Ctrl/Cmd to select multiple</div>
+                </div>
+                
+                <div class="control-group">
+                    <label for="dateRange">Date Range:</label>
+                    <select id="dateRange">
+                        <option value="all">All Available Data</option>
+                        <option value="1m">Last Month</option>
+                        <option value="3m">Last 3 Months</option>
+                        <option value="6m">Last 6 Months</option>
+                        <option value="1y">Last Year</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="priceScale">Price Display:</label>
+                    <select id="priceScale" onchange="updatePriceScale()">
+                        <option value="absolute">Absolute Prices</option>
+                        <option value="normalized">Normalized (Start at 100)</option>
+                        <option value="log">Log Scale</option>
+                    </select>
+                    <div class="help-text">Use normalized to compare returns</div>
+                </div>
+                
+                <div class="control-group">
+                    <label for="topN">Top N:</label>
+                    <input type="number" id="topN" value="10" min="1" max="50" style="padding: 10px; width: 80px;">
+                    <div class="help-text">For top performers</div>
+                </div>
+                
+                <button id="loadBtn" onclick="loadData()">Load Data</button>
+                <button class="secondary" onclick="loadTopPerformers()">🏆 Top Performers</button>
+                <button class="tertiary" onclick="loadBottomPerformers()">📉 Bottom Performers</button>
             </div>
-            
-            <button id="loadBtn" onclick="loadData()">Load Data</button>
         </div>
         
         <div id="status"></div>
