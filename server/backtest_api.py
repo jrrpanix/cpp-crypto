@@ -101,9 +101,9 @@ DAILY_DATA_DIR = find_daily_data_directory()
 
 @app.route('/api/symbols', methods=['GET'])
 def get_symbols():
-    """Get list of available symbols from parquet files."""
+    """Get list of available symbols from parquet files and aggregate (includes indexes)."""
     try:
-        # Find all parquet files
+        # Get symbols from minute-level parquet files (real trading pairs)
         parquet_files = list(DATA_DIR.glob("*_1m_*.parquet"))
         
         # Extract unique symbols
@@ -113,6 +113,31 @@ def get_symbols():
             filename = file.stem
             symbol = filename.split('_1m_')[0]
             symbols.add(symbol)
+        
+        # Also check aggregate file for additional symbols (indexes)
+        # This allows indexes to appear in the daily market data visualization
+        try:
+            agg_dir = Path('/app/data/klines_aggregate') if Path('/app/data/klines_aggregate').exists() else Path(__file__).parent.parent / 'data' / 'klines_aggregate'
+            
+            # Prefer AGG_WITH_INDEXES file (includes both Binance + indexes)
+            agg_files = list(agg_dir.glob('AGG_WITH_INDEXES_*.pq'))
+            
+            if not agg_files:
+                # Fallback to regular AGG file
+                agg_files = list(agg_dir.glob('AGG_*.pq'))
+            
+            if agg_files:
+                agg_file = sorted(agg_files)[-1]
+                df = pl.read_parquet(agg_file)
+                
+                # Get unique symbols from aggregate
+                agg_symbols = df.select('symbol').unique()['symbol'].to_list()
+                symbols.update(agg_symbols)
+                
+                print(f"DEBUG: Added {len(agg_symbols)} symbols from aggregate file (includes indexes)")
+        except Exception as e:
+            print(f"DEBUG: Could not load symbols from aggregate: {e}")
+            # Continue with just the minute-level symbols
         
         return jsonify({
             "success": True,
@@ -958,8 +983,13 @@ def get_daily_data():
         # Find aggregate parquet file
         agg_dir = Path('/app/data/klines_aggregate') if Path('/app/data/klines_aggregate').exists() else Path(__file__).parent.parent / 'data' / 'klines_aggregate'
         
-        # Look for AGG_*.pq file
-        agg_files = list(agg_dir.glob('AGG_*.pq'))
+        # Look for AGG_WITH_INDEXES_*.pq file first (includes both Binance data and indexes)
+        # If not found, fall back to regular AGG_*.pq file (Binance data only)
+        agg_files = list(agg_dir.glob('AGG_WITH_INDEXES_*.pq'))
+        
+        if not agg_files:
+            print("DEBUG: No AGG_WITH_INDEXES file found, falling back to regular AGG file")
+            agg_files = list(agg_dir.glob('AGG_*.pq'))
         
         if not agg_files:
             return jsonify({"success": False, "error": "No aggregate data file found"}), 404
@@ -1085,8 +1115,12 @@ def calculate_adv():
         # Find aggregate parquet file
         agg_dir = Path('/workspace/data/klines_aggregate') if Path('/workspace/data/klines_aggregate').exists() else Path('/app/data/klines_aggregate') if Path('/app/data/klines_aggregate').exists() else Path(__file__).parent.parent / 'data' / 'klines_aggregate'
         
-        # Look for AGG_*.pq file
-        agg_files = list(agg_dir.glob('AGG_*.pq'))
+        # Look for AGG_WITH_INDEXES_*.pq file first, fallback to regular AGG_*.pq
+        agg_files = list(agg_dir.glob('AGG_WITH_INDEXES_*.pq'))
+        
+        if not agg_files:
+            print("DEBUG: No AGG_WITH_INDEXES file found for ADV, using regular AGG file")
+            agg_files = list(agg_dir.glob('AGG_*.pq'))
         
         if not agg_files:
             return jsonify({"success": False, "error": "No aggregate data file found"}), 404

@@ -7,6 +7,9 @@ avoiding look-ahead bias. Computes price as weighted sum: sum(wi * pricei)
 and dollar volume as sum(volumei * pricei * wi).
 
 Memory-efficient: processes data period-by-period instead of loading all data upfront.
+
+Works with any bar frequency (1-minute, daily, etc.) - just point to the appropriate
+klines directory containing the bar data.
 """
 
 import argparse
@@ -37,7 +40,9 @@ def load_weights(weights_file: Path) -> pl.DataFrame:
 
 def load_symbol_klines(klines_dir: Path, symbol: str, start_date: datetime, end_date: datetime) -> pl.DataFrame:
     """
-    Load 1-minute kline data for a single symbol and date range.
+    Load kline data for a single symbol and date range.
+    
+    Works with any bar frequency (1-minute, daily, etc.) stored in parquet files.
     
     Args:
         klines_dir: Directory containing symbol kline parquet files
@@ -346,12 +351,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic usage
-  python calc_index.py WEIGHTS_10_1_MONTH_2024-07-01_2025-09-30.pq "Top 10 Monthly Index"
+  # Using daily bars
+  python calc_index.py WEIGHTS_10_1_MONTH_2024-07-01_2025-09-30.pq "Top 10 Monthly Index" \\
+    --klines-dir /workspace/data/klines_daily
   
-  # Specify custom klines directory
+  # Using minute bars
   python calc_index.py WEIGHTS_50_12_WEEK_2024-07-01_2025-09-30.pq "Top 50 Weekly Index" \\
-    --klines-dir /data/klines
+    --klines-dir /workspace/data/daily_klines
   
   # Save output to specific location
   python calc_index.py WEIGHTS_25_1_MONTH_2024-07-01_2025-09-30.pq "Top 25 Index" \\
@@ -370,7 +376,8 @@ Examples:
     parser.add_argument(
         "--klines-dir",
         default="/workspace/data/daily_klines",
-        help="Directory containing kline parquet files (default: /workspace/data/daily_klines)"
+        help="Directory containing kline parquet files (default: /workspace/data/daily_klines). "
+             "Can point to any bar frequency: minute bars, daily bars, etc."
     )
     parser.add_argument(
         "--output",
