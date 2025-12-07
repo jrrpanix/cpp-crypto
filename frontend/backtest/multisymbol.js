@@ -752,11 +752,11 @@ function clearResults() {
 async function loadBacktestHistory() {
     try {
         const universe = document.getElementById('historyUniverseFilter').value;
-        const symbol = document.getElementById('historySymbolFilter').value.trim();
+        const minPnl = document.getElementById('historyMinPnl').value.trim();
         
         const params = new URLSearchParams({ type: 'minute', limit: 50 });
         if (universe) params.append('universe', universe);
-        if (symbol) params.append('symbol', symbol);
+        if (minPnl) params.append('min_pnl', minPnl);
         
         const response = await fetch(`${API_BASE_URL}/api/backtest-results?${params}`);
         const data = await response.json();
