@@ -278,6 +278,9 @@ async function loadData() {
         // Update charts
         updateCharts(result.data, selectedSymbols);
         
+        // Load correlation matrix (don't wait for it)
+        loadCorrelationMatrix().catch(err => console.error('Failed to load correlation:', err));
+        
         showStatus('success', `Successfully loaded data for ${selectedSymbols.length} symbols`);
         
     } catch (error) {
@@ -925,6 +928,132 @@ async function loadBottomPerformers() {
     } catch (error) {
         console.error('Error loading bottom performers:', error);
         showStatus('error', `Error: ${error.message}`);
+    }
+}
+
+/**
+ * Load and display correlation matrix
+ */
+async function loadCorrelationMatrix() {
+    console.log('loadCorrelationMatrix called, currentSymbols:', currentSymbols);
+    
+    if (!currentSymbols || currentSymbols.length < 2) {
+        console.log('Not enough symbols for correlation, need at least 2');
+        document.getElementById('correlationContainer').style.display = 'none';
+        return;
+    }
+    
+    try {
+        const dateRange = document.getElementById('dateRange').value;
+        let startDate = null;
+        let endDate = null;
+        
+        if (dateRange !== 'all') {
+            const now = new Date();
+            endDate = now.toISOString().split('T')[0];
+            
+            const daysBack = {
+                '1m': 30,
+                '3m': 90,
+                '6m': 180,
+                '1y': 365
+            }[dateRange];
+            
+            const startDateTime = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+            startDate = startDateTime.toISOString().split('T')[0];
+        }
+        
+        console.log('Fetching correlation from API...', {
+            url: `${API_BASE}/daily-correlation`,
+            symbols: currentSymbols,
+            startDate,
+            endDate
+        });
+        
+        const response = await fetch(`${API_BASE}/daily-correlation`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                symbols: currentSymbols,
+                start_date: startDate,
+                end_date: endDate
+            })
+        });
+        
+        const result = await response.json();
+        console.log('Correlation API response:', result);
+        
+        if (!result.success) {
+            console.error('Failed to load correlation:', result.error);
+            document.getElementById('correlationContainer').style.display = 'none';
+            return;
+        }
+        
+        renderCorrelationHeatmap(result.correlation_matrix, result.symbols, result.data_points);
+        document.getElementById('correlationContainer').style.display = 'block';
+        console.log('Correlation heatmap rendered successfully');
+        
+    } catch (error) {
+        console.error('Error loading correlation:', error);
+        document.getElementById('correlationContainer').style.display = 'none';
+    }
+}
+
+/**
+ * Render correlation matrix as HTML heatmap
+ */
+function renderCorrelationHeatmap(corrMatrix, symbols, dataPoints) {
+    const heatmapDiv = document.getElementById('correlationHeatmap');
+    
+    // Create table
+    let html = '<table class="corr-table">';
+    
+    // Header row
+    html += '<tr><th></th>';
+    symbols.forEach(sym => {
+        html += `<th>${sym}</th>`;
+    });
+    html += '</tr>';
+    
+    // Data rows
+    symbols.forEach(sym1 => {
+        html += '<tr>';
+        html += `<td class="symbol-label">${sym1}</td>`;
+        
+        symbols.forEach(sym2 => {
+            const corr = corrMatrix[sym1][sym2];
+            const color = getCorrelationColor(corr);
+            const textColor = Math.abs(corr) > 0.5 ? '#fff' : '#000';
+            html += `<td style="background-color: ${color}; color: ${textColor};">${corr.toFixed(2)}</td>`;
+        });
+        
+        html += '</tr>';
+    });
+    
+    html += '</table>';
+    
+    heatmapDiv.innerHTML = html;
+    document.getElementById('correlationDataPoints').textContent = `${dataPoints} days`;
+}
+
+/**
+ * Get color for correlation value
+ * Green for positive, red for negative, white for neutral
+ */
+function getCorrelationColor(corr) {
+    if (corr > 0) {
+        // Positive correlation: white to dark green
+        const intensity = Math.floor(corr * 255);
+        return `rgb(${255 - intensity}, 255, ${255 - intensity})`;
+    } else if (corr < 0) {
+        // Negative correlation: white to dark red
+        const intensity = Math.floor(Math.abs(corr) * 255);
+        return `rgb(255, ${255 - intensity}, ${255 - intensity})`;
+    } else {
+        // Zero correlation
+        return '#ffffff';
     }
 }
 

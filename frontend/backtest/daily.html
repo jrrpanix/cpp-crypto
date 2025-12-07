@@ -329,6 +329,42 @@
             text-align: right;
             font-family: 'Courier New', monospace;
         }
+        
+        /* Correlation heatmap styles */
+        .corr-table {
+            border-collapse: collapse;
+            font-size: 0.75rem;
+            margin: 0 auto;
+            background: white;
+        }
+        
+        .corr-table th {
+            background: #667eea;
+            color: white;
+            padding: 8px 4px;
+            font-weight: 600;
+            min-width: 60px;
+            max-width: 80px;
+            word-wrap: break-word;
+            border: 1px solid #999;
+        }
+        
+        .corr-table td {
+            padding: 8px 4px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            border: 1px solid #ddd;
+            min-width: 60px;
+        }
+        
+        .corr-table .symbol-label {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+            text-align: left;
+            padding-left: 8px;
+        }
     </style>
 </head>
 <body>
@@ -438,6 +474,25 @@
             <h3 style="margin: 0 0 15px 0; color: #333;">Daily Volume (USD)</h3>
             <div class="chart-wrapper">
                 <canvas id="volumeChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-container" id="correlationContainer" style="display: none;">
+            <h3 style="margin: 0 0 15px 0; color: #333;">
+                Return Correlations 
+                <span style="font-size: 0.8rem; color: #666; font-weight: normal;">
+                    (Based on daily returns)
+                </span>
+            </h3>
+            <div id="correlationHeatmap" style="overflow-x: auto; padding: 10px;">
+                <!-- Correlation matrix will be rendered here -->
+            </div>
+            <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 6px; font-size: 0.85rem; color: #666;">
+                <strong>How to read:</strong> Values range from -1 to +1. 
+                +1 (dark green) = perfect positive correlation, 
+                0 (white) = no correlation, 
+                -1 (dark red) = perfect negative correlation.
+                <br><strong>Data points:</strong> <span id="correlationDataPoints"></span>
             </div>
         </div>
     </div>

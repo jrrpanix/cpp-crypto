@@ -15,6 +15,7 @@ This is useful for:
 """
 
 import argparse
+from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -516,7 +517,9 @@ def run_simulation_from_file(
     
     # Filter by start date if provided
     if start_date:
-        df = df.filter(pl.col("open_time") >= start_date)
+        # Convert string date to datetime for proper comparison
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        df = df.filter(pl.col("open_time") >= start_dt)
     
     # Add index column for tracking
     df = df.with_row_index("index")

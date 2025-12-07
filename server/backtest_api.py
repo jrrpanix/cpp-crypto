@@ -9,6 +9,7 @@ import sys
 import io
 import os
 from pathlib import Path
+from datetime import datetime
 import base64
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
@@ -1182,6 +1183,168 @@ def calculate_adv():
             "total_symbols": len(set(r["symbol"] for r in result_data)),
             "file": agg_file.name,
             "drop_n": drop_n
+        })
+        
+    except Exception as e:
+        import traceback
+        print(f"ERROR: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@app.route('/api/daily-correlation', methods=['POST'])
+def calculate_correlation():
+    """
+    Calculate correlation matrix for selected symbols using daily returns.
+    
+    Expected JSON body:
+    {
+        "symbols": ["BTCUSDT", "ETHUSDT", "IX10USDT", ...],
+        "start_date": "2024-07-01" (optional),
+        "end_date": "2025-09-30" (optional),
+        "window_days": 30 (optional, for rolling correlation)
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "correlation_matrix": {
+            "BTCUSDT": {"BTCUSDT": 1.0, "ETHUSDT": 0.85, ...},
+            "ETHUSDT": {"BTCUSDT": 0.85, "ETHUSDT": 1.0, ...},
+            ...
+        },
+        "symbols": ["BTCUSDT", "ETHUSDT", ...],
+        "date_range": {"start": "2024-07-01", "end": "2025-09-30"},
+        "data_points": 123
+    }
+    """
+    try:
+        data = request.json
+        symbols = data.get('symbols', [])
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        
+        if not symbols or len(symbols) < 2:
+            return jsonify({"success": False, "error": "At least 2 symbols required"}), 400
+        
+        # Find aggregate parquet file
+        agg_dir = Path('/workspace/data/klines_aggregate') if Path('/workspace/data/klines_aggregate').exists() else Path('/app/data/klines_aggregate') if Path('/app/data/klines_aggregate').exists() else Path(__file__).parent.parent / 'data' / 'klines_aggregate'
+        
+        # Look for AGG_WITH_INDEXES_*.pq file first (includes both Binance data and indexes)
+        agg_files = list(agg_dir.glob('AGG_WITH_INDEXES_*.pq'))
+        
+        if not agg_files:
+            # Fallback to regular AGG_*.pq file
+            agg_files = list(agg_dir.glob('AGG_*.pq'))
+        
+        if not agg_files:
+            return jsonify({"success": False, "error": "No aggregate file found"}), 404
+        
+        # Use the most recent file
+        agg_file = max(agg_files, key=lambda p: p.stat().st_mtime)
+        
+        print(f"DEBUG: Reading {agg_file.name} for correlation calculation")
+        print(f"DEBUG: Symbols requested: {symbols}")
+        
+        # Read the aggregate file
+        df = pl.read_parquet(agg_file)
+        
+        # Filter by symbols
+        df = df.filter(pl.col("symbol").is_in(symbols))
+        
+        if len(df) == 0:
+            return jsonify({"success": False, "error": "No data found for requested symbols"}), 404
+        
+        # Filter by date range if provided
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                df = df.filter(pl.col("open_time") >= start_dt)
+            except ValueError:
+                return jsonify({"success": False, "error": "Invalid start_date format. Use YYYY-MM-DD"}), 400
+        
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+                df = df.filter(pl.col("open_time") <= end_dt)
+            except ValueError:
+                return jsonify({"success": False, "error": "Invalid end_date format. Use YYYY-MM-DD"}), 400
+        
+        # Calculate daily returns for each symbol
+        df = df.sort(["symbol", "open_time"])
+        df = df.with_columns([
+            pl.col("close").pct_change().over("symbol").alias("return")
+        ])
+        
+        # Remove first row for each symbol (NaN returns)
+        df = df.filter(pl.col("return").is_not_null())
+        
+        print(f"DEBUG: Data before pivot - {len(df)} rows, columns: {df.columns}")
+        print(f"DEBUG: Unique symbols: {df['symbol'].unique().to_list()}")
+        print(f"DEBUG: Sample data:\n{df.head(5)}")
+        
+        # Pivot to get symbols as columns
+        try:
+            pivot_df = df.pivot(
+                index="open_time",
+                on="symbol",
+                values="return"
+            ).sort("open_time")
+        except Exception as e:
+            print(f"ERROR during pivot: {e}")
+            import traceback
+            print(traceback.format_exc())
+            raise
+        
+        # Drop rows with any null values (days where not all symbols traded)
+        pivot_df = pivot_df.drop_nulls()
+        
+        if len(pivot_df) < 2:
+            return jsonify({"success": False, "error": "Insufficient overlapping data points"}), 400
+        
+        print(f"DEBUG: Calculating correlation with {len(pivot_df)} data points")
+        
+        # Calculate correlation matrix
+        # Get all symbol columns (exclude open_time)
+        symbol_cols = [col for col in pivot_df.columns if col != "open_time"]
+        
+        # Build correlation matrix
+        corr_matrix = {}
+        for sym1 in symbol_cols:
+            corr_matrix[sym1] = {}
+            for sym2 in symbol_cols:
+                if sym1 == sym2:
+                    corr_matrix[sym1][sym2] = 1.0
+                else:
+                    # Calculate Pearson correlation using Polars
+                    # Method 1: Use select with corr expression
+                    try:
+                        corr_value = pivot_df.select([
+                            pl.corr(sym1, sym2).alias("correlation")
+                        ])["correlation"][0]
+                        corr_matrix[sym1][sym2] = float(corr_value) if corr_value is not None else 0.0
+                    except Exception as e:
+                        print(f"Warning: Could not calculate correlation for {sym1} vs {sym2}: {e}")
+                        corr_matrix[sym1][sym2] = 0.0
+        
+        # Get actual date range from data
+        actual_start = pivot_df["open_time"].min()
+        actual_end = pivot_df["open_time"].max()
+        
+        return jsonify({
+            "success": True,
+            "correlation_matrix": corr_matrix,
+            "symbols": symbol_cols,
+            "date_range": {
+                "start": actual_start.isoformat() if hasattr(actual_start, 'isoformat') else str(actual_start),
+                "end": actual_end.isoformat() if hasattr(actual_end, 'isoformat') else str(actual_end)
+            },
+            "data_points": len(pivot_df),
+            "file": agg_file.name
         })
         
     except Exception as e:
