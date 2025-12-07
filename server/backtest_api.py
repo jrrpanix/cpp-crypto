@@ -100,6 +100,66 @@ def find_daily_data_directory():
 
 DAILY_DATA_DIR = find_daily_data_directory()
 
+# Configure index data directory
+def find_index_directory():
+    """Find the index directory by checking common locations."""
+    possible_paths = [
+        Path('/workspace/data/klines_index'),  # Container workspace
+        Path('/app/data/klines_index'),  # Docker mount
+        Path(__file__).parent.parent / 'data' / 'klines_index',  # Local
+    ]
+    
+    for path in possible_paths:
+        if path.exists() and path.is_dir():
+            if list(path.glob('*.parquet')):
+                print(f"📊 Using index directory: {path}")
+                return path
+    
+    default = Path('/workspace/data/klines_index')
+    print(f"⚠️  No index directory found, using default: {default}")
+    return default
+
+INDEX_DIR = find_index_directory()
+
+# Universe/segment definitions based on ADV
+UNIVERSES = {
+    "all": {
+        "name": "All Symbols",
+        "description": "All available symbols (no filter)",
+        "filter": None
+    },
+    "top10": {
+        "name": "Top 10 (Mega Cap)",
+        "description": "Top 10 symbols by ADV - highest liquidity",
+        "index": "IX10USDT",
+        "filter": "IX10"
+    },
+    "top10_exbtc": {
+        "name": "Top 10 ex-BTC (Alt Mega)",
+        "description": "Top 10 excluding BTC - largest altcoins",
+        "index": "IX10EXBTCUSDT",
+        "filter": "IX10EXBTC"
+    },
+    "mid60": {
+        "name": "Mid 60 (Mid Cap)",
+        "description": "Mid-tier 60 symbols by ADV",
+        "index": "IXMID60USDT",
+        "filter": "IXMID"
+    },
+    "small100": {
+        "name": "Small 100 (Small Cap)",
+        "description": "Smaller 100 symbols by ADV",
+        "index": "IXSMALL100USDT",
+        "filter": "IXSMALL"
+    },
+    "tiny130": {
+        "name": "Tiny 130 (Micro Cap)",
+        "description": "Micro-cap 130 symbols - lowest liquidity tier",
+        "index": "IX130TINYUSDT",
+        "filter": "IX130TINY"
+    }
+}
+
 @app.route('/api/symbols', methods=['GET'])
 def get_symbols():
     """Get list of available symbols from parquet files and aggregate (includes indexes)."""
@@ -577,6 +637,132 @@ def get_daily_symbols():
         return jsonify({
             "success": False,
             "error": str(e)
+        }), 500
+
+
+@app.route('/api/universes', methods=['GET'])
+def get_universes():
+    """Get list of available universe/segment definitions."""
+    try:
+        return jsonify({
+            "success": True,
+            "universes": UNIVERSES
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route('/api/universe-symbols', methods=['GET'])
+def get_universe_symbols():
+    """Get symbols for a specific universe by reading the index weights file."""
+    try:
+        universe_id = request.args.get('universe', 'all')
+        
+        if universe_id == 'all' or universe_id not in UNIVERSES:
+            # Return all symbols
+            parquet_files = list(DAILY_DATA_DIR.glob("*_daily_*.parquet"))
+            symbols = set()
+            for file in parquet_files:
+                filename = file.stem
+                symbol = filename.split('_daily_')[0]
+                # Exclude index symbols from "all" category
+                if not symbol.startswith('IX'):
+                    symbols.add(symbol)
+            
+            return jsonify({
+                "success": True,
+                "universe": universe_id,
+                "symbols": sorted(list(symbols))
+            })
+        
+        # Get universe config
+        universe_config = UNIVERSES[universe_id]
+        
+        # Try to find the most recent weights file for this index
+        # Match by number of symbols in the weights filename
+        agg_dir = Path('/workspace/data/klines_aggregate') if Path('/workspace/data/klines_aggregate').exists() else Path('/app/data/klines_aggregate')
+        
+        # Determine the WEIGHTS file pattern based on universe
+        # The pattern depends on nsymbols and drop-n used when generating
+        weights_patterns = {
+            'top10': 'WEIGHTS_10_*WEEK*.pq',
+            'top10_exbtc': 'WEIGHTS_10_*WEEK*.pq',  # Will need drop-n=1 in filename somehow
+            'mid60': 'WEIGHTS_*60*WEEK*.pq',  # Or WEIGHTS_70 with drop 10
+            'small100': 'WEIGHTS_*100*WEEK*.pq',  # Or WEIGHTS_170 with drop 70
+            'tiny130': 'WEIGHTS_*130*WEEK*.pq'  # Or WEIGHTS_300 with drop 170
+        }
+        
+        # For now, try a simpler approach: look for files by the number of output symbols
+        # Top10 -> files with exactly 10 symbols per period
+        # This requires reading the file to check
+        
+        weights_files = sorted(agg_dir.glob('WEIGHTS_*.pq'))
+        
+        if weights_files:
+            # Read the most recent weights file and filter
+            for weights_file in reversed(weights_files):  # Start with most recent
+                try:
+                    df = pl.read_parquet(weights_file)
+                    
+                    # Get the most recent period
+                    last_period = df.select('end_date').max().item()
+                    period_df = df.filter(pl.col('end_date') == last_period)
+                    
+                    # Check if this matches our universe based on symbol count
+                    num_symbols = period_df.select('symbol').n_unique()
+                    
+                    # Match universe by expected symbol count
+                    expected_counts = {
+                        'top10': 10,
+                        'top10_exbtc': 10,
+                        'mid60': 60,
+                        'small100': 100,
+                        'tiny130': 130
+                    }
+                    
+                    if universe_id in expected_counts and num_symbols == expected_counts[universe_id]:
+                        symbols = period_df.select('symbol').to_series().to_list()
+                        
+                        return jsonify({
+                            "success": True,
+                            "universe": universe_id,
+                            "symbols": sorted(symbols),
+                            "source": "weights_file",
+                            "file": str(weights_file.name),
+                            "symbol_count": len(symbols)
+                        })
+                except Exception as e:
+                    print(f"Error reading weights file {weights_file}: {e}")
+                    continue
+        
+        # Fallback: use all symbols
+        parquet_files = list(DAILY_DATA_DIR.glob("*_daily_*.parquet"))
+        all_symbols = []
+        for file in parquet_files:
+            filename = file.stem
+            symbol = filename.split('_daily_')[0]
+            if not symbol.startswith('IX'):
+                all_symbols.append(symbol)
+        
+        # For now, return all non-index symbols as fallback
+        # TODO: implement ADV-based ranking and filtering
+        return jsonify({
+            "success": True,
+            "universe": universe_id,
+            "symbols": sorted(all_symbols),
+            "source": "fallback",
+            "warning": "No weights file found, returning all symbols"
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
         }), 500
 
 

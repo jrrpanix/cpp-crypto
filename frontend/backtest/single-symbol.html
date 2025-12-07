@@ -478,6 +478,22 @@
         </div>
 
         <div class="card">
+            <h2>🎯 Universe Selection</h2>
+            <div style="padding: 15px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107; margin-bottom: 15px;">
+                <label style="font-weight: 600; margin-bottom: 8px; display: block; color: #856404;">
+                    Market Segment / Liquidity Tier:
+                </label>
+                <select id="universeSelect" onchange="onUniverseChange()" style="width: 100%; padding: 10px; border: 2px solid #ffc107; border-radius: 6px; font-size: 0.95rem;">
+                    <option value="all">All Symbols (No Filter)</option>
+                    <!-- Populated by JavaScript -->
+                </select>
+                <div style="margin-top: 8px; color: #856404; font-size: 0.9rem;">
+                    📊 Filter available symbols by ADV (Average Daily Volume) tiers to analyze size effects
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
             <h2>Strategy Parameters</h2>
             <div class="info-box">
                 <strong>How it works:</strong> Define events as up/down price movements within a detection window. 

@@ -10,9 +10,12 @@
     let availableSymbols = [];
     let rowCounter = 0;
     let backtestResults = [];
+    let availableUniverses = {};
+    let currentUniverse = 'all';
 
     // Initialize on page load
     async function init() {
+        await loadUniverses();
         await loadSymbols();
         addParameterRow(); // Add initial row
     }
@@ -25,14 +28,77 @@
         init();
     }
 
+// Load universe definitions
+async function loadUniverses() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/universes`);
+        const data = await response.json();
+        
+        if (data.success) {
+            availableUniverses = data.universes;
+            
+            const universeSelect = document.getElementById('universeSelect');
+            if (universeSelect) {
+                universeSelect.innerHTML = '<option value="all">All Symbols (No Filter)</option>';
+                
+                for (const [id, config] of Object.entries(availableUniverses)) {
+                    if (id === 'all') continue;
+                    
+                    const option = document.createElement('option');
+                    option.value = id;
+                    option.textContent = `${config.name} - ${config.description}`;
+                    universeSelect.appendChild(option);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading universes:', error);
+    }
+}
+
+// Handle universe selection change
+window.onUniverseChange = async function() {
+    const universeSelect = document.getElementById('universeSelect');
+    currentUniverse = universeSelect.value;
+    
+    console.log(`Universe changed to: ${currentUniverse}`);
+    
+    // Reload symbols for the selected universe
+    await loadSymbols();
+    
+    // Update all existing symbol dropdowns
+    updateAllSymbolDropdowns();
+}
+
+// Update all symbol dropdowns with new symbol list
+function updateAllSymbolDropdowns() {
+    const symbolSelects = document.querySelectorAll('.param-symbol');
+    symbolSelects.forEach(select => {
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">Select...</option>' +
+            availableSymbols.map(s => `<option value="${s}">${s}</option>`).join('');
+        
+        // Restore previous selection if it's still available
+        if (currentValue && availableSymbols.includes(currentValue)) {
+            select.value = currentValue;
+        }
+    });
+}
+
 // Load available symbols from API
 async function loadSymbols() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/symbols`);
+        let url = `${API_BASE_URL}/api/symbols`;
+        if (currentUniverse && currentUniverse !== 'all') {
+            url = `${API_BASE_URL}/api/universe-symbols?universe=${currentUniverse}`;
+        }
+        
+        const response = await fetch(url);
         const data = await response.json();
         
         if (data.symbols && data.symbols.length > 0) {
             availableSymbols = data.symbols;
+            console.log(`Loaded ${availableSymbols.length} symbols for universe: ${currentUniverse}`);
         } else {
             showError('No symbols available. Make sure parquet data files exist in data/aggregate_parquet/');
         }

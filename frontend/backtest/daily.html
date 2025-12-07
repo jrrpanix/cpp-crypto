@@ -378,6 +378,19 @@
         </div>
         
         <div class="controls">
+            <div style="padding: 15px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107; margin-bottom: 15px;">
+                <label style="font-weight: 600; margin-bottom: 8px; display: block; color: #856404;">
+                    🎯 Universe / Market Segment:
+                </label>
+                <select id="universeSelect" onchange="onUniverseChange()" style="width: 100%; padding: 10px; border: 2px solid #ffc107; border-radius: 6px; font-size: 0.95rem;">
+                    <option value="all">All Symbols (No Filter)</option>
+                    <!-- Populated by JavaScript -->
+                </select>
+                <div class="help-text" style="margin-top: 5px; color: #856404;">
+                    Filter symbols by liquidity/ADV tiers - corresponds to index universes
+                </div>
+            </div>
+            
             <div class="search-section">
                 <div class="search-input-group">
                     <label>🔍 Search & Add Symbols:</label>

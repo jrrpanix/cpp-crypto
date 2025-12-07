@@ -15,6 +15,8 @@
     let currentSymbols = null;
     let allAvailableSymbols = []; // Store all symbols for search
     let selectedSymbolsSet = new Set(); // Track manually selected symbols
+    let availableUniverses = {}; // Store universe definitions
+    let currentUniverse = 'all'; // Track selected universe
 
     // Color palette for multiple symbols (15 colors for 15 symbols)
     const CHART_COLORS = [
@@ -29,16 +31,80 @@
      */
     async function init() {
         console.log('Initializing daily data page...');
+        await loadUniverses();
         await loadAvailableSymbols();
         setupSearchHandlers();
     }
+
+/**
+ * Load universe definitions from API
+ */
+async function loadUniverses() {
+    try {
+        const response = await fetch(`${API_BASE}/universes`);
+        const data = await response.json();
+        
+        if (!data.success) {
+            console.error('Failed to load universes:', data.error);
+            return;
+        }
+        
+        availableUniverses = data.universes;
+        
+        const universeSelect = document.getElementById('universeSelect');
+        universeSelect.innerHTML = '<option value="all">All Symbols (No Filter)</option>';
+        
+        // Add universe options
+        for (const [id, config] of Object.entries(availableUniverses)) {
+            if (id === 'all') continue; // Skip 'all' as it's already added
+            
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = `${config.name} - ${config.description}`;
+            universeSelect.appendChild(option);
+        }
+        
+        console.log(`Loaded ${Object.keys(availableUniverses).length} universes`);
+        
+    } catch (error) {
+        console.error('Error loading universes:', error);
+    }
+}
+
+/**
+ * Handle universe selection change
+ */
+async function onUniverseChange() {
+    const universeSelect = document.getElementById('universeSelect');
+    currentUniverse = universeSelect.value;
+    
+    console.log(`Universe changed to: ${currentUniverse}`);
+    
+    // Reload symbols for the selected universe
+    await loadAvailableSymbols();
+    
+    // Clear selected symbols as they might not be in the new universe
+    clearSelectedSymbols();
+    
+    // Show info message about the selected universe
+    if (currentUniverse !== 'all' && availableUniverses[currentUniverse]) {
+        const config = availableUniverses[currentUniverse];
+        showStatus('info', `📊 Universe: ${config.name} - ${config.description}`);
+    }
+}
 
 /**
  * Load available symbols from API
  */
 async function loadAvailableSymbols() {
     try {
-        const response = await fetch(`${API_BASE}/symbols`);
+        // Use universe-specific endpoint if a universe is selected
+        let url = `${API_BASE}/symbols`;
+        if (currentUniverse && currentUniverse !== 'all') {
+            url = `${API_BASE}/universe-symbols?universe=${currentUniverse}`;
+        }
+        
+        const response = await fetch(url);
         const data = await response.json();
         
         if (!data.success) {
@@ -47,14 +113,19 @@ async function loadAvailableSymbols() {
         }
         
         // Store all symbols for search
-        allAvailableSymbols = data.symbols;
+        allAvailableSymbols = data.symbols || [];
         
         const symbolSelect = document.getElementById('symbols');
         symbolSelect.innerHTML = '';
         
+        // Add info about source if using universe
+        if (data.source) {
+            console.log(`Loaded symbols from: ${data.source}`);
+        }
+        
         // Add common symbols at top
         const commonSymbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'ADAUSDT'];
-        const availableCommon = commonSymbols.filter(s => data.symbols.includes(s));
+        const availableCommon = commonSymbols.filter(s => allAvailableSymbols.includes(s));
         
         if (availableCommon.length > 0) {
             const commonGroup = document.createElement('optgroup');
@@ -70,8 +141,8 @@ async function loadAvailableSymbols() {
         
         // Add all symbols
         const allGroup = document.createElement('optgroup');
-        allGroup.label = 'All Symbols';
-        data.symbols.forEach(symbol => {
+        allGroup.label = currentUniverse === 'all' ? 'All Symbols' : `${availableUniverses[currentUniverse]?.name || 'Filtered'} Symbols`;
+        allAvailableSymbols.forEach(symbol => {
             const option = document.createElement('option');
             option.value = symbol;
             option.textContent = symbol;
@@ -79,7 +150,7 @@ async function loadAvailableSymbols() {
         });
         symbolSelect.appendChild(allGroup);
         
-        console.log(`Loaded ${data.symbols.length} symbols`);
+        console.log(`Loaded ${allAvailableSymbols.length} symbols for universe: ${currentUniverse}`);
         
     } catch (error) {
         console.error('Error loading symbols:', error);
@@ -646,6 +717,7 @@ function showStatus(type, message) {
     window.addSymbol = addSymbol;
     window.removeSymbol = removeSymbol;
     window.clearSelectedSymbols = clearSelectedSymbols;
+    window.onUniverseChange = onUniverseChange;
 
 /**
  * Load top performing coins

@@ -8,16 +8,125 @@
 
     let availableSymbols = [];
     let currentResults = [];
+    let availableUniverses = {};
+    let currentUniverse = 'all';
+
+    // Initialize on page load
+    async function init() {
+        console.log('Initializing multi-symbol backtest page...');
+        await loadUniverses();
+        await fetchSymbols();
+        
+        const form = document.getElementById('backtestForm');
+        const clearBtn = document.getElementById('clearBtn');
+        
+        if (form) {
+            // Remove any existing listener to avoid duplicates
+            form.removeEventListener('submit', runMultiSymbolBacktest);
+            form.addEventListener('submit', runMultiSymbolBacktest);
+            console.log('Form submit listener attached');
+        } else {
+            console.error('Form not found!');
+        }
+        
+        if (clearBtn) {
+            clearBtn.removeEventListener('click', clearResults);
+            clearBtn.addEventListener('click', clearResults);
+            console.log('Clear button listener attached');
+        }
+    }
+
+    // Run initialization when DOM is ready or immediately if already loaded
+    if (document.readyState === 'loading') {
+        console.log('DOM loading - will init on DOMContentLoaded');
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        // DOM is already ready, run init immediately
+        console.log('DOM already loaded - initializing immediately');
+        init();
+    }
+
+    // Load universe definitions
+    async function loadUniverses() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/universes`);
+            const data = await response.json();
+            
+            if (data.success) {
+                availableUniverses = data.universes;
+                
+                const universeSelect = document.getElementById('universeSelect');
+                if (universeSelect) {
+                    universeSelect.innerHTML = '<option value="all">All Symbols (No Filter)</option>';
+                    
+                    for (const [id, config] of Object.entries(availableUniverses)) {
+                        if (id === 'all') continue;
+                        
+                        const option = document.createElement('option');
+                        option.value = id;
+                        option.textContent = `${config.name} - ${config.description}`;
+                        universeSelect.appendChild(option);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error loading universes:', error);
+        }
+    }
+
+    // Handle universe selection change
+    window.onUniverseChange = async function() {
+        const universeSelect = document.getElementById('universeSelect');
+        currentUniverse = universeSelect.value;
+        
+        console.log(`Universe changed to: ${currentUniverse}`);
+        
+        // Reload symbols for the selected universe
+        await fetchSymbols();
+        
+        // Update the Number of Symbols input to match universe size
+        const numSymbolsInput = document.getElementById('numSymbols');
+        if (numSymbolsInput) {
+            numSymbolsInput.max = availableSymbols.length;
+            
+            // For defined universes (not "all"), automatically set N to the universe size
+            // This makes it easier to test the full universe
+            if (currentUniverse !== 'all' && availableSymbols.length <= 200) {
+                numSymbolsInput.value = availableSymbols.length;
+            } else {
+                // For "all" or very large universes, adjust only if current value exceeds available
+                if (parseInt(numSymbolsInput.value) > availableSymbols.length) {
+                    numSymbolsInput.value = availableSymbols.length;
+                }
+            }
+            
+            // Update placeholder to show range
+            numSymbolsInput.placeholder = `1-${availableSymbols.length}`;
+        }
+        
+        // Show info message
+        if (currentUniverse !== 'all' && availableUniverses[currentUniverse]) {
+            const config = availableUniverses[currentUniverse];
+            showStatus(`Universe: ${config.name} - Testing all ${availableSymbols.length} symbols (you can adjust Number of Symbols to test fewer)`, 'info');
+        } else {
+            showStatus(`${availableSymbols.length} symbols available`, 'info');
+        }
+    };
 
     // Fetch available symbols on page load
     async function fetchSymbols() {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/symbols`);
+            let url = `${API_BASE_URL}/api/symbols`;
+            if (currentUniverse && currentUniverse !== 'all') {
+                url = `${API_BASE_URL}/api/universe-symbols?universe=${currentUniverse}`;
+            }
+            
+            const response = await fetch(url);
             const data = await response.json();
             
             if (data.success && data.symbols) {
                 availableSymbols = data.symbols;
-                console.log(`Loaded ${availableSymbols.length} available symbols`);
+                console.log(`Loaded ${availableSymbols.length} available symbols for universe: ${currentUniverse}`);
             } else {
                 showStatus('Failed to load available symbols', 'error');
             }
@@ -132,14 +241,27 @@ async function runMultiSymbolBacktest(event) {
         
         // Select random symbols
         showStatus('Selecting random symbols...', 'info');
+        
+        // Log current universe and available symbols for debugging
+        console.log(`Current universe: ${currentUniverse}`);
+        console.log(`Available symbols count: ${availableSymbols.length}`);
+        console.log(`Available symbols:`, availableSymbols.slice(0, 10)); // First 10 for debug
+        
         const selectedSymbols = selectRandomSymbols(numSymbols);
+        console.log(`Selected symbols:`, selectedSymbols);
         
         if (selectedSymbols.length === 0) {
             showStatus('No symbols available to test', 'error');
             return;
         }
         
-        showStatus(`Running backtest on ${selectedSymbols.length} symbols...`, 'info');
+        // Show which universe is being used
+        let universeInfo = 'All Symbols';
+        if (currentUniverse !== 'all' && availableUniverses[currentUniverse]) {
+            universeInfo = availableUniverses[currentUniverse].name;
+        }
+        
+        showStatus(`Running backtest on ${selectedSymbols.length} symbols from ${universeInfo}...`, 'info');
         
         // Prepare parameters
         const params = {
@@ -620,46 +742,6 @@ function clearResults() {
     document.getElementById('resultsSection').classList.remove('show');
     document.getElementById('status').className = '';
     document.getElementById('progressBar').classList.remove('show');
-}
-
-// Initialize
-function init() {
-    console.log('Initializing multi-symbol backtest page...');
-    
-    // Fetch symbols if not already loaded
-    if (availableSymbols.length === 0) {
-        fetchSymbols();
-    } else {
-        console.log(`Using cached ${availableSymbols.length} symbols`);
-    }
-    
-    const form = document.getElementById('backtestForm');
-    const clearBtn = document.getElementById('clearBtn');
-    
-    if (form) {
-        // Remove any existing listener to avoid duplicates
-        form.removeEventListener('submit', runMultiSymbolBacktest);
-        form.addEventListener('submit', runMultiSymbolBacktest);
-        console.log('Form submit listener attached');
-    } else {
-        console.error('Form not found!');
-    }
-    
-    if (clearBtn) {
-        clearBtn.removeEventListener('click', clearResults);
-        clearBtn.addEventListener('click', clearResults);
-        console.log('Clear button listener attached');
-    }
-}
-
-// Run initialization when DOM is ready or immediately if already loaded
-if (document.readyState === 'loading') {
-    console.log('DOM loading - will init on DOMContentLoaded');
-    document.addEventListener('DOMContentLoaded', init);
-} else {
-    // DOM is already ready, run init immediately
-    console.log('DOM already loaded - initializing immediately');
-    init();
 }
 
 })(); // End IIFE
