@@ -121,6 +121,22 @@ def find_index_directory():
 
 INDEX_DIR = find_index_directory()
 
+# Configure results directory for saving backtest runs
+def find_results_directory():
+    """Find or create the results directory for saving backtest runs."""
+    # Use the explicitly mounted writable directory from docker-compose
+    results_path = Path('/app/backtest_results')
+    
+    try:
+        results_path.mkdir(parents=True, exist_ok=True)
+        print(f"💾 Results directory ready: {results_path}")
+    except Exception as e:
+        print(f"⚠️  Cannot create {results_path}: {e}")
+    
+    return results_path
+
+RESULTS_DIR = find_results_directory()
+
 # Universe/segment definitions based on ADV
 UNIVERSES = {
     "all": {
@@ -159,6 +175,128 @@ UNIVERSES = {
         "filter": "IX130TINY"
     }
 }
+
+def save_aggregate_backtest_result(result_type, symbols, params, results, universe='all'):
+    """
+    Save aggregate backtest results (one row per backtest run, not per symbol).
+    
+    Args:
+        result_type: 'minute' or 'daily'
+        symbols: List of symbols tested
+        params: Dictionary of backtest parameters
+        results: List of individual symbol results
+        universe: Universe/segment identifier
+    """
+    try:
+        # Filter successful results
+        successful_results = [r for r in results if r.get('success', False) and r.get('summary')]
+        
+        if not successful_results:
+            print("⚠️  No successful results to save")
+            return
+        
+        # Calculate aggregate statistics
+        total_symbols = len(successful_results)
+        total_trades = sum(r['summary'].get('num_trades', 0) for r in successful_results)
+        total_gross_profit = sum(r['summary'].get('gross_profit', 0) for r in successful_results)
+        total_fees = sum(r['summary'].get('total_fees', 0) for r in successful_results)
+        total_net_profit = sum(r['summary'].get('net_profit', 0) for r in successful_results)
+        
+        # Calculate averages
+        avg_profit_per_symbol = total_net_profit / total_symbols if total_symbols > 0 else 0
+        avg_profit_per_trade = total_net_profit / total_trades if total_trades > 0 else 0
+        avg_win_rate = sum(r['summary'].get('win_rate', 0) for r in successful_results) / total_symbols if total_symbols > 0 else 0
+        avg_sharpe = sum(r['summary'].get('net_sharpe_ratio', 0) for r in successful_results) / total_symbols if total_symbols > 0 else 0
+        
+        # Calculate portfolio Sharpe ratio from cumulative PnL series if available
+        portfolio_sharpe = 0.0
+        try:
+            # Collect all PnL series and merge by date
+            import numpy as np
+            daily_pnls = []
+            
+            for r in successful_results:
+                if 'cumulative_pnl_series' in r and len(r['cumulative_pnl_series']) > 0:
+                    # Extract daily changes from cumulative PnL
+                    series = r['cumulative_pnl_series']
+                    for i in range(1, len(series)):
+                        daily_change = series[i]['pnl'] - series[i-1]['pnl']
+                        daily_pnls.append(daily_change)
+            
+            if len(daily_pnls) > 1:
+                daily_pnls_array = np.array(daily_pnls)
+                mean_daily_pnl = np.mean(daily_pnls_array)
+                std_daily_pnl = np.std(daily_pnls_array, ddof=1)
+                
+                if std_daily_pnl > 0:
+                    # Sharpe = mean(daily_pnl) / std(daily_pnl) * sqrt(252)
+                    portfolio_sharpe = (mean_daily_pnl / std_daily_pnl) * np.sqrt(252)
+        except Exception as e:
+            print(f"⚠️  Could not calculate portfolio Sharpe: {e}")
+        
+        profitable_symbols = sum(1 for r in successful_results if r['summary'].get('net_profit', 0) > 0)
+        
+        # Aggregate ROI
+        total_position_size = params.get('position_size', 1000) * total_symbols
+        aggregate_roi = total_net_profit / total_position_size if total_position_size > 0 else 0
+        
+        timestamp = datetime.now()
+        
+        # Create aggregate result record
+        result_record = {
+            'timestamp': timestamp,
+            'result_type': result_type,
+            'universe': universe,
+            'num_symbols': total_symbols,
+            'symbol_list': ','.join([r['symbol'] for r in successful_results[:10]]) + ('...' if total_symbols > 10 else ''),
+            # Parameters
+            'up_threshold': params.get('up_threshold'),
+            'up_direction': params.get('up_direction'),
+            'down_threshold': params.get('down_threshold'),
+            'down_direction': params.get('down_direction'),
+            'detection_window': params.get('detection_window'),
+            'hold_window': params.get('hold_window'),
+            'position_size': params.get('position_size'),
+            'position_limit': params.get('position_limit'),
+            'fee_rate': params.get('fee_rate'),
+            'num_accounts': params.get('num_accounts'),
+            'start_date': params.get('start_date'),
+            # Aggregate results
+            'total_trades': total_trades,
+            'total_gross_profit': total_gross_profit,
+            'total_fees': total_fees,
+            'total_net_profit': total_net_profit,
+            'aggregate_roi': aggregate_roi,
+            'avg_profit_per_symbol': avg_profit_per_symbol,
+            'avg_profit_per_trade': avg_profit_per_trade,
+            'avg_win_rate': avg_win_rate,
+            'avg_sharpe_ratio': avg_sharpe,
+            'portfolio_sharpe_ratio': portfolio_sharpe,
+            'profitable_symbols': profitable_symbols,
+            'profitable_pct': (profitable_symbols / total_symbols * 100) if total_symbols > 0 else 0,
+        }
+        
+        # Convert to DataFrame
+        df = pl.DataFrame([result_record])
+        
+        # Determine filename
+        filename = f"backtest_results_{result_type}.parquet"
+        filepath = RESULTS_DIR / filename
+        
+        # Append or create
+        if filepath.exists():
+            existing_df = pl.read_parquet(filepath)
+            combined_df = pl.concat([existing_df, df])
+            combined_df.write_parquet(filepath)
+        else:
+            df.write_parquet(filepath)
+        
+        print(f"✅ Saved aggregate result: {total_symbols} symbols, {total_trades} trades, ${total_net_profit:.2f}")
+        
+    except Exception as e:
+        print(f"⚠️ Failed to save aggregate result: {e}")
+        import traceback
+        print(traceback.format_exc())
 
 @app.route('/api/symbols', methods=['GET'])
 def get_symbols():
@@ -507,6 +645,7 @@ def run_batch_backtest():
         data = request.json
         symbols = data.get('symbols', [])
         params = data.get('params', {})
+        universe = data.get('universe', 'all')
         
         if not symbols:
             return jsonify({"success": False, "error": "No symbols provided"}), 400
@@ -593,6 +732,15 @@ def run_batch_backtest():
                 print(f"DEBUG: Shutting down executor with {max_workers} workers", flush=True)
                 executor.shutdown(wait=True, cancel_futures=False)
                 print(f"DEBUG: Executor shutdown complete", flush=True)
+        
+        # Save aggregate results after all backtests complete
+        save_aggregate_backtest_result(
+            result_type='minute',
+            symbols=symbols,
+            params=worker_params,
+            results=results,
+            universe=universe
+        )
         
         return jsonify({
             "success": True,
@@ -682,28 +830,27 @@ def get_universe_symbols():
         universe_config = UNIVERSES[universe_id]
         
         # Try to find the most recent weights file for this index
-        # Match by number of symbols in the weights filename
+        # Match by filename pattern that includes DROP information
         agg_dir = Path('/workspace/data/klines_aggregate') if Path('/workspace/data/klines_aggregate').exists() else Path('/app/data/klines_aggregate')
         
         # Determine the WEIGHTS file pattern based on universe
-        # The pattern depends on nsymbols and drop-n used when generating
+        # Pattern includes the drop-n parameter encoded in filename
         weights_patterns = {
-            'top10': 'WEIGHTS_10_*WEEK*.pq',
-            'top10_exbtc': 'WEIGHTS_10_*WEEK*.pq',  # Will need drop-n=1 in filename somehow
-            'mid60': 'WEIGHTS_*60*WEEK*.pq',  # Or WEIGHTS_70 with drop 10
-            'small100': 'WEIGHTS_*100*WEEK*.pq',  # Or WEIGHTS_170 with drop 70
-            'tiny130': 'WEIGHTS_*130*WEEK*.pq'  # Or WEIGHTS_300 with drop 170
+            'top10': 'WEIGHTS_10_1_WEEK_*.pq',  # Top 10 including BTC (no DROP)
+            'top10_exbtc': 'WEIGHTS_10_DROP1_1_WEEK_*.pq',  # Top 10 excluding BTC (DROP1)
+            'mid60': 'WEIGHTS_70_DROP10_1_WEEK_*.pq',  # Mid 60: top 70 drop 10
+            'small100': 'WEIGHTS_170_DROP70_1_WEEK_*.pq',  # Small 100: top 170 drop 70
+            'tiny130': 'WEIGHTS_300_DROP170_1_WEEK_*.pq'  # Tiny 130: top 300 drop 170
         }
         
-        # For now, try a simpler approach: look for files by the number of output symbols
-        # Top10 -> files with exactly 10 symbols per period
-        # This requires reading the file to check
-        
-        weights_files = sorted(agg_dir.glob('WEIGHTS_*.pq'))
-        
-        if weights_files:
-            # Read the most recent weights file and filter
-            for weights_file in reversed(weights_files):  # Start with most recent
+        # Try to find matching weights file by pattern
+        pattern = weights_patterns.get(universe_id)
+        if pattern:
+            weights_files = sorted(agg_dir.glob(pattern))
+            
+            if weights_files:
+                # Use the most recent file
+                weights_file = weights_files[-1]
                 try:
                     df = pl.read_parquet(weights_file)
                     
@@ -711,32 +858,18 @@ def get_universe_symbols():
                     last_period = df.select('end_date').max().item()
                     period_df = df.filter(pl.col('end_date') == last_period)
                     
-                    # Check if this matches our universe based on symbol count
-                    num_symbols = period_df.select('symbol').n_unique()
+                    symbols = period_df.select('symbol').to_series().to_list()
                     
-                    # Match universe by expected symbol count
-                    expected_counts = {
-                        'top10': 10,
-                        'top10_exbtc': 10,
-                        'mid60': 60,
-                        'small100': 100,
-                        'tiny130': 130
-                    }
-                    
-                    if universe_id in expected_counts and num_symbols == expected_counts[universe_id]:
-                        symbols = period_df.select('symbol').to_series().to_list()
-                        
-                        return jsonify({
-                            "success": True,
-                            "universe": universe_id,
-                            "symbols": sorted(symbols),
-                            "source": "weights_file",
-                            "file": str(weights_file.name),
-                            "symbol_count": len(symbols)
-                        })
+                    return jsonify({
+                        "success": True,
+                        "universe": universe_id,
+                        "symbols": sorted(symbols),
+                        "source": "weights_file",
+                        "file": str(weights_file.name),
+                        "symbol_count": len(symbols)
+                    })
                 except Exception as e:
                     print(f"Error reading weights file {weights_file}: {e}")
-                    continue
         
         # Fallback: use all symbols
         parquet_files = list(DAILY_DATA_DIR.glob("*_daily_*.parquet"))
@@ -994,6 +1127,7 @@ def run_batch_daily_backtest():
         data = request.json
         symbols = data.get('symbols', [])
         params = data.get('params', {})
+        universe = data.get('universe', 'all')
         
         if not symbols:
             return jsonify({"success": False, "error": "No symbols provided"}), 400
@@ -1073,6 +1207,15 @@ def run_batch_daily_backtest():
                 print(f"DEBUG: Shutting down executor with {max_workers} workers", flush=True)
                 executor.shutdown(wait=True, cancel_futures=False)
                 print(f"DEBUG: Executor shutdown complete", flush=True)
+        
+        # Save aggregate results after all backtests complete
+        save_aggregate_backtest_result(
+            result_type='daily',
+            symbols=symbols,
+            params=worker_params,
+            results=results,
+            universe=universe
+        )
         
         return jsonify({
             "success": True,
@@ -1548,6 +1691,69 @@ def calculate_correlation():
 def health_check():
     """Health check endpoint."""
     return jsonify({"status": "healthy", "service": "backtest-api"})
+
+
+@app.route('/api/backtest-results', methods=['GET'])
+def get_backtest_results():
+    """Get saved backtest results with optional filtering."""
+    try:
+        result_type = request.args.get('type')  # 'minute' or 'daily'
+        universe = request.args.get('universe')
+        min_pnl = request.args.get('min_pnl')  # Minimum net profit filter
+        limit = int(request.args.get('limit', 100))
+        
+        results = []
+        
+        # Determine which file(s) to read
+        files_to_read = []
+        if result_type == 'minute':
+            files_to_read.append(RESULTS_DIR / 'backtest_results_minute.parquet')
+        elif result_type == 'daily':
+            files_to_read.append(RESULTS_DIR / 'backtest_results_daily.parquet')
+        else:
+            # Read both
+            files_to_read.append(RESULTS_DIR / 'backtest_results_minute.parquet')
+            files_to_read.append(RESULTS_DIR / 'backtest_results_daily.parquet')
+        
+        for filepath in files_to_read:
+            if not filepath.exists():
+                continue
+            
+            df = pl.read_parquet(filepath)
+            
+            # Apply filters
+            if universe:
+                df = df.filter(pl.col('universe') == universe)
+            if min_pnl is not None and min_pnl != '':
+                min_pnl_val = float(min_pnl)
+                df = df.filter(pl.col('total_net_profit') >= min_pnl_val)
+            
+            # Sort by timestamp descending (most recent first)
+            df = df.sort('timestamp', descending=True)
+            
+            # Convert to dicts
+            for row in df.head(limit).to_dicts():
+                # Convert timestamp to ISO string
+                if 'timestamp' in row and row['timestamp']:
+                    row['timestamp'] = row['timestamp'].isoformat()
+                results.append(row)
+        
+        # Sort combined results by timestamp
+        results.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
+        return jsonify({
+            "success": True,
+            "results": results[:limit],
+            "count": len(results[:limit])
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
 
 
 # ============================================================================

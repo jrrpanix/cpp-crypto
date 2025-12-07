@@ -287,7 +287,8 @@ async function runMultiSymbolBacktest(event) {
             },
             body: JSON.stringify({
                 symbols: selectedSymbols,
-                params: params
+                params: params,
+                universe: currentUniverse
             })
         });
         
@@ -322,7 +323,7 @@ async function runMultiSymbolBacktest(event) {
         
         // Display results
         displayResults();
-        showStatus(`✅ Completed ${currentResults.length} backtests in ${duration}s (${failures.length} failed)`, 'success');
+        showStatus(`✅ Completed ${currentResults.length} backtests in ${duration}s (${failures.length} failed) - Results saved to history`, 'success');
         
     } catch (error) {
         console.error('Error running multi-symbol backtest:', error);
@@ -744,4 +745,99 @@ function clearResults() {
     document.getElementById('progressBar').classList.remove('show');
 }
 
-})(); // End IIFE
+// ============================================================================
+// History Management
+// ============================================================================
+
+async function loadBacktestHistory() {
+    try {
+        const universe = document.getElementById('historyUniverseFilter').value;
+        const symbol = document.getElementById('historySymbolFilter').value.trim();
+        
+        const params = new URLSearchParams({ type: 'minute', limit: 50 });
+        if (universe) params.append('universe', universe);
+        if (symbol) params.append('symbol', symbol);
+        
+        const response = await fetch(`${API_BASE_URL}/api/backtest-results?${params}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to load history');
+        }
+        
+        renderHistoryTable(data.results);
+    } catch (error) {
+        console.error('Error loading history:', error);
+        document.getElementById('historyTableBody').innerHTML = 
+            `<tr><td colspan="11" style="text-align: center; color: #e74c3c;">Error: ${error.message}</td></tr>`;
+    }
+}
+
+    function renderHistoryTable(results) {
+        const tbody = document.getElementById('historyTableBody');
+        
+        if (results.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="13" style="text-align: center;">No saved results found</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = results.map(r => {
+            const netProfit = r.total_net_profit || 0;
+            const profitColor = netProfit >= 0 ? '#27ae60' : '#e74c3c';
+            const profitStyle = `color: ${profitColor}; font-weight: bold;`;
+            
+            // Format triggers with direction
+            const upTrigger = `${r.up_threshold} ${r.up_direction || 'B'}`;
+            const downTrigger = `${r.down_threshold} ${r.down_direction || 'S'}`;
+            
+            // Win rate is already in 0-100 range from backend
+            const winRatePct = r.avg_win_rate || 0;
+            
+            return `
+            <tr>
+                <td>${new Date(r.timestamp).toLocaleString()}</td>
+                <td>${r.result_type}</td>
+                <td>${r.num_symbols || 1}</td>
+                <td>${r.universe || 'all'}</td>
+                <td><strong>${upTrigger}</strong></td>
+                <td><strong>${downTrigger}</strong></td>
+                <td>${r.detection_window}/${r.hold_window}</td>
+                <td>${r.position_limit || 1}</td>
+                <td>${r.total_trades || 0}</td>
+                <td>$${(r.total_gross_profit || 0).toFixed(2)}</td>
+                <td style="${profitStyle}">$${netProfit.toFixed(2)}</td>
+                <td style="${profitStyle}">${((r.aggregate_roi || 0) * 100).toFixed(2)}%</td>
+                <td>${winRatePct.toFixed(1)}%</td>
+                <td>${(r.portfolio_sharpe_ratio || r.avg_sharpe_ratio || 0).toFixed(2)}</td>
+            </tr>
+        `}).join('');
+    }function toggleHistory() {
+    const section = document.getElementById('historySection');
+    const isHidden = section.style.display === 'none';
+    section.style.display = isHidden ? 'block' : 'none';
+    
+    if (isHidden) {
+        // Load universe options
+        const filter = document.getElementById('historyUniverseFilter');
+        const currentOptions = Array.from(filter.options).map(o => o.value);
+        
+        if (currentOptions.length === 1) { // Only "All" option
+            for (const [id, config] of Object.entries(availableUniverses)) {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = config.name;
+                filter.appendChild(option);
+            }
+        }
+        
+        loadBacktestHistory();
+    }
+}
+
+    // Event listeners
+    document.getElementById('historyBtn').addEventListener('click', toggleHistory);
+    document.getElementById('refreshHistoryBtn').addEventListener('click', loadBacktestHistory);
+    document.getElementById('historyUniverseFilter').addEventListener('change', loadBacktestHistory);
+    document.getElementById('historyMinPnl').addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') loadBacktestHistory();
+    });})(); // End IIFE

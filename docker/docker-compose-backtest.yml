@@ -9,6 +9,8 @@ services:
     volumes:
       # Mount data directory for parquet access (configurable via DATA_DIR env var)
       - ${DATA_DIR:-../data}:/app/data:ro
+      # Mount writable directory for backtest results
+      - ${DATA_DIR:-../data}/backtest_results:/app/backtest_results:rw
       # Mount source for live development
       - ../server/backtest_api.py:/app/backtest_api.py
       - ../src/research/signal_utils:/app/signal_utils:ro
