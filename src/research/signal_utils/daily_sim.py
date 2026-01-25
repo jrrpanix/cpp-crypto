@@ -44,18 +44,27 @@ def detect_signals(
     up_threshold: float,
     down_threshold: float,
     detection_window: int = 5,
+    index_df: pl.DataFrame = None,
+    index_threshold: float = None,
 ) -> pl.DataFrame:
     """
     Detect when price change exceeds thresholds within detection window (days).
     
     For each day, calculates return from the open of the day detection_window periods ago
     to the close of the current day. Signals when this return exceeds threshold.
+    
+    Optionally filters for idiosyncratic moves by comparing to an index:
+    - If index_df provided, calculates idiosyncratic_return = symbol_return - index_return
+    - Only triggers signal if abs(idiosyncratic_return) > index_threshold
+    - This filters out trades driven purely by market/index movement
 
     Args:
         df: DataFrame with 'open_time', 'open', and 'close' columns
         up_threshold: Minimum return to trigger buy signal (e.g., 0.05 for 5%)
         down_threshold: Maximum return to trigger sell signal (e.g., -0.05 for -5%)
         detection_window: Number of days to look back (e.g., 5 means compare current close to open from 5 days ago)
+        index_df: Optional DataFrame with index data (same structure as df) for idiosyncratic filtering
+        index_threshold: Optional minimum absolute idiosyncratic return to trigger signal (e.g., 0.02 for 2%)
 
     Returns:
         DataFrame with additional 'signal_up' and 'signal_down' columns
@@ -77,13 +86,58 @@ def detect_signals(
         ]
     )
 
-    # Create signal flags
-    df = df.with_columns(
-        [
-            (pl.col("window_return") > up_threshold).alias("signal_up"),
-            (pl.col("window_return") < down_threshold).alias("signal_down"),
-        ]
-    )
+    # If index provided, calculate idiosyncratic returns
+    if index_df is not None and index_threshold is not None:
+        # Calculate index window return using same logic
+        index_df = index_df.with_columns(
+            [
+                pl.col("open").shift(detection_window).alias("index_window_start_open"),
+            ]
+        )
+        index_df = index_df.with_columns(
+            [
+                (
+                    (pl.col("close") - pl.col("index_window_start_open")) / pl.col("index_window_start_open")
+                ).alias("index_window_return")
+            ]
+        )
+        
+        # Join index returns to symbol data by timestamp
+        df = df.join(
+            index_df.select(["open_time", "index_window_return"]),
+            on="open_time",
+            how="left"
+        )
+        
+        # Calculate idiosyncratic return (symbol return - index return)
+        df = df.with_columns(
+            [
+                (pl.col("window_return") - pl.col("index_window_return")).alias("idiosyncratic_return")
+            ]
+        )
+        
+        # Create signal flags with idiosyncratic filter
+        # Only signal if the idiosyncratic component is large enough
+        df = df.with_columns(
+            [
+                (
+                    (pl.col("window_return") > up_threshold) & 
+                    (pl.col("idiosyncratic_return") > index_threshold)
+                ).alias("signal_up"),
+                (
+                    (pl.col("window_return") < down_threshold) & 
+                    (pl.col("idiosyncratic_return") < -index_threshold)
+                ).alias("signal_down"),
+            ]
+        )
+    else:
+        # Create signal flags without index filter
+        df = df.with_columns(
+            [
+                (pl.col("window_return") > up_threshold).alias("signal_up"),
+                (pl.col("window_return") < down_threshold).alias("signal_down"),
+            ]
+        )
 
     return df
 
@@ -473,6 +527,8 @@ def run_simulation_from_file(
     num_accounts: int = 1,
     up_direction: str = "B",
     down_direction: str = "S",
+    index_symbol: str = None,
+    index_threshold: float = None,
 ) -> tuple[pl.DataFrame, dict]:
     """
     Run simulation from a daily data parquet file.
@@ -490,6 +546,8 @@ def run_simulation_from_file(
         num_accounts: 1 or 2 accounts
         up_direction: 'B' for long, 'S' for short on up signal
         down_direction: 'B' for long, 'S' for short on down signal
+        index_symbol: Optional index symbol for idiosyncratic filtering (default: None)
+        index_threshold: Optional minimum absolute idiosyncratic return to trigger signal (default: None)
 
     Returns:
         Tuple of (trades DataFrame, summary dict)
@@ -527,8 +585,28 @@ def run_simulation_from_file(
     # Calculate returns
     df = calculate_returns(df)
     
-    # Detect signals
-    df = detect_signals(df, up_threshold, down_threshold, detection_window)
+    # Load index data if specified
+    index_df = None
+    if index_symbol and index_threshold is not None:
+        # Find index parquet file in same directory
+        file_path_obj = Path(file_path)
+        data_dir = file_path_obj.parent
+        index_files = list(data_dir.glob(f"{index_symbol}_daily_*.parquet"))
+        
+        if index_files:
+            index_file = sorted(index_files)[-1]  # Use most recent
+            index_df = pl.read_parquet(index_file)
+            
+            # Filter by same date range
+            if start_date:
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                index_df = index_df.filter(pl.col("open_time") >= start_dt)
+            
+            # Calculate returns for index
+            index_df = calculate_returns(index_df)
+    
+    # Detect signals (with optional index filtering)
+    df = detect_signals(df, up_threshold, down_threshold, detection_window, index_df, index_threshold)
     
     # Simulate trades
     trades_df, summary = simulate_trades(

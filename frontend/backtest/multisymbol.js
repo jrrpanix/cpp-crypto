@@ -86,15 +86,15 @@
         
         // Update the Number of Symbols input to match universe size
         const numSymbolsInput = document.getElementById('numSymbols');
-        if (numSymbolsInput) {
+        if (numSymbolsInput && availableSymbols.length > 0) {
             numSymbolsInput.max = availableSymbols.length;
             
             // For defined universes (not "all"), automatically set N to the universe size
-            // This makes it easier to test the full universe
-            if (currentUniverse !== 'all' && availableSymbols.length <= 200) {
+            if (currentUniverse && currentUniverse !== 'all') {
                 numSymbolsInput.value = availableSymbols.length;
+                console.log(`Updated numSymbols to ${availableSymbols.length} for universe ${currentUniverse}`);
             } else {
-                // For "all" or very large universes, adjust only if current value exceeds available
+                // For "all", only adjust if current value exceeds available
                 if (parseInt(numSymbolsInput.value) > availableSymbols.length) {
                     numSymbolsInput.value = availableSymbols.length;
                 }
@@ -102,6 +102,8 @@
             
             // Update placeholder to show range
             numSymbolsInput.placeholder = `1-${availableSymbols.length}`;
+        } else {
+            console.warn('numSymbols input not found or no symbols available');
         }
         
         // Show info message

@@ -36,18 +36,27 @@ def detect_signals(
     up_threshold: float,
     down_threshold: float,
     detection_window: int = 5,
+    index_df: pl.DataFrame = None,
+    index_threshold: float = None,
 ) -> pl.DataFrame:
     """
     Detect when price change exceeds thresholds within detection window.
     
     For each bar, calculates return from the open of the bar detection_window periods ago
     to the close of the current bar. Signals when this return exceeds threshold.
+    
+    Optionally filters for idiosyncratic moves by comparing to an index:
+    - If index_df provided, calculates idiosyncratic_return = symbol_return - index_return
+    - Only triggers signal if abs(idiosyncratic_return) > index_threshold
+    - This filters out trades driven purely by market/index movement
 
     Args:
         df: DataFrame with 'timestamp', 'open', and 'close' columns
         up_threshold: Minimum return to trigger buy signal (e.g., 0.01 for 1%)
         down_threshold: Maximum return to trigger sell signal (e.g., -0.01 for -1%)
         detection_window: Number of periods to look back (e.g., 5 means compare current close to open from 5 bars ago)
+        index_df: Optional DataFrame with index data (same structure as df) for idiosyncratic filtering
+        index_threshold: Optional minimum absolute idiosyncratic return to trigger signal (e.g., 0.02 for 2%)
 
     Returns:
         DataFrame with additional 'signal_up' and 'signal_down' columns
@@ -69,13 +78,58 @@ def detect_signals(
         ]
     )
 
-    # Create signal flags
-    df = df.with_columns(
-        [
-            (pl.col("window_return") > up_threshold).alias("signal_up"),
-            (pl.col("window_return") < down_threshold).alias("signal_down"),
-        ]
-    )
+    # If index provided, calculate idiosyncratic returns
+    if index_df is not None and index_threshold is not None:
+        # Calculate index window return using same logic
+        index_df = index_df.with_columns(
+            [
+                pl.col("open").shift(detection_window).alias("index_window_start_open"),
+            ]
+        )
+        index_df = index_df.with_columns(
+            [
+                (
+                    (pl.col("close") - pl.col("index_window_start_open")) / pl.col("index_window_start_open")
+                ).alias("index_window_return")
+            ]
+        )
+        
+        # Join index returns to symbol data by timestamp
+        df = df.join(
+            index_df.select(["open_time", "index_window_return"]),
+            on="open_time",
+            how="left"
+        )
+        
+        # Calculate idiosyncratic return (symbol return - index return)
+        df = df.with_columns(
+            [
+                (pl.col("window_return") - pl.col("index_window_return")).alias("idiosyncratic_return")
+            ]
+        )
+        
+        # Create signal flags with idiosyncratic filter
+        # Only signal if the idiosyncratic component is large enough
+        df = df.with_columns(
+            [
+                (
+                    (pl.col("window_return") > up_threshold) & 
+                    (pl.col("idiosyncratic_return") > index_threshold)
+                ).alias("signal_up"),
+                (
+                    (pl.col("window_return") < down_threshold) & 
+                    (pl.col("idiosyncratic_return") < -index_threshold)
+                ).alias("signal_down"),
+            ]
+        )
+    else:
+        # Create signal flags without index filter
+        df = df.with_columns(
+            [
+                (pl.col("window_return") > up_threshold).alias("signal_up"),
+                (pl.col("window_return") < down_threshold).alias("signal_down"),
+            ]
+        )
 
     return df
 
@@ -646,6 +700,8 @@ def run_simulation(
     num_accounts: int = 1,
     verbose: bool = True,
     symbol: str = None,
+    index_symbol: str = None,
+    index_threshold: float = None,
 ) -> tuple[pl.DataFrame, dict]:
     """
     Run the complete trading simulation on a DataFrame.
@@ -664,6 +720,8 @@ def run_simulation(
         num_accounts: Number of accounts (1=single account with position reversal, 2=separate long/short accounts, default: 1)
         verbose: Print results if True
         symbol: Optional symbol name for display purposes (default: None)
+        index_symbol: Optional index symbol for idiosyncratic filtering (default: None)
+        index_threshold: Optional minimum absolute idiosyncratic return to trigger signal (default: None)
 
     Returns:
         Tuple of (trades DataFrame, summary statistics dict)
@@ -686,8 +744,19 @@ def run_simulation(
     data_end_date = df["open_time"].max()
     num_rows = len(df)
 
-    # Detect signals
-    df = detect_signals(df, up_threshold, down_threshold, detection_window)
+    # Load index data if specified
+    index_df = None
+    if index_symbol and index_threshold is not None:
+        # Try to load index data from same directory structure
+        # Assumes index files follow pattern: IXSYMBOL_1m_*.parquet or similar
+        if verbose:
+            print(f"Loading index data for {index_symbol}...")
+        # This will be handled by the caller passing in index_df, or we can load it here
+        # For now, we'll expect the caller to provide index_df if needed
+        pass
+
+    # Detect signals (with optional index filtering)
+    df = detect_signals(df, up_threshold, down_threshold, detection_window, index_df, index_threshold)
 
     # Simulate trades
     trades_df, summary = simulate_trades(df, hold_window, position_size, position_limit, fee_rate, num_accounts, up_direction, down_direction)
@@ -782,6 +851,8 @@ def run_simulation_from_file(
     fee_rate: float = 0.001,
     num_accounts: int = 1,
     verbose: bool = True,
+    index_symbol: str = None,
+    index_threshold: float = None,
 ) -> tuple[pl.DataFrame, dict]:
     """
     Run trading simulation by loading data from a parquet file.
@@ -803,6 +874,8 @@ def run_simulation_from_file(
         fee_rate: Transaction fee rate applied to both entry and exit (default: 0.001 = 0.1%)
         num_accounts: Number of accounts (1=single account with position reversal, 2=separate long/short accounts, default: 1)
         verbose: Print results if True
+        index_symbol: Optional index symbol for idiosyncratic filtering (default: None)
+        index_threshold: Optional minimum absolute idiosyncratic return to trigger signal (default: None)
 
     Returns:
         Tuple of (trades DataFrame, summary statistics dict)
@@ -825,6 +898,31 @@ def run_simulation_from_file(
     filename = parquet_path.stem
     symbol = filename.split("_")[0] if "_" in filename else filename
     
+    # Load index data if specified
+    index_df = None
+    if index_symbol and index_threshold is not None:
+        # Find index parquet file in same directory
+        data_dir = parquet_path.parent
+        index_files = list(data_dir.glob(f"{index_symbol}_1m_*.parquet"))
+        
+        if index_files:
+            index_file = sorted(index_files)[-1]  # Use most recent
+            index_df = pl.read_parquet(index_file)
+            
+            # Filter by same date range
+            if start_date:
+                if isinstance(start_date, str):
+                    start_date_dt = pl.lit(start_date).str.strptime(pl.Datetime, "%Y-%m-%d")
+                    index_df = index_df.filter(pl.col("open_time") >= start_date_dt)
+                else:
+                    index_df = index_df.filter(pl.col("open_time") >= start_date)
+            
+            if verbose:
+                print(f"Loaded index data: {index_symbol} ({len(index_df)} rows)")
+        else:
+            if verbose:
+                print(f"Warning: Index symbol {index_symbol} specified but no data found. Proceeding without index filter.")
+    
     # Run the simulation with the loaded data
     return run_simulation(
         df=df,
@@ -840,6 +938,8 @@ def run_simulation_from_file(
         num_accounts=num_accounts,
         verbose=verbose,
         symbol=symbol,
+        index_symbol=index_symbol,
+        index_threshold=index_threshold,
     )
 
 
