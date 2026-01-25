@@ -120,6 +120,26 @@ def process_file(input_path: Path, output_dir: Path, dry_run: bool = False) -> N
         print(f"  ❌ Error writing file: {e}")
 
 
+def process_directory(input_dir: Path | str, output_dir: Path | str, dry_run: bool = False) -> None:
+    """
+    Process all minute-bar parquet files in input_dir to daily bars in output_dir.
+    
+    This is a batch wrapper around process_file() for use by the pipeline orchestrator.
+    """
+    input_dir = Path(input_dir)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    parquet_files = sorted(input_dir.glob("*.parquet"))
+    if not parquet_files:
+        print(f"No parquet files found in {input_dir}")
+        return
+    
+    print(f"Processing {len(parquet_files)} files from {input_dir} → {output_dir}")
+    for pf in parquet_files:
+        process_file(pf, output_dir, dry_run=dry_run)
+
+
 def main():
     """Main function to process all parquet files."""
     parser = argparse.ArgumentParser(

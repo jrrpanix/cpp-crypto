@@ -496,22 +496,22 @@
                         <tbody>
                             <tr>
                                 <td><input type="number" id="numSymbols" value="5" min="1" required></td>
-                                <td><input type="number" id="upThreshold" step="0.01" value="10.0" required></td>
+                                <td><input type="number" id="upThreshold" step="0.01" value="5.0" required></td>
                                 <td>
                                     <select id="upDirection" required>
                                         <option value="B" selected>Long</option>
                                         <option value="S">Short</option>
                                     </select>
                                 </td>
-                                <td><input type="number" id="downThreshold" step="0.01" value="-999" required></td>
+                                <td><input type="number" id="downThreshold" step="0.01" value="-5.0" required></td>
                                 <td>
                                     <select id="downDirection" required>
                                         <option value="B">Long</option>
                                         <option value="S" selected>Short</option>
                                     </select>
                                 </td>
-                                <td><input type="number" id="detectionWindow" value="5" min="1" required></td>
-                                <td><input type="number" id="holdWindow" value="10" min="1" required></td>
+                                <td><input type="number" id="detectionWindow" value="2" min="1" required></td>
+                                <td><input type="number" id="holdWindow" value="1" min="1" required></td>
                                 <td><input type="number" id="positionSize" step="any" value="10000" min="0.01" required></td>
                                 <td><input type="number" id="positionLimit" value="1" min="1" required></td>
                                 <td><input type="number" id="feeRate" step="0.0001" value="0.1" required></td>

@@ -19,6 +19,7 @@ dependencies = [
     "mplfinance>=0.12.10b0",
     "pyarrow>=21.0.0",
     "scipy>=1.16.2",
+    "duckdb>=1.4.3",
 ]
 
 [project.optional-dependencies]

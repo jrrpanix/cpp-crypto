@@ -1,647 +1,537 @@
-# Binance Kline Data Pipeline
+# Data Utils: Binance Kline Pipeline & Analytics
 
-A comprehensive toolkit for downloading, processing, and analyzing Binance perpetual futures kline (candlestick) data at 1-minute resolution.
+A comprehensive toolkit for downloading, processing, analyzing, and backtesting with Binance perpetual futures kline data at 1-minute resolution.
 
-## Overview
+## 🎯 Quick Start
 
-This pipeline enables you to:
-1. **Bootstrap** historical data from Binance
-2. **Update** with latest klines 
-3. **Aggregate** minute-level data to daily resolution
-4. **Detect and repair** missing data gaps
-5. **Calculate** Average Daily Volume (ADV) metrics
-6. **Generate** weighted indexes for portfolio construction
+```bash
+# Full pipeline: download → parse → daily → aggregate → index
+uv run python src/research/data_utils/pipeline.py --month 2025-01 --all-symbols
 
-## Directory Structure
+# Or individual steps
+uv run python src/research/data_utils/make_daily.py       # 1m → daily bars
+uv run python src/research/data_utils/make_aggregate.py   # Combine symbols
+uv run python src/research/data_utils/calc_adv.py         # Calculate weights
 
-```
-data/
-├── downloads/           # Raw monthly ZIP files from Binance
-├── klines/             # Minute-level parquet files (per symbol)
-├── klines_daily/       # Daily aggregated parquet files (per symbol)
-├── klines_aggregate/   # Combined aggregate files (all symbols)
-│   ├── AGG_2024-07-01_2025-09-30.pq       # Daily data, all symbols
-│   ├── ADV_1_WEEK_2024-07-01_2025-09-30.pq    # Weekly ADV
-│   └── WEIGHTS_25_1_WEEK_2024-07-01_2025-09-30.pq  # Top 25 with weights
-├── missing/            # Downloaded gap-fill data
-└── check/              # Gap detection output
+# Track runs & rank by Sharpe
+uv run python src/research/data_utils/runlog_stats.py
 ```
 
 ---
 
-## Complete Workflow
+## 📁 File Organization
 
-### Step 1: Bootstrap Initial Data
+### Core Pipeline (5 files)
+Essential files for the data workflow. Use these for monthly updates.
 
-**First-time setup**: Download historical kline data for all perpetual futures symbols.
+| File | Purpose | How to Use |
+|------|---------|-----------|
+| **config.py** | Centralized paths & settings | Imported by all scripts |
+| **pipeline.py** | Orchestrates all 5 steps | `pipeline.py --month 2025-01 --all-symbols` |
+| **update_klines.py** | Parse Binance ZIPs → parquet | Called by pipeline |
+| **make_daily.py** | Aggregate 1m bars → daily OHLCV | Called by pipeline or standalone |
+| **make_aggregate.py** | Combine daily files (all symbols) | Called by pipeline or standalone |
 
+**Monthly Workflow:**
 ```bash
-# Download last N months of data for all perpetual symbols
-uv run python src/research/data_utils/bootstrap_klines.py \
-  --last 2025-09-30 \
-  --months 15 \
-  --interval 1m
-
-# Downloads to: data/downloads/{SYMBOL}/1m/{SYMBOL}-1m-YYYY-MM.zip
-```
-
-**What it does:**
-- Fetches all perpetual futures symbols from Binance API
-- Downloads monthly kline ZIP files (last N months)
-- Skips already downloaded files
-- Stores in `data/downloads/`
-
-**Output:** Raw monthly ZIP files organized by symbol
-
----
-
-### Step 2: Convert Downloads to Parquet
-
-**Convert** monthly ZIP files to efficient parquet format (minute-level data).
-
-```bash
-# Convert all downloaded ZIPs to minute-level parquet files
-uv run python src/research/data_utils/update_klines.py \
-  --downloads-dir data/downloads \
-  --output-dir data/klines
-
-# Processes: data/downloads/{SYMBOL}/1m/*.zip 
-# Creates:   data/klines/{SYMBOL}.pq
-```
-
-**What it does:**
-- Reads CSV data from Binance ZIP files
-- Handles timestamp conversion (string milliseconds → datetime)
-- Merges/appends data to existing parquet files
-- Removes duplicates and sorts by time
-- Schema casting for consistency
-
-**Output:** `data/klines/{SYMBOL}.pq` - one parquet file per symbol with minute-level OHLCV data
-
-**Key Features:**
-- Shared `read_binance_zip()` function for consistent parsing
-- Handles both String and Int64 timestamp formats
-- Automatic schema matching
-
----
-
-### Step 3: Get Latest Data from Binance
-
-**Update** your data with the most recent klines (incremental updates).
-
-```bash
-# Download latest monthly data for all symbols
-uv run python src/research/data_utils/get_latest_klines.py \
-  --year 2025 \
-  --month 10 \
-  --output-dir data/downloads
-
-# Then update parquet files
-uv run python src/research/data_utils/update_klines.py \
-  --downloads-dir data/downloads \
-  --output-dir data/klines
-```
-
-**What it does:**
-- Downloads the current/latest month's data
-- Fetches data for all perpetual symbols
-- Appends to existing minute-level parquet files
-
-**Best Practice:** Run this monthly or weekly to keep data current
-
----
-
-### Step 4: Create Daily Aggregates
-
-**Aggregate** minute-level data to daily OHLCV bars.
-
-```bash
-# Generate daily parquet files from minute data
-uv run python src/research/data_utils/make_daily.py \
-  --input-dir data/klines \
-  --output-dir data/klines_daily
-
-# Creates: data/klines_daily/{SYMBOL}.pq
-```
-
-**What it does:**
-- Groups minute bars by calendar day
-- Calculates daily OHLCV: 
-  - `open`: First minute's open
-  - `high`: Max of all highs
-  - `low`: Min of all lows  
-  - `close`: Last minute's close
-  - `volume`: Sum of all volumes
-  - `quote_volume`: Sum of all quote volumes
-
-**Output:** `data/klines_daily/{SYMBOL}.pq` - one parquet file per symbol with daily OHLCV
-
----
-
-### Step 5: Create Combined Aggregate File
-
-**Combine** all symbols into a single aggregate file for analysis.
-
-```bash
-# Combine all daily files into one aggregate
-uv run python src/research/data_utils/make_aggregate.py \
-  --input-dir data/klines_daily \
-  --output-file data/klines_aggregate/AGG_2024-07-01_2025-09-30.pq \
-  --start-date 2024-07-01 \
-  --end-date 2025-09-30
-
-# Creates: data/klines_aggregate/AGG_2024-07-01_2025-09-30.pq
-```
-
-**What it does:**
-- Reads all daily parquet files
-- Filters to specified date range
-- Combines into single file with `symbol` column
-- Optimized for cross-symbol analysis
-
-**Output:** Single parquet file with schema:
-```
-┌────────────┬────────┬──────┬──────┬──────┬───────┬────────┬──────────────┐
-│ open_time  │ symbol │ open │ high │ low  │ close │ volume │ quote_volume │
-│ datetime   │ str    │ f64  │ f64  │ f64  │ f64   │ f64    │ f64          │
-└────────────┴────────┴──────┴──────┴──────┴───────┴────────┴──────────────┘
+# Pipeline automates all these steps:
+uv run python src/research/data_utils/pipeline.py --month 2025-02 --skip-download
+# Equivalent to:
+#  1. update_klines() - parse ZIPs
+#  2. make_daily() - create daily files
+#  3. make_aggregate() - combine symbols
+#  4. (optional) build indexes
 ```
 
 ---
 
-### Step 6: Check for Missing Data
+### Run Logging & Analytics (5 files)
+Track backtest runs, rank by Sharpe ratio, analyze cross-run metrics.
 
-**Detect** gaps in your time series data.
+| File | Purpose | When to Use |
+|------|---------|-------------|
+| **runlog.py** | SQLite registry for run metadata | Imported by pipeline & backtests |
+| **runlog_demo.py** | Example: log a run & query results | `python runlog_demo.py` |
+| **runlog_stats.py** | Query runs, rank by Sharpe | `runlog_stats.py --top 20` |
+| **duckdb_analytics.py** | Optional SQL-based analytics | Advanced queries; requires duckdb |
+| **duckdb_analytics_demo.py** | Example DuckDB queries | `python duckdb_analytics_demo.py` |
 
-```bash
-# Check for missing days in minute-level data
-uv run python src/research/data_utils/check_missing.py \
-  --input-dir data/klines \
-  --output-dir data/check \
-  --start-date 2024-07-01 \
-  --end-date 2025-09-30
+**Typical Usage:**
+```python
+# In your backtest script
+from data_utils.runlog import log_run, write_metrics
 
-# Creates: data/check/missing_*.csv files
-```
+run_id = log_run(
+    command="backtest --symbols BTCUSDT --window 5",
+    config={"window": 5, "symbols": "BTCUSDT"},
+    tags="daily,hw5"
+)
 
-**What it does:**
-- Scans all parquet files for date gaps
-- Identifies missing days/months
-- Generates CSV reports per symbol
-- Lists exactly which data needs to be downloaded
+# ... run backtest ...
 
-**Output:** CSV files listing missing dates:
-```
-symbol,missing_dates
-BTCUSDT,2024-08-15
-ETHUSDT,2024-08-15,2024-08-16
-```
-
----
-
-### Step 7: Download Missing Data
-
-**Fill gaps** by downloading missing monthly files.
-
-```bash
-# Download missing data based on check results
-uv run python src/research/data_utils/download_missing.py \
-  --check-dir data/check \
-  --output-dir data/missing
-
-# Downloads to: data/missing/{SYMBOL}/1m/*.zip
-```
-
-**What it does:**
-- Reads missing data reports from check step
-- Downloads required monthly ZIP files from Binance
-- Organizes downloads by symbol
-- Skips already downloaded files
-
-**Output:** ZIP files in `data/missing/` ready for repair
-
----
-
-### Step 8: Repair Missing Data
-
-**Merge** downloaded gap-fill data into existing parquet files.
-
-```bash
-# Repair gaps in minute-level data
-uv run python src/research/data_utils/repair_missing.py \
-  --missing-dir data/missing \
-  --klines-dir data/klines
-
-# Updates: data/klines/{SYMBOL}.pq
-```
-
-**What it does:**
-- Reads ZIP files from missing data directory
-- Merges new data with existing parquet files
-- Removes duplicates and sorts
-- Validates schema consistency
-
-**Important:** After repair, regenerate daily and aggregate files:
-```bash
-# Regenerate daily files
-uv run python src/research/data_utils/make_daily.py \
-  --input-dir data/klines \
-  --output-dir data/klines_daily
-
-# Regenerate aggregate
-uv run python src/research/data_utils/make_aggregate.py \
-  --input-dir data/klines_daily \
-  --output-file data/klines_aggregate/AGG_2024-07-01_2025-09-30.pq \
-  --start-date 2024-07-01 \
-  --end-date 2025-09-30
+write_metrics(run_id, [
+    {"metric": "sharpe", "value": 1.82},
+    {"metric": "max_dd", "value": -0.12}
+])
 ```
 
 ---
 
-### Step 9: Calculate Average Daily Volume (ADV)
+### Data Loading (1 file)
+Robust utilities for loading daily data without brittle filenames.
 
-**Compute** trading volume metrics for symbol ranking and filtering.
+| File | Purpose |
+|------|---------|
+| **daily_loader.py** | Load daily parquet files by symbol/glob; handles monthly file rotation |
 
+**Example:**
+```python
+from data_utils.daily_loader import load_daily_lazy, load_daily_concat
+
+# Lazy load (efficient for large datasets)
+df = load_daily_lazy("data/klines_daily", symbol="BTCUSDT")
+
+# Eager load (for small datasets)
+df = load_daily_concat("data/klines_daily", symbol="BTCUSDT")
+```
+
+---
+
+### Signal Detection (1 file)
+5 variants of signal detection filters to prevent overfitting.
+
+| File | Purpose |
+|------|---------|
+| **detection_filters.py** | Apply 5 detection variants side-by-side for A/B testing |
+
+**Example:**
+```python
+from data_utils.detection_filters import apply_detection_filters
+
+df = apply_detection_filters(
+    df, 
+    window=5,          # 5-day detection window
+    target=0.05,       # 5% target move
+    max_single=0.03,   # max single-day move
+    up_days_required=2 # min consecutive up days
+)
+
+# Result columns: spread_pass, cap_pass, updays_pass, smooth_pass, hybrid_pass
+print(df[["date", "ret", "spread_pass", "hybrid_pass"]])
+```
+
+---
+
+### Utilities (2 files)
+Specialized calculations for ADV, weights, and indexes.
+
+| File | Lines | Purpose | Frequency |
+|------|-------|---------|-----------|
+| **calc_adv.py** | 840 | Calculate ADV, portfolio weights, generate plots | Monthly+ |
+| **build_index.py** | 570 | Build market indexes from daily data | Occasionally |
+
+**ADV Example:**
 ```bash
-# Calculate weekly ADV for all USDT symbols
+# Calculate weekly ADV for top 25 symbols
 uv run python src/research/data_utils/calc_adv.py \
   --input-file data/klines_aggregate/AGG_2024-07-01_2025-09-30.pq \
-  --interval 1 \
-  --units weeks \
-  --index-start-day monday \
-  --output-dir data/klines_aggregate
-
-# Creates: data/klines_aggregate/ADV_1_WEEK_2024-07-01_2025-09-30.pq
-```
-
-**Interval Options:**
-- `--interval N`: Number of units (weeks/months)
-- `--units weeks`: Weekly intervals
-- `--units months`: Monthly intervals
-
-**Alignment Options:**
-- `--index-start-day monday`: Start weekly intervals on Mondays (recommended for indexes)
-- `--start-of-month`: Align to calendar month start
-- Default: Rolling from first data point
-
-**Filtering Options:**
-- `--suffix USDT`: Filter by quote currency (default: USDT)
-- `--symbol BTC`: Filter by symbol prefix (e.g., BTC, ETH)
-
-**Output:**
-```
-┌────────────┬────────────┬─────────┬─────────────┐
-│ begin_date │ end_date   │ symbol  │ adv         │
-│ date       │ date       │ str     │ f64         │
-├────────────┼────────────┼─────────┼─────────────┤
-│ 2024-07-01 │ 2024-07-07 │ BTCUSDT │ 17212737298 │
-│ 2024-07-01 │ 2024-07-07 │ ETHUSDT │ 8268900000  │
-└────────────┴────────────┴─────────┴─────────────┘
-```
-
----
-
-### Step 10: Generate Weighted Indexes
-
-**Create** portfolio weights for top N symbols based on ADV.
-
-```bash
-# Top 25 symbols by ADV, weekly rebalancing on Mondays
-uv run python src/research/data_utils/calc_adv.py \
-  --input-file data/klines_aggregate/AGG_2024-07-01_2025-09-30.pq \
-  --interval 1 \
-  --units weeks \
-  --index-start-day monday \
-  --nsymbols 25 \
-  --output-dir data/klines_aggregate \
-  --plot
-
-# Creates: 
-#   - data/klines_aggregate/WEIGHTS_25_1_WEEK_2024-07-01_2025-09-30.pq
-#   - data/klines_aggregate/ADV_PLOT_1_WEEK_2024-07-01_2025-09-30.png
-#   - data/klines_aggregate/WEIGHTS_PLOT_25_1_WEEK_2024-07-01_2025-09-30.png
-```
-
-**Key Options:**
-- `--nsymbols 25`: Keep top 25 symbols per interval
-- `--plot`: Generate visualization charts
-- `--plot-symbols 10`: Number of symbols in plot (default: 10)
-- `--show-all`: Display all rows (no truncation)
-
-**What it does:**
-- Ranks symbols by ADV within each interval
-- Keeps top N symbols per interval
-- Calculates weights: `weight_i = adv_i / sum(top N adv)`
-- Weights sum to 1.0 per interval
-- Filters out mid-interval new listings
-- Ensures symbols have data from interval start
-
-**Output Schema:**
-```
-┌────────────┬────────────┬─────────┬─────────────┬────────┐
-│ begin_date │ end_date   │ symbol  │ adv         │ weight │
-│ date       │ date       │ str     │ f64         │ f64    │
-├────────────┼────────────┼─────────┼─────────────┼────────┤
-│ 2024-07-01 │ 2024-07-07 │ BTCUSDT │ 17212737298 │ 0.5697 │
-│ 2024-07-01 │ 2024-07-07 │ ETHUSDT │ 8268900000  │ 0.2737 │
-│ 2024-07-01 │ 2024-07-07 │ SOLUSDT │ 2648400000  │ 0.0877 │
-│ ...        │ ...        │ ...     │ ...         │ ...    │
-│ (sum of weights = 1.0 per interval)               │        │
-└────────────┴────────────┴─────────┴─────────────┴────────┘
-```
-
-**Use Cases:**
-- **Index Construction**: Use weights for portfolio allocation
-- **Rebalancing**: Update positions based on new weights each interval
-- **Backtesting**: Historical weights for strategy simulation
-- **Risk Management**: Diversification based on liquidity
-
----
-
-## Common Workflows
-
-### Initial Setup (First Time)
-
-```bash
-# 1. Bootstrap data (last 15 months)
-uv run python src/research/data_utils/bootstrap_klines.py --last 2025-09-30 --months 15
-
-# 2. Convert to parquet
-uv run python src/research/data_utils/update_klines.py --downloads-dir data/downloads --output-dir data/klines
-
-# 3. Create daily aggregates
-uv run python src/research/data_utils/make_daily.py --input-dir data/klines --output-dir data/klines_daily
-
-# 4. Create combined aggregate
-uv run python src/research/data_utils/make_aggregate.py \
-  --input-dir data/klines_daily \
-  --output-file data/klines_aggregate/AGG_2024-07-01_2025-09-30.pq \
-  --start-date 2024-07-01 --end-date 2025-09-30
-
-# 5. Generate weekly index weights
-uv run python src/research/data_utils/calc_adv.py \
-  --input-file data/klines_aggregate/AGG_2024-07-01_2025-09-30.pq \
-  --interval 1 --units weeks --index-start-day monday --nsymbols 25 \
+  --interval 1 --units weeks --nsymbols 25 \
   --output-dir data/klines_aggregate --plot
 ```
 
-### Monthly Update
+---
 
+### Validation & Debug Utilities (6 files)
+Find gaps, repair missing data, visualize, and validate.
+
+| File | Purpose | When to Use |
+|------|---------|-------------|
+| **check_missing.py** | Identify gaps in minute-level data | After downloading; before backtest |
+| **repair_missing.py** | Merge gap-fill data into existing files | After downloading missing data |
+| **debug_daily.py** | Inspect daily file structure/content | Ad-hoc troubleshooting |
+| **debug_gaps.py** | Find time series gaps | Ad-hoc gap detection |
+| **plot_daily.py** | Visualize daily price charts | Ad-hoc visualization |
+| **viewp.py** | Quick parquet file viewer | Ad-hoc inspection |
+
+**Gap Detection & Repair Workflow:**
 ```bash
-# 1. Download latest month
-uv run python src/research/data_utils/get_latest_klines.py --year 2025 --month 10 --output-dir data/downloads
-
-# 2. Update minute-level parquet
-uv run python src/research/data_utils/update_klines.py --downloads-dir data/downloads --output-dir data/klines
-
-# 3. Regenerate daily files
-uv run python src/research/data_utils/make_daily.py --input-dir data/klines --output-dir data/klines_daily
-
-# 4. Update aggregate
-uv run python src/research/data_utils/make_aggregate.py \
-  --input-dir data/klines_daily \
-  --output-file data/klines_aggregate/AGG_2024-07-01_2025-10-31.pq \
-  --start-date 2024-07-01 --end-date 2025-10-31
-
-# 5. Recalculate weights
-uv run python src/research/data_utils/calc_adv.py \
-  --input-file data/klines_aggregate/AGG_2024-07-01_2025-10-31.pq \
-  --interval 1 --units weeks --index-start-day monday --nsymbols 25 \
-  --output-dir data/klines_aggregate
-```
-
-### Gap Detection and Repair
-
-```bash
-# 1. Check for gaps
+# 1. Find gaps
 uv run python src/research/data_utils/check_missing.py \
-  --input-dir data/klines --output-dir data/check \
-  --start-date 2024-07-01 --end-date 2025-09-30
+  --input-dir data/klines --output-dir data/check
 
-# 2. Download missing data
-uv run python src/research/data_utils/download_missing.py \
-  --check-dir data/check --output-dir data/missing
+# 2. Download gap-fill data (manual or script)
+# ... download ZIPs from Binance to data/missing/ ...
 
 # 3. Repair gaps
 uv run python src/research/data_utils/repair_missing.py \
   --missing-dir data/missing --klines-dir data/klines
 
-# 4. IMPORTANT: Regenerate downstream files
-uv run python src/research/data_utils/make_daily.py --input-dir data/klines --output-dir data/klines_daily
-
-uv run python src/research/data_utils/make_aggregate.py \
-  --input-dir data/klines_daily \
-  --output-file data/klines_aggregate/AGG_2024-07-01_2025-09-30.pq \
-  --start-date 2024-07-01 --end-date 2025-09-30
-```
-
----
-
-## File Descriptions
-
-### Core Pipeline Scripts
-
-| Script | Purpose | Input | Output |
-|--------|---------|-------|--------|
-| `bootstrap_klines.py` | Initial historical download | Binance API | `data/downloads/` ZIPs |
-| `get_latest_klines.py` | Download latest month | Binance API | `data/downloads/` ZIPs |
-| `update_klines.py` | Convert ZIPs to parquet | `data/downloads/` | `data/klines/*.pq` |
-| `make_daily.py` | Aggregate to daily bars | `data/klines/` | `data/klines_daily/*.pq` |
-| `make_aggregate.py` | Combine all symbols | `data/klines_daily/` | `data/klines_aggregate/*.pq` |
-| `check_missing.py` | Detect data gaps | `data/klines/` | `data/check/*.csv` |
-| `download_missing.py` | Download gap-fill data | `data/check/` | `data/missing/` ZIPs |
-| `repair_missing.py` | Merge gap-fill data | `data/missing/` | Updates `data/klines/` |
-| `calc_adv.py` | Calculate ADV & weights | `data/klines_aggregate/` | ADV/WEIGHTS parquet + plots |
-
-### Utility Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `view_kline.py` | View parquet file contents |
-| `viewp.py` | View parquet with Polars |
-| `plot_daily.py` | Plot daily price charts |
-| `debug_gaps.py` | Debug time series gaps |
-| `debug_daily.py` | Validate daily aggregation |
-| `test_parse.py` | Test Binance ZIP parsing |
-
----
-
-## Data Schema
-
-### Minute-Level (klines)
-```python
-{
-    'open_time': datetime[ms],      # Bar start time
-    'open': float64,                # Open price
-    'high': float64,                # High price
-    'low': float64,                 # Low price
-    'close': float64,               # Close price
-    'volume': float64,              # Base asset volume
-    'close_time': datetime[ms],     # Bar end time
-    'quote_volume': float64,        # Quote asset volume (USD)
-    'count': int64,                 # Number of trades
-    'taker_buy_volume': float64,    # Taker buy base volume
-    'taker_buy_quote_volume': float64  # Taker buy quote volume
-}
-```
-
-### Daily-Level (klines_daily)
-```python
-{
-    'open_time': datetime[ms],      # Day start (00:00:00)
-    'open': float64,                # First minute open
-    'high': float64,                # Max of all minute highs
-    'low': float64,                 # Min of all minute lows
-    'close': float64,               # Last minute close
-    'volume': float64,              # Sum of minute volumes
-    'quote_volume': float64         # Sum of quote volumes (USD)
-}
-```
-
-### Aggregate (all symbols combined)
-```python
-{
-    'open_time': datetime[ms],      # Day start
-    'symbol': str,                  # Trading pair (e.g., BTCUSDT)
-    'open': float64,
-    'high': float64,
-    'low': float64,
-    'close': float64,
-    'volume': float64,
-    'quote_volume': float64
-}
-```
-
-### ADV Output
-```python
-{
-    'begin_date': date,             # Interval start
-    'end_date': date,               # Interval end
-    'symbol': str,
-    'adv': float64,                 # Average daily volume (USD)
-    'weight': float64               # Portfolio weight (if --nsymbols used)
-}
-```
-
----
-
-## Advanced Options
-
-### Custom Index Examples
-
-**Top 10 Monthly ADV (USDT pairs only):**
-```bash
-uv run python src/research/data_utils/calc_adv.py \
-  --input-file data/klines_aggregate/AGG_2024-07-01_2025-09-30.pq \
-  --interval 1 --units months --nsymbols 10 \
-  --suffix USDT --output-dir data/klines_aggregate
-```
-
-**BTC-related symbols, weekly, top 5:**
-```bash
-uv run python src/research/data_utils/calc_adv.py \
-  --input-file data/klines_aggregate/AGG_2024-07-01_2025-09-30.pq \
-  --interval 1 --units weeks --index-start-day monday \
-  --symbol BTC --nsymbols 5 --output-dir data/klines_aggregate
-```
-
-**Bi-weekly rebalancing, all symbols:**
-```bash
-uv run python src/research/data_utils/calc_adv.py \
-  --input-file data/klines_aggregate/AGG_2024-07-01_2025-09-30.pq \
-  --interval 2 --units weeks --index-start-day monday \
-  --suffix '' --output-dir data/klines_aggregate
-```
-
-**Quarterly review, top 50:**
-```bash
-uv run python src/research/data_utils/calc_adv.py \
-  --input-file data/klines_aggregate/AGG_2024-07-01_2025-09-30.pq \
-  --interval 3 --units months --nsymbols 50 \
-  --output-dir data/klines_aggregate --plot --plot-symbols 20
-```
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-**1. Schema Mismatch Errors**
-```
-Error: Cannot cast column 'quote_volume' from Int64 to Float64
-```
-**Solution:** Use `update_klines.py` which handles automatic schema casting.
-
-**2. Missing Data After Repair**
-```
-Gaps still showing after repair_missing.py
-```
-**Solution:** Remember to regenerate daily and aggregate files:
-```bash
+# 4. Regenerate downstream files
 uv run python src/research/data_utils/make_daily.py --input-dir data/klines --output-dir data/klines_daily
 uv run python src/research/data_utils/make_aggregate.py ...
 ```
 
-**3. Symbols Starting Mid-Week in Weights**
-```
-VOXELUSDT appearing with start time 10:30:00
-```
-**Solution:** This is now automatically filtered. The tool only includes symbols with data from the interval start (00:00:00).
+---
 
-**4. Timestamp Parsing Errors**
-```
-TypeError: cannot create expression literal for value of type Expr
-```
-**Solution:** Updated code now uses Python `date` objects instead of Polars expressions.
+### Documentation & Reference (2 files)
+
+| File | Purpose |
+|------|---------|
+| **PIPELINE_GUIDE.py** | Quick reference for CLI commands & file patterns (`python PIPELINE_GUIDE.py` to print) |
+| **CLEANUP_ANALYSIS.md** | Detailed analysis of code organization & redundancies |
+| **README.md** (this file) | Full documentation |
 
 ---
 
-## Performance Tips
+## 📊 Data Flow Diagram
 
-1. **Incremental Updates**: Only download and process new months
-2. **Parallel Processing**: Process multiple symbols simultaneously (future enhancement)
-3. **Parquet Compression**: Default zstd compression balances size and speed
-4. **Filter Early**: Use `--suffix` and `--symbol` to reduce data volume
-5. **Plot Selectively**: Use `--plot-symbols` to limit chart complexity
+```
+Binance Data
+    ↓
+[download] → data/downloads/ (ZIPs)
+    ↓
+[update_klines] → data/klines/ (1m parquet)
+    ↓
+[make_daily] → data/klines_daily/ (daily parquet)
+    ↓
+[make_aggregate] → data/klines_aggregate/ (combined daily)
+    ↓
+[calc_adv] → ADV + WEIGHTS parquet files
+    ↓
+[backtest] + [runlog] → run_metrics/ (parquet) + runlog.sqlite
+    ↓
+[duckdb_analytics / runlog_stats] → Cross-run analysis & ranking
+```
 
 ---
 
-## Dependencies
+## 🚀 Complete Workflows
 
-- Python 3.12+
-- Polars (DataFrame library)
-- Matplotlib (plotting)
+### Initial Setup (First Time)
+
+```bash
+# 1. Orchestrate entire pipeline for a month
+uv run python src/research/data_utils/pipeline.py \
+  --month 2025-01 \
+  --all-symbols
+
+# This automatically:
+#   - Downloads Binance data
+#   - Parses ZIPs to minute-level parquet
+#   - Aggregates to daily bars
+#   - Combines all symbols into aggregate file
+#   - Logs run to runlog.sqlite
+```
+
+---
+
+### Monthly Update
+
+```bash
+# 1. Run pipeline for latest month (skips download if you prefer)
+uv run python src/research/data_utils/pipeline.py \
+  --month 2025-02 \
+  --skip-download
+
+# 2. Calculate fresh ADV weights
+uv run python src/research/data_utils/calc_adv.py \
+  --input-file data/klines_aggregate/AGG_2024-07-01_2025-02-28.pq \
+  --interval 1 --units weeks --index-start-day monday \
+  --nsymbols 25 --output-dir data/klines_aggregate --plot
+```
+
+---
+
+### Running a Backtest with Run Logging
+
+```python
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src' / 'research'))
+
+from data_utils.runlog import log_run, write_metrics
+from data_utils.daily_loader import load_daily_concat
+from data_utils.detection_filters import apply_detection_filters
+
+# Load daily data
+df = load_daily_concat("data/klines_daily", symbol="BTCUSDT")
+
+# Apply detection filters
+df = apply_detection_filters(df, window=5, target=0.05)
+
+# Run backtest (your logic here)
+# ... compute returns, Sharpe, drawdown, etc ...
+sharpe = 1.85
+max_dd = -0.12
+
+# Log to runlog
+run_id = log_run(
+    command="backtest.py --symbol BTCUSDT --window 5",
+    config={"symbol": "BTCUSDT", "window": 5},
+    tags="daily,v2"
+)
+
+# Write metrics
+write_metrics(run_id, [
+    {"metric": "sharpe", "value": sharpe},
+    {"metric": "max_dd", "value": max_dd}
+])
+
+print(f"✅ Run logged: {run_id}")
+```
+
+Then query results:
+```bash
+uv run python src/research/data_utils/runlog_stats.py --top 10
+```
+
+---
+
+### Gap Detection & Repair
+
+```bash
+# 1. Check for gaps in minute-level data
+uv run python src/research/data_utils/check_missing.py \
+  --input-dir data/klines \
+  --output-dir data/check \
+  --start-date 2024-07-01 \
+  --end-date 2025-02-28
+
+# 2. Review results
+cat data/check/missing_*.csv
+
+# 3. Manually download missing ZIPs from Binance to data/missing/
+# (Or use download_missing.py if compatible with your setup)
+
+# 4. Repair gaps
+uv run python src/research/data_utils/repair_missing.py \
+  --missing-dir data/missing \
+  --klines-dir data/klines
+
+# 5. Regenerate daily & aggregate
+uv run python src/research/data_utils/make_daily.py \
+  --input-dir data/klines --output-dir data/klines_daily
+
+uv run python src/research/data_utils/make_aggregate.py \
+  --input-dir data/klines_daily \
+  --output-file data/klines_aggregate/AGG_2024-07-01_2025-02-28.pq \
+  --start-date 2024-07-01 --end-date 2025-02-28
+```
+
+---
+
+## 📋 File Descriptions (Detailed)
+
+### config.py
+```python
+"""Centralized configuration for all data utils scripts."""
+# Defines:
+#   - DATA_DIR = /workspace/data
+#   - KLINES_DIR, KLINES_DAILY_DIR, AGGREGATE_DIR, etc.
+#   - File naming patterns (KLINE_PATTERN, DAILY_PATTERN)
+#   - DEFAULT_SYMBOLS = [BTCUSDT, ETHUSDT, ...]
+#   - Feature flags (SKIP_DOWNLOAD, DRY_RUN, VERBOSE)
+```
+
+### pipeline.py
+```python
+"""5-step data pipeline orchestrator with logging & runlog integration."""
+# Usage: python pipeline.py --month 2025-01 --symbols BTCUSDT,ETHUSDT
+# Steps:
+#   1. Download from Binance
+#   2. Parse ZIPs → parquet
+#   3. Aggregate to daily
+#   4. Combine symbols
+#   5. Build indexes (optional)
+# All steps are logged with timestamps and run_id
+```
+
+### update_klines.py
+```python
+"""Parse downloaded Binance ZIP files into minute-level parquet."""
+# Handles:
+#   - CSV extraction from ZIPs
+#   - Timestamp conversion (string ms → datetime)
+#   - Schema matching & type casting
+#   - Duplicate removal & sorting
+#   - Append vs replace logic
+```
+
+### make_daily.py
+```python
+"""Aggregate minute-level parquet to daily OHLCV."""
+# Processes:
+#   - Groups by calendar day (UTC)
+#   - Calculates: open, high, low, close, volume
+# Output: One daily parquet file per symbol
+# New: process_directory() wrapper for batch processing
+```
+
+### make_aggregate.py
+```python
+"""Combine all daily parquet files into single aggregate."""
+# Inputs:
+#   - data/klines_daily/{SYMBOL}_daily_*.parquet
+# Output:
+#   - data/klines_aggregate/AGG_YYYY-MM-DD_YYYY-MM-DD.pq
+# Handles:
+#   - Symbol stacking
+#   - Date range filtering
+#   - Optimized for cross-symbol analysis
+```
+
+### runlog.py
+```python
+"""SQLite-backed run registry for backtest tracking."""
+# Key functions:
+#   - log_run(command, config, tags) → run_id
+#   - update_run(run_id, status, result_path)
+#   - write_metrics(run_id, metrics_list)
+#   - list_runs()
+# Schema: runs table with id, created_at, command, config_json, status, etc.
+```
+
+### daily_loader.py
+```python
+"""Robust loading of daily parquet files without brittle filenames."""
+# Key functions:
+#   - load_daily_lazy(dir, symbol=None) → Lazy DataFrame
+#   - load_daily_concat(dir, symbol=None) → Eager DataFrame
+# Handles:
+#   - Symbol filtering
+#   - Latest-per-symbol selection (for monthly file rotation)
+#   - Glob-based discovery (no hardcoded names)
+```
+
+### detection_filters.py
+```python
+"""5 signal detection variants for overfitting analysis."""
+# Filters:
+#   1. spread_pass: Detect multi-day trends (spread the move)
+#   2. cap_pass: Cap single-day moves
+#   3. updays_pass: Require consecutive up days
+#   4. smooth_pass: Smooth mean > threshold
+#   5. hybrid_pass: AND of all filters (most restrictive)
+# Output: DataFrame with 5 boolean columns
+```
+
+### calc_adv.py
+```python
+"""Calculate Average Daily Volume, portfolio weights, and plots."""
+# Options:
+#   - Interval: 1-N weeks/months
+#   - Alignment: rolling, start-of-month, index-start-day
+#   - Filtering: by suffix (USDT/USDC), symbol prefix
+#   - Ranking: top N symbols by ADV
+# Output: ADV parquet + optional WEIGHTS + plots
+```
+
+---
+
+## 🔄 Monthly Maintenance
+
+**Every Month:**
+1. Run pipeline for latest month
+2. Recalculate ADV & weights
+3. Check for gaps (optional)
+4. Log any infrastructure changes
+
+```bash
+# Entire monthly update in one command
+uv run python src/research/data_utils/pipeline.py --month 2025-02 --all-symbols
+
+# Then calculate new weights
+uv run python src/research/data_utils/calc_adv.py \
+  --input-file data/klines_aggregate/AGG_2024-07-01_2025-02-28.pq \
+  --interval 1 --units weeks --nsymbols 25 --output-dir data/klines_aggregate
+```
+
+---
+
+## ✅ Best Practices
+
+1. **Use pipeline.py**: Automates 5 steps with logging & error handling
+2. **Regenerate after repairs**: If you fix data gaps, always regenerate daily/aggregate
+3. **Version aggregates**: Include date range in filename (e.g., AGG_2024-07-01_2025-02-28.pq)
+4. **Check config.py**: All paths & symbols defined there; edit once, not in every script
+5. **Log your runs**: Use runlog to track backtest experiments; enables Sharpe ranking
+6. **Use daily_loader**: Don't hardcode filenames; use glob-based loader
+
+---
+
+## 🐛 Troubleshooting
+
+**Schema Mismatch After Update**
+```
+Error: Cannot cast column from Int64 to Float64
+```
+→ Use `update_klines.py` which handles auto-casting. If manual fix: regenerate daily/aggregate.
+
+**Pipeline Fails: "not implemented"**
+→ Ensure all imports work: `python -c "from research.data_utils.make_daily import process_directory"`
+
+**Missing Data After Repair**
+→ Did you regenerate daily & aggregate files? Required after any klines/ changes:
+```bash
+uv run python src/research/data_utils/make_daily.py --input-dir data/klines --output-dir data/klines_daily
+```
+
+**DuckDB Import Error**
+→ Optional dependency. Install with: `pip install duckdb` or `uv add duckdb`
+
+---
+
+## 📚 Dependencies
+
+- Python 3.10+
+- Polars (DataFrame operations)
 - Requests (HTTP downloads)
+- Matplotlib (plotting, optional)
+- DuckDB (analytics, optional)
 
-Install with:
+Install:
 ```bash
 uv sync
 ```
 
 ---
 
-## Notes
+## 🎓 Learning Path
 
-- **Data Source**: Binance perpetual futures historical data
-- **Resolution**: 1-minute bars (can aggregate to any timeframe)
-- **Update Frequency**: Monthly files available ~1 week after month end
-- **Symbol Coverage**: All PERPETUAL contract types
-- **Date Format**: UTC timezone, ISO 8601
-- **File Format**: Parquet with zstd compression
+**Beginner:**
+1. Read this README's "Quick Start" section
+2. Run: `python pipeline.py --month 2025-01 --dry-run`
+3. Run actual: `python pipeline.py --month 2025-01 --skip-download`
 
----
+**Intermediate:**
+1. Load daily data: `from data_utils.daily_loader import load_daily_concat`
+2. Apply filters: `from data_utils.detection_filters import apply_detection_filters`
+3. Log runs: `from data_utils.runlog import log_run, write_metrics`
 
-## Support & Documentation
-
-For issues or questions:
-1. Check error messages in terminal output
-2. Review troubleshooting section above
-3. Verify file paths and date ranges
-4. Ensure all dependencies are installed
+**Advanced:**
+1. Query with DuckDB: `from data_utils.duckdb_analytics import top_runs_by_sharpe`
+2. Build custom indexes: `from data_utils.calc_adv import calculate_adv`
+3. Parallel processing: (future enhancement)
 
 ---
 
-## License
+## 📞 Support
 
-Part of the cpp-crypto project.
+For issues:
+1. Check error message and traceback
+2. Review troubleshooting section
+3. Verify paths & date ranges are correct
+4. Check that dependencies are installed: `uv sync`
+5. Review detailed CLEANUP_ANALYSIS.md for file organization
+
+---
+
+## 📝 Notes
+
+- **Data Source**: Binance perpetual futures (1-minute bars)
+- **Update Frequency**: Monthly files available ~1 week after month-end
+- **Symbol Coverage**: All perpetual contract types (500+)
+- **Timezone**: UTC (all timestamps)
+- **Compression**: Parquet files use zstd (faster than gzip, better than snappy)
+
