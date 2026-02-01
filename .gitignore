@@ -26,6 +26,9 @@
 *.a
 *.lib
 
+# EXCEPTION: Include vendored static libraries in third_party
+!third_party/lib/*.a
+
 # Executables
 *.exe
 *.out
