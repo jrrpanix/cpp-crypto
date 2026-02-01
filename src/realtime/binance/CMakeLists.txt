@@ -14,17 +14,23 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Intelligently determine the dependency root directory
-# Use /opt/cpp-crypto-deps for CI, otherwise use project's install directory
+# Priority:
+#   1. CI environment: /opt/cpp-crypto-deps (precompiled optimized libraries)
+#   2. Offline/fallback: /workspace/third_party (vendored copy of dependencies)
+#
+# The third_party/ directory contains vendored headers and compiled libraries
+# for resilience against external project unavailability. This allows builds
+# even if original upstream projects become unavailable.
 if(EXISTS "/opt/cpp-crypto-deps/include")
     set(DEPS_ROOT "/opt/cpp-crypto-deps")
     message(STATUS "Using CI dependencies: ${DEPS_ROOT}")
 else()
-    set(DEPS_ROOT "${PROJECT_SRC_DIR}/install")
-    message(STATUS "Using local dependencies: ${DEPS_ROOT}")
+    set(DEPS_ROOT "${PROJECT_SRC_DIR}/third_party")
+    message(STATUS "Using vendored dependencies (offline fallback): ${DEPS_ROOT}")
 endif()
 
 # Add the dependency directories to the search paths
-include_directories(${DEPS_ROOT}/include)
+include_directories(${DEPS_ROOT})
 link_directories(${DEPS_ROOT}/lib)
 
 # Include directories
