@@ -13,6 +13,8 @@ from typing import List, Tuple
 
 import polars as pl
 
+from cli_utils import add_symbol_filter_arg
+
 
 def find_aggregate_file(aggregate_dir: Path) -> Path:
     """
@@ -255,11 +257,7 @@ Examples:
         default="/workspace/data/klines_aggregate",
         help="Directory containing aggregate parquet files (default: /workspace/data/klines_aggregate)"
     )
-    parser.add_argument(
-        "--symbol",
-        type=str,
-        help="Filter to symbols starting with this prefix (e.g., BTC, ETH, SOL)"
-    )
+    add_symbol_filter_arg(parser, help_text="Filter to symbols starting with this prefix (e.g., BTC, ETH, SOL)")
     parser.add_argument(
         "--show-clean",
         action="store_true",

@@ -6,6 +6,8 @@ from datetime import datetime
 
 import polars as pl
 
+from cli_utils import add_dir_arg
+
 
 def read_binance_zip(zip_path: str, existing_schema: dict = None) -> pl.DataFrame:
     """
@@ -193,17 +195,17 @@ def main():
     parser = argparse.ArgumentParser(
         description="Update kline files with the latest monthly downloads."
     )
-    parser.add_argument(
-        "--kline-dir",
-        type=str,
+    add_dir_arg(
+        parser,
+        "kline-dir",
         required=True,
-        help="Directory containing the existing kline files (e.g., in Parquet format).",
+        help_text="Directory containing the existing kline files (e.g., in Parquet format)"
     )
-    parser.add_argument(
-        "--download-dir",
-        type=str,
+    add_dir_arg(
+        parser,
+        "download-dir",
         required=True,
-        help="Directory containing the latest monthly Binance downloads (zip files).",
+        help_text="Directory containing the latest monthly Binance downloads (zip files)"
     )
 
     args = parser.parse_args()

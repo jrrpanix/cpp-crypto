@@ -8,6 +8,8 @@ from pathlib import Path
 
 import polars as pl
 
+from cli_utils import add_symbol_filter_arg
+
 
 def check_symbol_gaps(parquet_file: Path, symbol: str) -> None:
     """

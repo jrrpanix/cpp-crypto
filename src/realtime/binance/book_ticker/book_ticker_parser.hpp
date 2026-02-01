@@ -26,6 +26,10 @@ inline bool parse_book_ticker(simdjson::ondemand::parser &parser,
                               const std::string &s, BookTicker &bt,
                               bool set_recv_time,
                               const SymbolIdMap *symbol_lookup) {
+  // Fast detection: Futures has "e": field, Spot doesn't
+  // String search is much faster than simdjson find_field
+  bool is_futures = (s.find("\"e\":") != std::string::npos);
+  
   simdjson::padded_string padded(s);
   auto doc = parser.iterate(padded);
 
@@ -54,7 +58,9 @@ inline bool parse_book_ticker(simdjson::ondemand::parser &parser,
   bt.update_id = doc["u"].get_int64().value();
 
   if (symbol_lookup) {
-    std::string symbol = std::string(doc["s"].get_string().value());
+    std::string_view symbol_view = doc["s"].get_string().value();
+    // robin_hood map requires std::string for lookup, but we minimize scope
+    std::string symbol(symbol_view);
     auto it = symbol_lookup->find(symbol);
     if (it != symbol_lookup->end())
       bt.id = it->second;
@@ -63,9 +69,16 @@ inline bool parse_book_ticker(simdjson::ondemand::parser &parser,
     }
   }
 
-  bt.trade_time = doc["T"].get_int64().value();
-  int64_t event_time = doc["E"].get_int64().value();
-  bt.event_time_ms_midnight = epoch_ms_to_midnight_ms_utc(event_time);
+  if (is_futures) {
+    // Futures data path - has T and E fields, direct access
+    bt.trade_time = doc["T"].get_int64().value();
+    int64_t event_time = doc["E"].get_int64().value();
+    bt.event_time_ms_midnight = epoch_ms_to_midnight_ms_utc(event_time);
+  } else {
+    // Spot data path - no timestamps from exchange, use zeros
+    bt.trade_time = 0;
+    bt.event_time_ms_midnight = 0;
+  }
 
   if (set_recv_time) {
     bt.my_receive_time_ns = now_ns_since_epoch();

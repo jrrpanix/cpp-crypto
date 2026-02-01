@@ -12,6 +12,8 @@ from pathlib import Path
 
 import polars as pl
 
+from cli_utils import add_io_args, add_file_pattern_arg, add_dry_run_arg
+
 
 def aggregate_to_daily(df: pl.DataFrame) -> pl.DataFrame:
     """
@@ -145,29 +147,18 @@ def main():
     parser = argparse.ArgumentParser(
         description="Convert minute-bar parquet files to daily-bar summaries."
     )
-    parser.add_argument(
-        "--input-dir",
-        type=str,
-        default="/workspace/data/klines",
-        help="Input directory containing minute-bar parquet files (default: /workspace/data/klines)"
+    
+    # Use common CLI utilities
+    add_io_args(
+        parser,
+        input_default="/workspace/data/klines",
+        output_default="/workspace/data/klines_daily",
+        input_help="Input directory containing minute-bar parquet files",
+        output_help="Output directory for daily-bar parquet files"
     )
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        default="/workspace/data/klines_daily",
-        help="Output directory for daily-bar parquet files (default: /workspace/data/klines_daily)"
-    )
-    parser.add_argument(
-        "--pattern",
-        type=str,
-        default="*.parquet",
-        help="File pattern to match (default: *.parquet)"
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Don't write files, just show what would be done"
-    )
+    add_file_pattern_arg(parser)
+    add_dry_run_arg(parser)
+    
     parser.add_argument(
         "--file",
         type=str,

@@ -8,6 +8,8 @@ from pathlib import Path
 
 import polars as pl
 
+from cli_utils import add_symbol_filter_arg
+
 
 def check_daily_aggregation(symbol: str, klines_dir: Path, daily_dir: Path) -> None:
     """

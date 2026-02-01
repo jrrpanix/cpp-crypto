@@ -17,6 +17,8 @@ import polars as pl
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
+from cli_utils import add_dir_arg
+
 
 def find_aggregate_file(aggregate_dir: Path) -> Path:
     """
@@ -204,16 +206,16 @@ Examples:
         default="USDT",
         help="Symbol suffix (default: USDT)"
     )
-    parser.add_argument(
-        "--aggregate-dir",
-        type=str,
+    add_dir_arg(
+        parser,
+        "aggregate-dir",
         default="/workspace/data/klines_aggregate",
-        help="Directory containing aggregate parquet files (default: /workspace/data/klines_aggregate)"
+        help_text="Directory containing aggregate parquet files"
     )
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        help="Directory to save plot image (optional)"
+    add_dir_arg(
+        parser,
+        "output-dir",
+        help_text="Directory to save plot image (optional)"
     )
     parser.add_argument(
         "--no-show",

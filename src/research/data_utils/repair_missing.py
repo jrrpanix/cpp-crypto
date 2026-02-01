@@ -13,6 +13,7 @@ from pathlib import Path
 import polars as pl
 
 from update_klines import read_binance_zip
+from cli_utils import add_symbol_filter_arg
 
 
 def extract_symbol_from_filename(filename: str) -> str:
@@ -383,11 +384,7 @@ Examples:
         action="store_true",
         help="Check all mode: process all files and save to check directory (no actual updates)"
     )
-    parser.add_argument(
-        "--symbol",
-        type=str,
-        help="Filter to symbols starting with this prefix (e.g., BTC, ETH, SOL)"
-    )
+    add_symbol_filter_arg(parser, help_text="Filter to symbols starting with this prefix (e.g., BTC, ETH, SOL)")
     
     args = parser.parse_args()
     

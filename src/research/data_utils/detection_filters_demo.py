@@ -1,6 +1,6 @@
 """Quick demo to compare detection variants on a CSV of daily bars.
 Usage:
-  uv run python src/research/signal_utils/detection_filters_demo.py --csv path/to/daily.csv
+  uv run python src/research/data_utils/detection_filters_demo.py --csv path/to/daily.csv
 Columns expected: date, close (others ignored)
 """
 
@@ -16,13 +16,13 @@ import polars as pl
 
 # Support running as script from repo root or within package
 try:
-    from signal_utils.detection_filters import apply_detection_filters  # type: ignore
+    from data_utils.detection_filters import apply_detection_filters  # type: ignore
 except ImportError:
     here = os.path.abspath(os.path.dirname(__file__))
     root = os.path.abspath(os.path.join(here, "..", ".."))  # points to src/
     if root not in sys.path:
         sys.path.insert(0, root)
-    from research.signal_utils.detection_filters import apply_detection_filters  # type: ignore
+    from research.data_utils.detection_filters import apply_detection_filters  # type: ignore
 
 
 def run(csv_path: Path, window: int = 5) -> None:

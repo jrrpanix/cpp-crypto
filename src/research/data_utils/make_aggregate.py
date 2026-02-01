@@ -13,6 +13,8 @@ from pathlib import Path
 
 import polars as pl
 
+from cli_utils import add_io_args, add_dry_run_arg
+
 
 def get_date_range(df: pl.DataFrame) -> tuple[str, str]:
     """
@@ -146,23 +148,16 @@ def main():
     parser = argparse.ArgumentParser(
         description="Combine all daily parquet files into a single aggregated file."
     )
-    parser.add_argument(
-        "--input-dir",
-        type=str,
-        default="/workspace/data/klines_daily",
-        help="Input directory containing daily parquet files (default: /workspace/data/klines_daily)"
+    
+    # Use common CLI utilities
+    add_io_args(
+        parser,
+        input_default="/workspace/data/klines_daily",
+        output_default="/workspace/data/klines_aggregate",
+        input_help="Input directory containing daily parquet files",
+        output_help="Output directory for aggregated file"
     )
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        default="/workspace/data/klines_aggregate",
-        help="Output directory for aggregated file (default: /workspace/data/klines_aggregate)"
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Don't write file, just show what would be done"
-    )
+    add_dry_run_arg(parser)
     
     args = parser.parse_args()
     
