@@ -1,162 +1,146 @@
 # 🚀 Crypto Trading & Research Platform
 
-A high-performance C++/Python platform for real-time crypto data processing and quantitative research. This project is architected for a clean separation between a low-latency C++ core and a flexible Python research environment, all managed with Docker.
+High-performance C++/Python platform for real-time crypto data processing and quantitative research. Clean separation between low-latency C++ engine and flexible Python research environment, all managed with Docker.
 
 ---
 
-## Core Components
+## 🏗️ Architecture
 
-- **Real-time Engine (C++):** A C++17-based application for consuming and processing high-frequency data from Binance. It uses a lock-free, multi-threaded design to minimize latency.
-- **Research & Data Utilities (Python):** A suite of Python scripts using libraries like Polars and Pandas for data acquisition, analysis, and signal generation.
-- **Backtest Webapp:** A web-based interface for testing window-based trading strategies on historical data with comprehensive performance analytics.
+- **C++ Engine (`cpp/`)**: Real-time data processing with lock-free, multi-threaded design for Binance WebSocket feeds
+- **Python Research (`python/`)**: Data pipeline, signal generation, and analysis using Polars/Pandas
+- **Backtest Webapp**: Web interface for testing trading strategies with performance analytics
+- **Docker Dev Environment**: Consistent Ubuntu 22.04 container with all dependencies
 
 ---
 
 ## 🚀 Quick Start
 
-### Live Data WebSocket
+### Development Container
 ```bash
-# Test mode with mock data
-make run-websocket
+# Build image, start container, and get shell (all-in-one)
+make dev
+
+# Inside container, compile C++ code
+cd cpp/src/binance && make
+
+# Run Python scripts
+uv run python python/research/data_utils/script.py
+```
+
+### Services
+
+```bash
+# Backtest webapp (port 8084)
+make backtest
+# Access: http://localhost:8084
+
+# WebSocket server (port 8082)  
+make websocket
 # Access: http://localhost:8082
 
-# Live Binance data
-make run-live-websocket
-# Access: http://localhost:8083
+# View logs
+make logs
+
+# Stop all services
+make stop
 ```
 
-### Backtest Analysis Webapp
+See [Backtest Quick Start](docs/BACKTEST_QUICKSTART.md) for detailed usage.
+
+---
+
+## 📈 Monthly Data Update Workflow
+
+**Quick update (inside dev container):**
 ```bash
-# Start backtest webapp
-make run-backtest
-# Access: http://localhost:8084
-```
-See [Backtest Quick Start Guide](docs/BACKTEST_QUICKSTART.md) for detailed usage.
-
----
-
-## 🛠️ Development Workflow
-
-**First Time Setup:**
-```sh
-# 1. Configure your data directory location
-cp .env.example .env
-# Edit .env to set DATA_DIR to your data location
-# See docs/DATA_DIRECTORY_SETUP.md for details
-
-# 2. Build the development image
-make build-dev
+bash /workspace/scripts/monthly_data_update.sh
 ```
 
-All development is done inside a Docker container. The `Makefile` provides a simple interface for managing the environment.
+This automated script:
+1. Downloads latest monthly ZIP files from Binance
+2. Processes ZIPs into minute-level parquet files
+3. Aggregates to daily data
+4. Calculates ADV (Average Daily Volume)
+5. Generates 5 indexes with monthly rebalancing:
+   - **IX10**: Top 10 by ADV (mega-cap)
+   - **IX10EXBTC**: Top 10 excluding BTC (alt mega-cap)
+   - **IX60**: Mid 60 (ranks 11-70)
+   - **IX100**: Small 100 (ranks 71-170)
+   - **IX130**: Tiny 130 (ranks 171-300)
+6. Creates `AGG_WITH_INDEXES.pq` combining all data
 
-1.  **Build the development image:**
-    ```sh
-    make build-dev
-    ```
+**Manual steps:**
 
-2.  **Start the container in the background:**
-    ```sh
-    make run-dev
-    ```
+```bash
+# 1. Download latest month (example: Feb 2026)
+python python/research/data_utils/get_latest_klines.py \
+  --year 2026 --month 2 \
+  --symbol-file ~/github/data/symbols.csv \
+  --dest-dir ~/github/data/downloads
 
-3.  **Get a shell inside the running container:**
-    ```sh
-    make shell-dev
-    ```
+# 2. Process ZIPs to minute parquet
+python python/research/data_utils/update_klines.py \
+  --kline-dir ~/github/data/klines \
+  --download-dir ~/github/data/downloads
 
-4.  **Compile all C++ applications (inside the container):**
-    ```sh
-    make build-code
-    ```
+# 3. Aggregate to daily
+python python/research/data_utils/make_daily_klines.py
 
-5.  **Stop the development container when finished:**
-    ```sh
-    make stop-dev
-    ```
+# 4. Build indexes (monthly rebalancing only - weekly is broken)
+python python/research/data_utils/build_index.py \
+  --interval 1 --units months
 
-> **Note**: If you haven't set up your data directory, see [Data Directory Setup Guide](docs/DATA_DIRECTORY_SETUP.md)
+# 5. Combine everything
+python python/research/data_utils/make_aggregate_with_indexes.py
+```
 
----
-
-## 📈 Data Workflow: Bootstrapping and Updating Kline Data
-
-This workflow details the process for building and maintaining a local dataset of **Binance Perpetual Futures** kline data in the efficient Parquet format. It does not handle spot data.
-
-### Step 1 (Option A): Initial Data Bootstrap
-
-If you are starting with an empty database, use the `bootstrap_klines.py` script to perform a large-scale historical data download.
-
-1.  **Run the bootstrap script:**
-    ```sh
-    # This will download the last 13 months of 1-minute kline data.
-    python src/research/data_utils/bootstrap_klines.py
-    ```
-2.  **What it does:** The script downloads monthly kline data as `.zip` files into the `data/downloads/` directory.
-    - If a `symbols.csv` file exists in the root directory, it will download data for the symbols listed in that file.
-    - If `symbols.csv` does **not** exist, the script will automatically create it by querying the Binance API for a list of all currently tradeable perpetual futures contracts.
-    - This initial download can take a very long time and consume significant disk space.
-
-### Step 1 (Option B): Incremental Monthly Update
-
-If you already have a historical dataset, use `get_latest_klines.py` to download only the most recent monthly data.
-
-1.  **Run the download script:**
-    ```sh
-    # Example: Download October 2025 data for all symbols in symbols.csv
-    python src/research/data_utils/get_latest_klines.py \
-        --symbol-file symbols.csv \
-        --dest-dir data/downloads \
-        --year 2025 \
-        --month 10
-    ```
-2.  **What it does:** The script reads the specified symbol file and downloads the `.zip` archive for the given year and month into the destination directory, organized by symbol.
-
-### Step 2: Process ZIPs and Update Parquet Files
-
-After downloading the raw `.zip` files (either via bootstrapping or incremental update), you must process them into the final Parquet format. This script intelligently scans the download directory and updates any corresponding kline files with new monthly data.
-
-1.  **Run the update script:**
-    ```sh
-    # Example: Process all downloaded ZIPs and append to their respective Parquet files
-    python src/research/data_utils/update_klines.py \
-        --kline-dir data/klines \
-        --download-dir data/downloads
-    ```
-2.  **What it does:** The script scans the `download-dir` for any `.zip` files, extracts the kline data, and efficiently appends it to the corresponding consolidated Parquet file in the `kline-dir`. It automatically handles file renaming to reflect the new date range.
+> **Note**: Weekly rebalancing produces incorrect results due to ISO week grouping bug causing -98% drops. Use monthly only.
 
 ---
 
-## 📁 Project Layout
-
-The project is organized into distinct `realtime` and `research` components.
+## 📁 Project Structure
 
 ```plaintext
-/
-├── Makefile                  # Main entrypoint for all build/run commands
-├── docker/                   # Dockerfiles and docker-compose configurations
-│   ├── Dockerfile.dev
-│   ├── Dockerfile.runtime
-│   └── docker-compose.yml
-├── src/
-│   ├── realtime/             # C++ source for low-latency applications
-│   │   ├── binance/
-│   │   └── consumer/
-│   └── research/             # Python source for data analysis and utilities
-│       ├── data_utils/
-│       └── signal_utils/
-├── data/                     # (Git-ignored) Kline data, downloads, etc.
-├── apps/                     # (Git-ignored) Compiled C++ binaries
-└── pyproject.toml            # Python dependencies
-```
-
----
-
-## ✅ TODO
-
-* [ ] Prometheus metrics support
-* [ ] Auto-reconnect logic
-* [ ] Redis or DuckDB symbol mapping option
-* [ ] YAML or TOML configuration migration
-* [ ] Web dashboard view of consumer status
+cpp-crypto/
+├── Makefile                      # Simple commands: dev, backtest, websocket, stop, logs
+├── docker/
+│   ├── Dockerfile.dev            # Ubuntu dev container
+│   ├── Dockerfile.backtest       # Backtest webapp image  
+│   └── compose/                  # Service configurations
+│       ├── backtest.yml
+│       └── websocket.yml
+├── cpp/                          # C++ realtime engine
+│   ├── src/                      # Source code
+│   │   ├── binance/              # Binance client
+│   │   ├── consumer/             # Data consumer
+│   │   ├── bars/                 # Bar aggregation
+│   │   └── common/               # Utilities
+│   ├── third_party/              # Dependencies (simdjson, ixwebsocket, etc.)
+│   └── apps/                     # Compiled binaries (gitignored)
+├── python/                       # Python research & webapps
+│   ├── research/
+│   │   ├── data_utils/           # Data pipeline scripts
+│   │   │   ├── core/             # Bootstrap, update klines
+│   │   │   ├── utils/            # Daily agg, index building
+│   │   │   ├── experimental/     # calc_adv, analysis
+│   │   │   └── debug/            # Inspection tools
+│   │   ├── signal_utils/         # Strategy implementations
+│   │   ├── notebooks/            # Jupyter analysis
+│   │   └── ml/                   # Machine learning (local only)
+│   ├── backtest/
+│   │   ├── api/                  # Flask backend (backtest_api.py)
+│   │   └── frontend/             # HTML/JS webapp
+│   ├── pyproject.toml            # Python dependencies (uv)
+│   └── .venv/                    # Virtual environment (gitignored)
+├── config/                       # Configuration files
+│   └── binance/
+├── scripts/                      # Helper scripts
+│   └── monthly_data_update.sh
+├── data/                         # Data directory (external, mounted)
+│   ├── downloads/                # Monthly ZIP files
+│   ├── klines/                   # Minute parquet files
+│   ├── klines_daily/             # Daily aggregated data
+│   ├── klines_index/             # Index files (IX10, IX60, etc.)
+│   └── klines_aggregate/         # Combined AGG_WITH_INDEXES.pq
+└── docs/                         # Documentation
 
