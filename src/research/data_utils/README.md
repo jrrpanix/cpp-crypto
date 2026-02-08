@@ -5,42 +5,46 @@ A comprehensive toolkit for downloading, processing, analyzing, and backtesting 
 ## 🎯 Quick Start
 
 ```bash
-# Full pipeline: download → parse → daily → aggregate → index
-uv run python src/research/data_utils/pipeline.py --month 2025-01 --all-symbols
+# Monthly data update (recommended workflow)
+# See: docs/MONTHLY_UPDATE_WORKFLOW.md
+bash scripts/monthly_data_update.sh
 
 # Or individual steps
-uv run python src/research/data_utils/make_daily.py       # 1m → daily bars
-uv run python src/research/data_utils/make_aggregate.py   # Combine symbols
-uv run python src/research/data_utils/calc_adv.py         # Calculate weights
+uv run python src/research/data_utils/core/make_daily.py       # 1m → daily bars
+uv run python src/research/data_utils/core/make_aggregate.py   # Combine symbols
+uv run python src/research/data_utils/core/build_index.py      # Build indexes with ADV weights
 
 # Track runs & rank by Sharpe
-uv run python src/research/data_utils/runlog_stats.py
+uv run python src/research/data_utils/utils/runlog_stats.py
 ```
 
 ---
 
 ## 📁 File Organization
 
-### Core Pipeline (5 files)
+### Core Pipeline (4 files)
 Essential files for the data workflow. Use these for monthly updates.
 
 | File | Purpose | How to Use |
 |------|---------|-----------|
 | **config.py** | Centralized paths & settings | Imported by all scripts |
-| **pipeline.py** | Orchestrates all 5 steps | `pipeline.py --month 2025-01 --all-symbols` |
-| **update_klines.py** | Parse Binance ZIPs → parquet | Called by pipeline |
-| **make_daily.py** | Aggregate 1m bars → daily OHLCV | Called by pipeline or standalone |
-| **make_aggregate.py** | Combine daily files (all symbols) | Called by pipeline or standalone |
+| **core/update_klines.py** | Parse Binance ZIPs → parquet | `core/update_klines.py --input-dir data/downloads` |
+| **core/make_daily.py** | Aggregate 1m bars → daily OHLCV | `core/make_daily.py --input-dir data/klines` |
+| **core/make_aggregate.py** | Combine daily files (all symbols) | `core/make_aggregate.py --output-file AGG_*.pq` |
 
 **Monthly Workflow:**
 ```bash
-# Pipeline automates all these steps:
-uv run python src/research/data_utils/pipeline.py --month 2025-02 --skip-download
-# Equivalent to:
-#  1. update_klines() - parse ZIPs
-#  2. make_daily() - create daily files
-#  3. make_aggregate() - combine symbols
-#  4. (optional) build indexes
+# Automated script handles all steps:
+bash scripts/monthly_data_update.sh
+
+# Or manually:
+#  1. Download data from Binance (get_latest_klines.py)
+#  2. Parse ZIPs (update_klines.py --mode replace)
+#  3. Create daily files (make_daily.py)
+#  4. Aggregate all symbols (make_aggregate.py)
+#  5. Build indexes (build_index.py)
+
+# See complete instructions: docs/MONTHLY_UPDATE_WORKFLOW.md
 ```
 
 ---
@@ -97,11 +101,11 @@ Track backtest runs, rank by Sharpe ratio, analyze cross-run metrics.
 
 | File | Purpose | When to Use |
 |------|---------|-------------|
-| **runlog.py** | SQLite registry for run metadata | Imported by pipeline & backtests |
-| **runlog_demo.py** | Example: log a run & query results | `python runlog_demo.py` |
-| **runlog_stats.py** | Query runs, rank by Sharpe | `runlog_stats.py --top 20` |
-| **duckdb_analytics.py** | Optional SQL-based analytics | Advanced queries; requires duckdb |
-| **duckdb_analytics_demo.py** | Example DuckDB queries | `python duckdb_analytics_demo.py` |
+| **utils/runlog.py** | SQLite registry for run metadata | Imported by pipeline & backtests |
+| **experimental/runlog_demo.py** | Example: log a run & query results | `python experimental/runlog_demo.py` |
+| **utils/runlog_stats.py** | Query runs, rank by Sharpe | `utils/runlog_stats.py --top 20` |
+| **experimental/duckdb_analytics.py** | Optional SQL-based analytics | Advanced queries; requires duckdb |
+| **experimental/duckdb_analytics_demo.py** | Example DuckDB queries | `python experimental/duckdb_analytics_demo.py` |
 
 **Typical Usage:**
 ```python
@@ -129,7 +133,7 @@ Robust utilities for loading daily data without brittle filenames.
 
 | File | Purpose |
 |------|---------|
-| **daily_loader.py** | Load daily parquet files by symbol/glob; handles monthly file rotation |
+| **utils/daily_loader.py** | Load daily parquet files by symbol/glob; handles monthly file rotation |
 
 **Example:**
 ```python
@@ -149,7 +153,7 @@ df = load_daily_concat("data/klines_daily", symbol="BTCUSDT")
 
 | File | Purpose |
 |------|---------|
-| **detection_filters.py** | Apply 5 detection variants side-by-side for A/B testing |
+| **experimental/detection_filters.py** | Apply 5 detection variants side-by-side for A/B testing |
 
 **Example:**
 ```python
@@ -174,8 +178,8 @@ Specialized calculations for ADV, weights, and indexes.
 
 | File | Lines | Purpose | Frequency |
 |------|-------|---------|-----------|
-| **calc_adv.py** | 840 | Calculate ADV, portfolio weights, generate plots | Monthly+ |
-| **build_index.py** | 570 | Build market indexes from daily data | Occasionally |
+| **experimental/calc_adv.py** | 840 | Calculate ADV, portfolio weights, generate plots | Ad-hoc analysis |
+| **core/build_index.py** | 570 | Build market indexes with ADV weighting | Monthly (automated) |
 
 **ADV Example:**
 ```bash
@@ -193,29 +197,29 @@ Find gaps, repair missing data, visualize, and validate. All use cli_utils.py fo
 
 | File | Purpose | When to Use |
 |------|---------|-------------|
-| **check_missing.py** | Identify gaps in minute-level data | After downloading; before backtest |
-| **repair_missing.py** | Merge gap-fill data into existing files | After downloading missing data |
-| **debug_daily.py** | Inspect daily file structure/content | Ad-hoc troubleshooting |
-| **debug_gaps.py** | Find time series gaps | Ad-hoc gap detection |
-| **plot_daily.py** | Visualize daily price charts | Ad-hoc visualization |
-| **viewp.py** | Quick parquet file viewer | Ad-hoc inspection |
+| **debug/check_missing.py** | Identify gaps in minute-level data | After downloading; before backtest |
+| **debug/repair_missing.py** | Merge gap-fill data into existing files | After downloading missing data |
+| **debug/debug_daily.py** | Inspect daily file structure/content | Ad-hoc troubleshooting |
+| **debug/debug_gaps.py** | Find time series gaps | Ad-hoc gap detection |
+| **debug/plot_daily.py** | Visualize daily price charts | Ad-hoc visualization |
+| **debug/viewp.py** | Quick parquet file viewer | Ad-hoc inspection |
 
 **Gap Detection & Repair Workflow:**
 ```bash
 # 1. Find gaps
-uv run python src/research/data_utils/check_missing.py \
+uv run python src/research/data_utils/debug/check_missing.py \
   --input-dir data/klines --output-dir data/check
 
 # 2. Download gap-fill data (manual or script)
 # ... download ZIPs from Binance to data/missing/ ...
 
 # 3. Repair gaps
-uv run python src/research/data_utils/repair_missing.py \
+uv run python src/research/data_utils/debug/repair_missing.py \
   --missing-dir data/missing --klines-dir data/klines
 
 # 4. Regenerate downstream files
-uv run python src/research/data_utils/make_daily.py --input-dir data/klines --output-dir data/klines_daily
-uv run python src/research/data_utils/make_aggregate.py ...
+uv run python src/research/data_utils/core/make_daily.py --input-dir data/klines --output-dir data/klines_daily
+uv run python src/research/data_utils/core/make_aggregate.py ...
 ```
 
 ---
@@ -224,9 +228,8 @@ uv run python src/research/data_utils/make_aggregate.py ...
 
 | File | Purpose |
 |------|---------|
-| **PIPELINE_GUIDE.py** | Quick reference for CLI commands & file patterns (`python PIPELINE_GUIDE.py` to print) |
-| **CLEANUP_ANALYSIS.md** | Detailed analysis of code organization & redundancies |
 | **README.md** (this file) | Full documentation |
+| **../../docs/MONTHLY_UPDATE_WORKFLOW.md** | Complete monthly data update instructions |
 
 ---
 
@@ -257,17 +260,23 @@ Binance Data
 ### Initial Setup (First Time)
 
 ```bash
-# 1. Orchestrate entire pipeline for a month
-uv run python src/research/data_utils/pipeline.py \
-  --month 2025-01 \
-  --all-symbols
+# 1. Download latest data from Binance
+uv run python src/research/data_utils/core/get_latest_klines.py \
+  --output-dir /workspace/data/downloads \
+  --symbols-file apps/config/binance/perp_usdt_symbols.txt
+
+# 2. Run complete monthly update
+bash scripts/monthly_data_update.sh
 
 # This automatically:
-#   - Downloads Binance data
 #   - Parses ZIPs to minute-level parquet
 #   - Aggregates to daily bars
 #   - Combines all symbols into aggregate file
-#   - Logs run to runlog.sqlite
+#   - Builds 5 market indexes (IX10, IX10EXBTC, IX60, IX100, IX130)
+#   - Generates AGG_WITH_INDEXES file for frontend
+#   - Creates WEIGHTS files for each index
+
+# See: docs/MONTHLY_UPDATE_WORKFLOW.md for complete instructions
 ```
 
 ---
@@ -275,16 +284,37 @@ uv run python src/research/data_utils/pipeline.py \
 ### Monthly Update
 
 ```bash
-# 1. Run pipeline for latest month (skips download if you prefer)
-uv run python src/research/data_utils/pipeline.py \
-  --month 2025-02 \
-  --skip-download
+# Complete monthly workflow (recommended)
+bash scripts/monthly_data_update.sh
 
-# 2. Calculate fresh ADV weights
-uv run python src/research/data_utils/calc_adv.py \
-  --input-file data/klines_aggregate/AGG_2024-07-01_2025-02-28.pq \
-  --interval 1 --units weeks --index-start-day monday \
-  --nsymbols 25 --output-dir data/klines_aggregate --plot
+# Or step-by-step:
+
+# 1. Download latest data
+uv run python src/research/data_utils/core/get_latest_klines.py \
+  --output-dir /workspace/data/downloads \
+  --symbols-file apps/config/binance/perp_usdt_symbols.txt
+
+# 2. Parse new ZIPs (replaces all existing minute data)
+uv run python src/research/data_utils/core/update_klines.py \
+  --input-dir /workspace/data/downloads \
+  --output-dir /workspace/data/klines \
+  --mode replace
+
+# 3. Regenerate daily aggregates
+uv run python src/research/data_utils/core/make_daily.py \
+  --input-dir /workspace/data/klines \
+  --output-dir /workspace/data/klines_daily
+
+# 4. Rebuild main aggregate file
+uv run python src/research/data_utils/core/make_aggregate.py \
+  --input-dir /workspace/data/klines_daily \
+  --output-file /workspace/data/klines_aggregate/AGG_2024-07-01_2025-01-31.pq \
+  --start-date 2024-07-01 --end-date 2025-01-31
+
+# 5. Build all indexes (generates AGG_WITH_INDEXES and WEIGHTS files)
+bash scripts/monthly_data_update.sh  # Or run build_index.py for each index
+
+# See: docs/MONTHLY_UPDATE_WORKFLOW.md for complete instructions
 ```
 
 ---
@@ -297,9 +327,9 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src' / 'research'))
 
-from data_utils.runlog import log_run, write_metrics
-from data_utils.daily_loader import load_daily_concat
-from data_utils.detection_filters import apply_detection_filters
+from data_utils.utils.runlog import log_run, write_metrics
+from data_utils.utils.daily_loader import load_daily_concat
+from data_utils.experimental.detection_filters import apply_detection_filters
 
 # Load daily data
 df = load_daily_concat("data/klines_daily", symbol="BTCUSDT")
@@ -330,7 +360,7 @@ print(f"✅ Run logged: {run_id}")
 
 Then query results:
 ```bash
-uv run python src/research/data_utils/runlog_stats.py --top 10
+uv run python src/research/data_utils/utils/runlog_stats.py --top 10
 ```
 
 ---
@@ -339,7 +369,7 @@ uv run python src/research/data_utils/runlog_stats.py --top 10
 
 ```bash
 # 1. Check for gaps in minute-level data
-uv run python src/research/data_utils/check_missing.py \
+uv run python src/research/data_utils/debug/check_missing.py \
   --input-dir data/klines \
   --output-dir data/check \
   --start-date 2024-07-01 \
@@ -349,18 +379,18 @@ uv run python src/research/data_utils/check_missing.py \
 cat data/check/missing_*.csv
 
 # 3. Manually download missing ZIPs from Binance to data/missing/
-# (Or use download_missing.py if compatible with your setup)
+# (Or use debug/download_missing.py if compatible with your setup)
 
 # 4. Repair gaps
-uv run python src/research/data_utils/repair_missing.py \
+uv run python src/research/data_utils/debug/repair_missing.py \
   --missing-dir data/missing \
   --klines-dir data/klines
 
 # 5. Regenerate daily & aggregate
-uv run python src/research/data_utils/make_daily.py \
+uv run python src/research/data_utils/core/make_daily.py \
   --input-dir data/klines --output-dir data/klines_daily
 
-uv run python src/research/data_utils/make_aggregate.py \
+uv run python src/research/data_utils/core/make_aggregate.py \
   --input-dir data/klines_daily \
   --output-file data/klines_aggregate/AGG_2024-07-01_2025-02-28.pq \
   --start-date 2024-07-01 --end-date 2025-02-28
@@ -394,20 +424,7 @@ uv run python src/research/data_utils/make_aggregate.py \
 # Impact: Reduces CLI code by 50-70% across 8 scripts
 ```
 
-### pipeline.py
-```python
-"""5-step data pipeline orchestrator with logging & runlog integration."""
-# Usage: python pipeline.py --month 2025-01 --symbols BTCUSDT,ETHUSDT
-# Steps:
-#   1. Download from Binance
-#   2. Parse ZIPs → parquet
-#   3. Aggregate to daily
-#   4. Combine symbols
-#   5. Build indexes (optional)
-# All steps are logged with timestamps and run_id
-```
-
-### update_klines.py
+### core/update_klines.py
 ```python
 """Parse downloaded Binance ZIP files into minute-level parquet."""
 # Handles:
@@ -418,7 +435,7 @@ uv run python src/research/data_utils/make_aggregate.py \
 #   - Append vs replace logic
 ```
 
-### make_daily.py
+### core/make_daily.py
 ```python
 """Aggregate minute-level parquet to daily OHLCV."""
 # Processes:
@@ -429,7 +446,7 @@ uv run python src/research/data_utils/make_aggregate.py \
 # Uses cli_utils.py for CLI (reduced from 34 lines to 15)
 ```
 
-### make_aggregate.py
+### core/make_aggregate.py
 ```python
 """Combine all daily parquet files into single aggregate."""
 # Inputs:
@@ -443,7 +460,7 @@ uv run python src/research/data_utils/make_aggregate.py \
 # Uses cli_utils.py for CLI (reduced from 24 lines to 12)
 ```
 
-### runlog.py
+### utils/runlog.py
 ```python
 """SQLite-backed run registry for backtest tracking."""
 # Key functions:
@@ -454,7 +471,7 @@ uv run python src/research/data_utils/make_aggregate.py \
 # Schema: runs table with id, created_at, command, config_json, status, etc.
 ```
 
-### daily_loader.py
+### utils/daily_loader.py
 ```python
 """Robust loading of daily parquet files without brittle filenames."""
 # Key functions:
@@ -466,7 +483,7 @@ uv run python src/research/data_utils/make_aggregate.py \
 #   - Glob-based discovery (no hardcoded names)
 ```
 
-### detection_filters.py
+### experimental/detection_filters.py
 ```python
 """5 signal detection variants for overfitting analysis."""
 # Filters:
@@ -478,7 +495,7 @@ uv run python src/research/data_utils/make_aggregate.py \
 # Output: DataFrame with 5 boolean columns
 ```
 
-### calc_adv.py
+### experimental/calc_adv.py
 ```python
 """Calculate Average Daily Volume, portfolio weights, and plots."""
 # Options:
@@ -494,32 +511,36 @@ uv run python src/research/data_utils/make_aggregate.py \
 ## 🔄 Monthly Maintenance
 
 **Every Month:**
-1. Run pipeline for latest month
-2. Recalculate ADV & weights
+1. Download latest Binance data
+2. Run monthly_data_update.sh script
 3. Check for gaps (optional)
-4. Log any infrastructure changes
+4. Frontend will automatically use new AGG_WITH_INDEXES file
 
 ```bash
 # Entire monthly update in one command
-uv run python src/research/data_utils/pipeline.py --month 2025-02 --all-symbols
+bash scripts/monthly_data_update.sh
 
-# Then calculate new weights
-uv run python src/research/data_utils/calc_adv.py \
-  --input-file data/klines_aggregate/AGG_2024-07-01_2025-02-28.pq \
-  --interval 1 --units weeks --nsymbols 25 --output-dir data/klines_aggregate
+# This generates:
+#   - AGG_WITH_INDEXES_{dates}.pq (for frontend)
+#   - WEIGHTS files for each index
+#   - All market indexes (IX10, IX10EXBTC, IX60, IX100, IX130)
+
+# See complete instructions:
+# docs/MONTHLY_UPDATE_WORKFLOW.md
 ```
 
 ---
 
 ## ✅ Best Practices
 
-1. **Use pipeline.py**: Automates 5 steps with logging & error handling
+1. **Use monthly_data_update.sh**: Automates entire workflow with correct sequence
 2. **Regenerate after repairs**: If you fix data gaps, always regenerate daily/aggregate
 3. **Version aggregates**: Include date range in filename (e.g., AGG_2024-07-01_2025-02-28.pq)
 4. **Check config.py**: All paths & symbols defined there; edit once, not in every script
 5. **Log your runs**: Use runlog to track backtest experiments; enables Sharpe ranking
 6. **Use daily_loader**: Don't hardcode filenames; use glob-based loader
 7. **Use cli_utils.py**: When writing new scripts, import CLI helpers instead of duplicating argparse
+8. **Monthly rebalancing only**: Weekly rebalancing has known issues; use monthly (--units months)
 
 ---
 
@@ -531,13 +552,10 @@ Error: Cannot cast column from Int64 to Float64
 ```
 → Use `update_klines.py` which handles auto-casting. If manual fix: regenerate daily/aggregate.
 
-**Pipeline Fails: "not implemented"**
-→ Ensure all imports work: `python -c "from research.data_utils.make_daily import process_directory"`
-
 **Missing Data After Repair**
 → Did you regenerate daily & aggregate files? Required after any klines/ changes:
 ```bash
-uv run python src/research/data_utils/make_daily.py --input-dir data/klines --output-dir data/klines_daily
+uv run python src/research/data_utils/core/make_daily.py --input-dir data/klines --output-dir data/klines_daily
 ```
 
 **DuckDB Import Error**
@@ -564,17 +582,17 @@ uv sync
 
 **Beginner:**
 1. Read this README's "Quick Start" section
-2. Run: `python pipeline.py --month 2025-01 --dry-run`
-3. Run actual: `python pipeline.py --month 2025-01 --skip-download`
+2. Read: `docs/MONTHLY_UPDATE_WORKFLOW.md`
+3. Run: `bash scripts/monthly_data_update.sh`
 
 **Intermediate:**
-1. Load daily data: `from data_utils.daily_loader import load_daily_concat`
-2. Apply filters: `from data_utils.detection_filters import apply_detection_filters`
-3. Log runs: `from data_utils.runlog import log_run, write_metrics`
+1. Load daily data: `from data_utils.utils.daily_loader import load_daily_concat`
+2. Apply filters: `from data_utils.experimental.detection_filters import apply_detection_filters`
+3. Log runs: `from data_utils.utils.runlog import log_run, write_metrics`
 
 **Advanced:**
-1. Query with DuckDB: `from data_utils.duckdb_analytics import top_runs_by_sharpe`
-2. Build custom indexes: `from data_utils.calc_adv import calculate_adv`
+1. Query with DuckDB: `from data_utils.experimental.duckdb_analytics import top_runs_by_sharpe`
+2. Build custom indexes: `from data_utils.experimental.calc_adv import calculate_adv`
 3. Parallel processing: (future enhancement)
 
 ---
