@@ -23,8 +23,8 @@ std::string extract_json_from_line(const std::string &line) {
 int main(int argc, char **argv) {
   // Default values
   std::string data_file = "/workspace/test_data/sample.json";
-  std::string config_file = "/workspace/apps/config/binance/config.json";
-  std::string symbol_file = "/workspace/apps/config/binance/symbols.json";
+  std::string config_file = "/workspace/cpp/apps/config/binance/config.json";
+  std::string symbol_file = "/workspace/cpp/apps/config/binance/symbols.json";
   std::string key = "fut";
   int throttle_ms = 20; // Default 20ms = 50 messages/second max
   double price_variation = 0.001; // Default 0.1% price variation

@@ -142,7 +142,7 @@ int main(int argc, char **argv) {
   std::cout << "BookTicker size: " << sizeof(BookTicker) << " bytes\n\n";
   
   const char *input_file = "/workspace/test_data/sample.json";
-  const char *symbol_file = "/workspace/src/realtime/binance/config/symbols.json";
+  const char *symbol_file = "/workspace/config/binance/symbols.json";
   
   std::cout << "Using input file: " << input_file << std::endl;
   std::cout << "Using symbol map: " << symbol_file << std::endl;
