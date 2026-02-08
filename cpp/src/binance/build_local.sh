@@ -10,7 +10,7 @@ cd build
 if [ -d "/opt/cpp-crypto-deps" ]; then
     INSTALL_PREFIX="/opt/cpp-crypto-deps"
 else
-    INSTALL_PREFIX="$(cd ../../.. && pwd)/install"
+    INSTALL_PREFIX="$(cd ../../.. && pwd)/cpp/install"
 fi
 
 # Run cmake

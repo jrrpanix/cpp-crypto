@@ -39,7 +39,7 @@ add_executable(consumer_main consumer_main.cpp)
 # Include paths (aligned with BookTicker location)
 target_include_directories(consumer_main
   PRIVATE
-  ${PROJECT_SRC_DIR}/src/realtime
+  ${PROJECT_SRC_DIR}/cpp/src
 )
 
 target_link_directories(consumer_main PRIVATE ${DEPS_ROOT}/lib)
@@ -62,7 +62,7 @@ add_executable(consumer_ws_main consumer_ws_main.cpp)
 # Include paths for WebSocket version
 target_include_directories(consumer_ws_main
   PRIVATE
-  ${PROJECT_SRC_DIR}/src/realtime
+  ${PROJECT_SRC_DIR}/cpp/src
   ${PROJECT_SRC_DIR}/third_party/IXWebSocket
 )
 

@@ -16,18 +16,21 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Intelligently determine the dependency root directory
 # Priority:
 #   1. CI environment: /opt/cpp-crypto-deps (precompiled optimized libraries)
-#   2. Offline/fallback: /workspace/third_party (vendored copy of dependencies)
+#   2. Offline/fallback: /workspace/cpp/third_party (vendored copy of dependencies)
 #
-# The third_party/ directory contains vendored headers and compiled libraries
+# The cpp/third_party/ directory contains vendored headers and compiled libraries
 # for resilience against external project unavailability. This allows builds
 # even if original upstream projects become unavailable.
 if(EXISTS "/opt/cpp-crypto-deps/include")
     set(DEPS_ROOT "/opt/cpp-crypto-deps")
     message(STATUS "Using CI dependencies: ${DEPS_ROOT}")
 else()
-    set(DEPS_ROOT "${PROJECT_SRC_DIR}/third_party")
+    set(DEPS_ROOT "${PROJECT_SRC_DIR}/cpp/third_party")
     message(STATUS "Using vendored dependencies (offline fallback): ${DEPS_ROOT}")
 endif()
+
+# Always include cpp/third_party for header-only libraries
+include_directories(${PROJECT_SRC_DIR}/cpp/third_party)
 
 # Add the dependency directories to the search paths
 include_directories(${DEPS_ROOT})
@@ -43,7 +46,7 @@ include_directories(
 add_executable(binance_main binance_main.cpp)
 target_include_directories(binance_main
   PRIVATE
-  ${PROJECT_SRC_DIR}/src/realtime
+  ${PROJECT_SRC_DIR}/cpp/src
   ${CMAKE_CURRENT_SOURCE_DIR}/book_ticker
 )
 target_link_directories(binance_main PRIVATE ${DEPS_ROOT}/lib)
@@ -64,7 +67,7 @@ install(TARGETS binance_main DESTINATION bin)
 add_executable(mock_binance_main mock_binance_main.cpp)
 target_include_directories(mock_binance_main
   PRIVATE
-  ${PROJECT_SRC_DIR}/src/realtime
+  ${PROJECT_SRC_DIR}/cpp/src
   ${CMAKE_CURRENT_SOURCE_DIR}/book_ticker
 )
 target_link_directories(mock_binance_main PRIVATE ${DEPS_ROOT}/lib)
@@ -87,7 +90,7 @@ add_executable(mock_producer_main mock_producer_main.cpp)
 target_link_directories(mock_producer_main PRIVATE ${DEPS_ROOT}/lib)
 target_include_directories(mock_producer_main
   PRIVATE
-    ${PROJECT_SRC_DIR}/src/realtime
+    ${PROJECT_SRC_DIR}/cpp/src
 )
 
 target_compile_options(mock_producer_main PRIVATE -O3 -march=native)
@@ -107,7 +110,7 @@ install(TARGETS mock_producer_main DESTINATION bin)
 add_executable(parquet_reader parquet_reader.cpp)
 target_include_directories(parquet_reader
   PRIVATE
-  ${PROJECT_SRC_DIR}/src/realtime
+  ${PROJECT_SRC_DIR}/cpp/src
 )
 target_link_directories(parquet_reader PRIVATE ${DEPS_ROOT}/lib)
 target_compile_options(parquet_reader PRIVATE -O3 -march=native)
@@ -137,7 +140,7 @@ foreach(TEST_SRC ${TEST_SOURCES})
 
     target_include_directories(${TEST_NAME}
         PRIVATE
-            ${PROJECT_SRC_DIR}/src/realtime
+            ${PROJECT_SRC_DIR}/cpp/src
             ${CMAKE_CURRENT_SOURCE_DIR}/book_ticker
     )
 
