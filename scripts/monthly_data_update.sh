@@ -40,7 +40,7 @@ echo ""
 echo "================================================================================"
 echo "STEP 1: Create Aggregate File"
 echo "================================================================================"
-uv run python $SCRIPTS_DIR/make_aggregate.py \
+uv run python $SCRIPTS_DIR/core/make_aggregate.py \
   --input-dir $KLINES_DAILY_DIR \
   --output-dir $KLINES_AGG_DIR
 
@@ -56,7 +56,7 @@ echo "==========================================================================
 # IX10 - Top 10 including BTC (monthly rebalancing)
 echo ""
 echo "📊 Building IX10 (Top 10 with BTC, monthly rebalancing)..."
-uv run python $SCRIPTS_DIR/build_index.py \
+uv run python $SCRIPTS_DIR/core/build_index.py \
   --klines-dir $KLINES_DAILY_DIR \
   --start-date $START_DATE \
   --end-date $END_DATE \
@@ -69,7 +69,7 @@ uv run python $SCRIPTS_DIR/build_index.py \
 # IX10EXBTC - Top 10 excluding BTC (drop rank 1)
 echo ""
 echo "📊 Building IX10EXBTC (Top 10 excluding BTC, monthly rebalancing)..."
-uv run python $SCRIPTS_DIR/build_index.py \
+uv run python $SCRIPTS_DIR/core/build_index.py \
   --klines-dir $KLINES_DAILY_DIR \
   --start-date $START_DATE \
   --end-date $END_DATE \
@@ -82,7 +82,7 @@ uv run python $SCRIPTS_DIR/build_index.py \
 # IX60 - Mid 60 (ranks 11-70)
 echo ""
 echo "📊 Building IX60 (Mid 60: ranks 11-70, monthly rebalancing)..."
-uv run python $SCRIPTS_DIR/build_index.py \
+uv run python $SCRIPTS_DIR/core/build_index.py \
   --klines-dir $KLINES_DAILY_DIR \
   --start-date $START_DATE \
   --end-date $END_DATE \
@@ -95,7 +95,7 @@ uv run python $SCRIPTS_DIR/build_index.py \
 # IX100 - Small 100 (ranks 71-170)
 echo ""
 echo "📊 Building IX100 (Small 100: ranks 71-170, monthly rebalancing)..."
-uv run python $SCRIPTS_DIR/build_index.py \
+uv run python $SCRIPTS_DIR/core/build_index.py \
   --klines-dir $KLINES_DAILY_DIR \
   --start-date $START_DATE \
   --end-date $END_DATE \
@@ -108,7 +108,7 @@ uv run python $SCRIPTS_DIR/build_index.py \
 # IX130 - Tiny 130 (ranks 171-300)
 echo ""
 echo "📊 Building IX130 (Tiny 130: ranks 171-300, monthly rebalancing)..."
-uv run python $SCRIPTS_DIR/build_index.py \
+uv run python $SCRIPTS_DIR/core/build_index.py \
   --klines-dir $KLINES_DAILY_DIR \
   --start-date $START_DATE \
   --end-date $END_DATE \
@@ -126,7 +126,7 @@ echo ""
 echo "================================================================================"
 echo "STEP 3: Combine Binance + Indexes"
 echo "================================================================================"
-uv run python $SCRIPTS_DIR/make_aggregate_with_indexes.py \
+uv run python $SCRIPTS_DIR/core/make_aggregate_with_indexes.py \
   --binance-dir $KLINES_DAILY_DIR \
   --index-dir $KLINES_INDEX_DIR \
   --output-dir $KLINES_AGG_DIR \
@@ -149,7 +149,7 @@ echo ""
 
 # WEIGHTS_10_1_MONTH (top 10 with BTC)
 echo "📊 Generating WEIGHTS_10 (Top 10 with BTC, monthly)..."
-uv run python $SCRIPTS_DIR/calc_adv.py \
+uv run python $SCRIPTS_DIR/experimental/calc_adv.py \
   --input-file $AGG_FILE \
   --output-dir $KLINES_AGG_DIR \
   --nsymbols 10 \
@@ -159,7 +159,7 @@ uv run python $SCRIPTS_DIR/calc_adv.py \
 # WEIGHTS_10_DROP1_1_MONTH (top 10 excluding BTC)
 echo ""
 echo "📊 Generating WEIGHTS_10_DROP1 (Top 10 excluding BTC, monthly)..."
-uv run python $SCRIPTS_DIR/calc_adv.py \
+uv run python $SCRIPTS_DIR/experimental/calc_adv.py \
   --input-file $AGG_FILE \
   --output-dir $KLINES_AGG_DIR \
   --nsymbols 10 \
@@ -170,7 +170,7 @@ uv run python $SCRIPTS_DIR/calc_adv.py \
 # WEIGHTS_70_DROP10_1_MONTH (mid 60)
 echo ""
 echo "📊 Generating WEIGHTS_70_DROP10 (Mid 60, monthly)..."
-uv run python $SCRIPTS_DIR/calc_adv.py \
+uv run python $SCRIPTS_DIR/experimental/calc_adv.py \
   --input-file $AGG_FILE \
   --output-dir $KLINES_AGG_DIR \
   --nsymbols 70 \
@@ -181,7 +181,7 @@ uv run python $SCRIPTS_DIR/calc_adv.py \
 # WEIGHTS_170_DROP70_1_MONTH (small 100)
 echo ""
 echo "📊 Generating WEIGHTS_170_DROP70 (Small 100, monthly)..."
-uv run python $SCRIPTS_DIR/calc_adv.py \
+uv run python $SCRIPTS_DIR/experimental/calc_adv.py \
   --input-file $AGG_FILE \
   --output-dir $KLINES_AGG_DIR \
   --nsymbols 170 \
@@ -192,7 +192,7 @@ uv run python $SCRIPTS_DIR/calc_adv.py \
 # WEIGHTS_300_DROP170_1_MONTH (tiny 130)
 echo ""
 echo "📊 Generating WEIGHTS_300_DROP170 (Tiny 130, monthly)..."
-uv run python $SCRIPTS_DIR/calc_adv.py \
+uv run python $SCRIPTS_DIR/experimental/calc_adv.py \
   --input-file $AGG_FILE \
   --output-dir $KLINES_AGG_DIR \
   --nsymbols 300 \
