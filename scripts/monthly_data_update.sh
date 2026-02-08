@@ -31,7 +31,7 @@ KLINES_DIR="/workspace/data/klines"
 KLINES_DAILY_DIR="/workspace/data/klines_daily"
 KLINES_INDEX_DIR="/workspace/data/klines_index"
 KLINES_AGG_DIR="/workspace/data/klines_aggregate"
-SCRIPTS_DIR="/workspace/src/research/data_utils"
+SCRIPTS_DIR="/workspace/python/research/data_utils"
 
 echo "📅 Date range: $START_DATE to $END_DATE"
 echo ""

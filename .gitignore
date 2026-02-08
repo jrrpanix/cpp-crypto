@@ -73,3 +73,23 @@ src/install/
 *.njsproj
 *.sln
 *.sw?
+python/research/ml/
+# Build artifacts
+**/buildxx/
+**/build/
+*.o
+*.a
+cmd
+bcmd
+cmdx
+
+# Mac system files
+**/.DS_Store
+
+# Test data
+**/test0/
+
+# Compiled binaries
+cpp/src/**/mock_*
+cpp/src/**/parquet_reader
+cpp/src/**/test_*
