@@ -62,12 +62,12 @@ RUN chmod +x /workspace/scripts/install/deps_install.sh && \
 
 WORKDIR /workspace
 
-# Copy Python dependency definitions
-COPY pyproject.toml uv.lock* /workspace/
+# Copy Python dependency definitions from new location
+COPY python/pyproject.toml python/uv.lock* /workspace/python/
 
 # Create/activate venv and resolve deps
-ENV VIRTUAL_ENV=/workspace/.venv
+ENV VIRTUAL_ENV=/workspace/python/.venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-RUN uv sync --no-dev --frozen || uv sync --no-dev
+RUN cd /workspace/python && (uv sync --no-dev --frozen || uv sync --no-dev)
 
 CMD ["/bin/bash"]

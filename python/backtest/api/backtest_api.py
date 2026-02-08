@@ -37,8 +37,8 @@ except ImportError:
 # Import calc_adv - should work now with paths set
 calc_adv_module = None
 try:
-    # Try direct import (should work with paths above)
-    import calc_adv as calc_adv_module
+    # Try direct import from experimental subdirectory
+    from data_utils.experimental import calc_adv as calc_adv_module
     print("✅ calc_adv module loaded successfully")
 except ImportError as e:
     print(f"⚠️  Warning: calc_adv module not found: {e}")
@@ -147,31 +147,31 @@ UNIVERSES = {
     "top10": {
         "name": "Top 10 (Mega Cap)",
         "description": "Top 10 symbols by ADV - highest liquidity",
-        "index": "IX10USDT",
+        "index": "IX10",
         "filter": "IX10"
     },
     "top10_exbtc": {
         "name": "Top 10 ex-BTC (Alt Mega)",
         "description": "Top 10 excluding BTC - largest altcoins",
-        "index": "IX10EXBTCUSDT",
+        "index": "IX10EXBTC",
         "filter": "IX10EXBTC"
     },
     "mid60": {
         "name": "Mid 60 (Mid Cap)",
         "description": "Mid-tier 60 symbols by ADV",
-        "index": "IXMID60USDT",
+        "index": "IX60",
         "filter": "IXMID"
     },
     "small100": {
         "name": "Small 100 (Small Cap)",
         "description": "Smaller 100 symbols by ADV",
-        "index": "IXSMALL100USDT",
+        "index": "IX100",
         "filter": "IXSMALL"
     },
     "tiny130": {
         "name": "Tiny 130 (Micro Cap)",
         "description": "Micro-cap 130 symbols - lowest liquidity tier",
-        "index": "IX130TINYUSDT",
+        "index": "IX130",
         "filter": "IX130TINY"
     }
 }
@@ -836,11 +836,11 @@ def get_universe_symbols():
         # Determine the WEIGHTS file pattern based on universe
         # Pattern includes the drop-n parameter encoded in filename
         weights_patterns = {
-            'top10': 'WEIGHTS_10_1_WEEK_*.pq',  # Top 10 including BTC (no DROP)
-            'top10_exbtc': 'WEIGHTS_10_DROP1_1_WEEK_*.pq',  # Top 10 excluding BTC (DROP1)
-            'mid60': 'WEIGHTS_70_DROP10_1_WEEK_*.pq',  # Mid 60: top 70 drop 10
-            'small100': 'WEIGHTS_170_DROP70_1_WEEK_*.pq',  # Small 100: top 170 drop 70
-            'tiny130': 'WEIGHTS_300_DROP170_1_WEEK_*.pq'  # Tiny 130: top 300 drop 170
+            'top10': 'WEIGHTS_10_1_MONTH_*.pq',  # Top 10 including BTC (no DROP)
+            'top10_exbtc': 'WEIGHTS_10_DROP1_1_MONTH_*.pq',  # Top 10 excluding BTC (DROP1)
+            'mid60': 'WEIGHTS_70_DROP10_1_MONTH_*.pq',  # Mid 60: top 70 drop 10
+            'small100': 'WEIGHTS_170_DROP70_1_MONTH_*.pq',  # Small 100: top 170 drop 70
+            'tiny130': 'WEIGHTS_300_DROP170_1_MONTH_*.pq'  # Tiny 130: top 300 drop 170
         }
         
         # Try to find matching weights file by pattern
@@ -859,6 +859,12 @@ def get_universe_symbols():
                     period_df = df.filter(pl.col('end_date') == last_period)
                     
                     symbols = period_df.select('symbol').to_series().to_list()
+                    
+                    # Add the index symbol itself if defined
+                    if 'index' in universe_config:
+                        index_symbol = universe_config['index']
+                        if index_symbol not in symbols:
+                            symbols.append(index_symbol)
                     
                     return jsonify({
                         "success": True,
@@ -1761,9 +1767,9 @@ def get_backtest_results():
 # ============================================================================
 
 # Determine frontend directory based on environment
-# In Docker: /app/frontend/backtest (mounted from ../frontend/backtest)
-# Locally: ../frontend/backtest relative to this file
-FRONTEND_DIR = Path('/app/frontend/backtest') if Path('/app/frontend/backtest').exists() else Path(__file__).parent.parent / 'frontend' / 'backtest'
+# In Docker: /app/frontend (mounted from python/backtest/frontend)
+# Locally: ../frontend relative to this file
+FRONTEND_DIR = Path('/app/frontend') if Path('/app/frontend').exists() else Path(__file__).parent.parent / 'frontend'
 
 @app.route('/')
 def landing():

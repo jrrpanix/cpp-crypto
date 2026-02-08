@@ -7,7 +7,7 @@
 (function() {
     'use strict';
     
-    const API_BASE = 'http://localhost:5001/api';
+    const API_BASE = `${window.location.origin}/api`;
 
     let priceChart = null;
     let volumeChart = null;

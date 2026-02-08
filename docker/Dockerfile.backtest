@@ -5,18 +5,18 @@ WORKDIR /app
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Copy pyproject.toml (context is project root now)
-COPY pyproject.toml /workspace/pyproject.toml
+# Copy pyproject.toml and uv.lock
+COPY python/pyproject.toml python/uv.lock* /workspace/
 
 # Install dependencies using uv
 RUN cd /workspace && uv pip install --system --no-cache .
 
 # Copy API server
-COPY server/backtest_api.py .
+COPY python/backtest/api /app/api
 
 # Copy research modules (signal_utils and data_utils)
-COPY src/research/signal_utils /app/signal_utils
-COPY src/research/data_utils /app/data_utils
+COPY python/research/signal_utils /app/signal_utils
+COPY python/research/data_utils /app/data_utils
 
 # Set Python path
 ENV PYTHONPATH=/app
@@ -24,4 +24,4 @@ ENV PYTHONPATH=/app
 # Expose Flask port
 EXPOSE 5000
 
-CMD ["python", "backtest_api.py"]
+CMD ["python", "api/backtest_api.py"]

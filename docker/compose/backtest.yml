@@ -1,25 +1,26 @@
 services:
   backtest-api:
     build:
-      context: ..
-      dockerfile: server/Dockerfile
+      context: ../..
+      dockerfile: docker/Dockerfile.backtest
     container_name: backtest-api
     ports:
-      - "5001:5000"
+      - "8084:5000"
     volumes:
       # Mount data directory for parquet access (configurable via DATA_DIR env var)
-      - ${DATA_DIR:-../data}:/app/data:ro
+      - ${DATA_DIR:-../../data}:/app/data:ro
       # Mount writable directory for backtest results
-      - ${DATA_DIR:-../data}/backtest_results:/app/backtest_results:rw
+      - ${DATA_DIR:-../../data}/backtest_results:/app/backtest_results:rw
       # Mount source for live development
-      - ../server/backtest_api.py:/app/backtest_api.py
-      - ../src/research/signal_utils:/app/signal_utils:ro
+      - ../../python/backtest/api:/app/api
+      - ../../python/research/signal_utils:/app/signal_utils:ro
       # Mount frontend files so Flask can serve them
-      - ../frontend/backtest:/app/frontend/backtest:ro
+      - ../../python/backtest/frontend:/app/frontend:ro
     environment:
       - FLASK_ENV=${FLASK_ENV:-development}
-      # Try both common data directory structures
-      - DATA_PATH=/app/data/kline_aggregate:/app/data/aggregate_parquet:/app/data/klines
+      - DATA_PATH=/app/data/klines_aggregate:/app/data/klines_daily
+    working_dir: /app/api
+    command: python backtest_api.py
     networks:
       - backtest-network
 

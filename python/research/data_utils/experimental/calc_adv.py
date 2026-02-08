@@ -43,11 +43,22 @@ def calculate_adv(
         Weight column is added if top_n is specified
         Rank shows original ranking (1 = highest ADV, even if dropped)
     """
+    # Ensure open_time is datetime type
+    if not str(df["open_time"].dtype).startswith("Datetime"):
+        df = df.with_columns(pl.col("open_time").cast(pl.Datetime))
+    
     # Add year and month columns for grouping
-    df = df.with_columns([
-        pl.col("open_time").dt.year().alias("year"),
-        pl.col("open_time").dt.month().alias("month")
-    ])
+    try:
+        df = df.with_columns([
+            pl.col("open_time").dt.year().alias("year"),
+            pl.col("open_time").dt.month().alias("month")
+        ])
+        print(f"DEBUG calc_adv: Added year/month columns. DF columns: {df.columns}", flush=True)
+        print(f"DEBUG calc_adv: interval={interval}, units={units}", flush=True)
+        print(f"DEBUG calc_adv: DF shape: {df.shape}", flush=True)
+    except Exception as e:
+        print(f"ERROR calc_adv: Failed to add year/month columns: {e}", flush=True)
+        raise
     
     if units == "months":
         return _calculate_adv_months(df, interval, top_n, drop_n)
@@ -64,6 +75,10 @@ def _calculate_adv_months(
     drop_n: int = 0
 ) -> pl.DataFrame:
     """Calculate ADV using month-based intervals."""
+    
+    print(f"DEBUG _calculate_adv_months: interval_months={interval_months}", flush=True)
+    print(f"DEBUG _calculate_adv_months: DF columns: {df.columns}", flush=True)
+    print(f"DEBUG _calculate_adv_months: DF shape: {df.shape}", flush=True)
     
     if interval_months == 1:
         # Monthly intervals - group by year and month
@@ -192,8 +207,13 @@ def _calculate_adv_months(
             (pl.col("adv") / pl.col("adv").sum().over("interval_id")).alias("weight")
         ])
         
-        # Drop temporary interval_id column
-        result = result.drop(["interval_id", "year", "month"])
+        # Drop temporary columns (only if they exist)
+        cols_to_drop = ["interval_id"]
+        if "year" in result.columns:
+            cols_to_drop.append("year")
+        if "month" in result.columns:
+            cols_to_drop.append("month")
+        result = result.drop(cols_to_drop)
         
         # Sort by begin_date, then by rank
         result = result.sort(["begin_date", "rank"])
@@ -201,8 +221,14 @@ def _calculate_adv_months(
         # Reorder columns with weight and rank
         result = result.select(["begin_date", "end_date", "symbol", "adv", "rank", "weight"])
     else:
-        # Drop year and month columns
-        result = result.drop(["year", "month"])
+        # Drop year and month columns (only if they exist)
+        cols_to_drop = []
+        if "year" in result.columns:
+            cols_to_drop.append("year")
+        if "month" in result.columns:
+            cols_to_drop.append("month")
+        if cols_to_drop:
+            result = result.drop(cols_to_drop)
         
         # Sort by begin_date, then by adv descending
         result = result.sort(["begin_date", "adv"], descending=[False, True])
