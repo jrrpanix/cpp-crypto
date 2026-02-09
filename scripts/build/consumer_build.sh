@@ -1,4 +1,4 @@
 #!/bin/sh
-cd src/realtime/consumer
+cd cpp/src/consumer
 ./build_local.sh
 

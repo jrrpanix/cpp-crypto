@@ -15,7 +15,7 @@
 struct Args {
   bool websocket = false;
   int ws_port = 9001;
-  std::string symbol_file = "/workspace/apps/config/binance/symbols.json";
+  std::string symbol_file = "/workspace/cpp/apps/config/binance/symbols.json";
   int throttle_ms = 0;  // Throttle in milliseconds (0 = no throttle)
   int max_rate = 0;     // Maximum messages per second (0 = unlimited)
 };

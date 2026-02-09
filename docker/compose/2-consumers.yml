@@ -15,9 +15,9 @@ services:
     working_dir: /workspace/apps/bin
     command: >
       ./binance_main
-      --config_file /workspace/apps/config/binance/config.json
+      --config_file /workspace/cpp/apps/config/binance/config.json
       --key fut
-      --symbol_file /workspace/apps/config/binance/symbols.json
+      --symbol_file /workspace/cpp/apps/config/binance/symbols.json
       --zmqon
 
   consumer1:

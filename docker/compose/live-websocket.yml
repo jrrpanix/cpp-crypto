@@ -1,21 +1,21 @@
 services:
   consumer-websocket:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/Dockerfile.runtime
     container_name: consumer-websocket-live
     ports:
       - "9001:9001"
     networks:
       - market-net
-    command: /app/bin/consumer_ws_main --websocket --port 9001 --symbols /workspace/apps/config/binance/symbols.json --max-rate 20
+    command: /app/bin/consumer_ws_main --websocket --port 9001 --symbols /workspace/cpp/apps/config/binance/symbols.json --max-rate 20
     volumes:
-      - ${DATA_DIR:-../data}:/workspace/data:ro
-      - ../apps/config:/workspace/apps/config:ro
+      - ${DATA_DIR:-../../data}:/workspace/data:ro
+      - ../../cpp/apps/config:/workspace/cpp/apps/config:ro
 
   producer:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/Dockerfile.runtime
     container_name: producer-live
     depends_on:
@@ -23,13 +23,13 @@ services:
     networks:
       - market-net
     volumes:
-      - ${DATA_DIR:-../data}:/workspace/data:ro
-      - ../apps/config:/workspace/apps/config:ro
+      - ${DATA_DIR:-../../data}:/workspace/data:ro
+      - ../../cpp/apps/config:/workspace/cpp/apps/config:ro
     command: >
       /app/bin/binance_main
-      --config_file /workspace/apps/config/binance/config.json
+      --config_file /workspace/cpp/apps/config/binance/config.json
       --key fut
-      --symbol_file /workspace/apps/config/binance/symbols.json
+      --symbol_file /workspace/cpp/apps/config/binance/symbols.json
       --zmqon
 
   frontend-server:
@@ -38,7 +38,7 @@ services:
     ports:
       - "8083:80"  # Different port to avoid conflicts
     volumes:
-      - ../frontend/realtime:/usr/share/nginx/html:ro
+      - ../../frontend/realtime:/usr/share/nginx/html:ro
     networks:
       - market-net
 

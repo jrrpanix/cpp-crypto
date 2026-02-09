@@ -9,7 +9,7 @@
 struct Args {
   bool sendweb = false;
   std::string endpoint_url = "http://webserver:8000/status";
-  std::string symbol_file = "/workspace/apps/config/binance/symbols.json";
+  std::string symbol_file = "/workspace/cpp/apps/config/binance/symbols.json";
 };
 
 Args parse_args(int argc, char **argv) {

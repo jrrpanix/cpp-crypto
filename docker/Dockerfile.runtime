@@ -44,7 +44,7 @@ RUN chmod +x /workspace/scripts/install/deps_install.sh && \
     /workspace/scripts/install/deps_install.sh
 
 # Now copy source code (after deps are cached)
-COPY src/ /workspace/src/
+COPY cpp/src/ /workspace/cpp/src/
 
 # Build the C++ applications
 # The binaries will be installed to /workspace/install/bin
