@@ -12,7 +12,8 @@ from pathlib import Path
 from datetime import datetime
 import base64
 import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend
+
+matplotlib.use("Agg")  # Non-interactive backend
 import matplotlib.pyplot as plt
 import polars as pl
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -21,8 +22,8 @@ import multiprocessing
 
 # Add paths for module imports
 sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, '/app/data_utils')  # Docker path for data_utils
-sys.path.insert(0, str(Path(__file__).parent / 'data_utils'))  # Local fallback
+sys.path.insert(0, "/app/data_utils")  # Docker path for data_utils
+sys.path.insert(0, str(Path(__file__).parent / "data_utils"))  # Local fallback
 
 # Add parent directory to path to import window_sim and daily_sim
 try:
@@ -30,7 +31,7 @@ try:
     from signal_utils import daily_sim
 except ImportError:
     # Fallback for local development
-    sys.path.insert(0, str(Path(__file__).parent.parent / 'src' / 'research'))
+    sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "research"))
     from signal_utils import window_sim
     from signal_utils import daily_sim
 
@@ -39,6 +40,7 @@ calc_adv_module = None
 try:
     # Try direct import from experimental subdirectory
     from data_utils.experimental import calc_adv as calc_adv_module
+
     print("✅ calc_adv module loaded successfully")
 except ImportError as e:
     print(f"⚠️  Warning: calc_adv module not found: {e}")
@@ -48,92 +50,100 @@ except ImportError as e:
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend access
 
+
 # Configure data directory - support both Docker and local paths
 # Check multiple common locations in order of preference
 def find_data_directory():
     """Find the data directory by checking common locations."""
     possible_paths = [
-        Path(os.getenv('DATA_PATH', '')),  # Explicitly set path
-        Path('/app/data/kline_aggregate'),  # Docker mount - new structure
-        Path('/app/data/aggregate_parquet'),  # Docker mount - old structure
-        Path('/app/data/klines'),  # Docker mount - alternative
-        Path('/workspace/data/klines'),  # Container workspace
-        Path(__file__).parent.parent / 'data' / 'kline_aggregate',  # Local - new
-        Path(__file__).parent.parent / 'data' / 'aggregate_parquet',  # Local - old
-        Path(__file__).parent.parent / 'data' / 'klines',  # Local - alternative
+        Path(os.getenv("DATA_PATH", "")),  # Explicitly set path
+        Path("/app/data/kline_aggregate"),  # Docker mount - new structure
+        Path("/app/data/aggregate_parquet"),  # Docker mount - old structure
+        Path("/app/data/klines"),  # Docker mount - alternative
+        Path("/workspace/data/klines"),  # Container workspace
+        Path(__file__).parent.parent / "data" / "kline_aggregate",  # Local - new
+        Path(__file__).parent.parent / "data" / "aggregate_parquet",  # Local - old
+        Path(__file__).parent.parent / "data" / "klines",  # Local - alternative
     ]
-    
+
     for path in possible_paths:
         if path.exists() and path.is_dir():
             # Check if it has parquet files
-            if list(path.glob('*.parquet')):
+            if list(path.glob("*.parquet")):
                 print(f"📁 Using data directory: {path}")
                 return path
-    
+
     # Default fallback
-    default = Path('/app/data/kline_aggregate')
+    default = Path("/app/data/kline_aggregate")
     print(f"⚠️  No data directory found, using default: {default}")
     return default
 
+
 DATA_DIR = find_data_directory()
+
 
 # Configure daily data directory
 def find_daily_data_directory():
     """Find the daily data directory by checking common locations."""
     possible_paths = [
-        Path('/workspace/data/klines_daily'),  # Container workspace
-        Path('/app/data/klines_daily'),  # Docker mount
-        Path(__file__).parent.parent / 'data' / 'klines_daily',  # Local
+        Path("/workspace/data/klines_daily"),  # Container workspace
+        Path("/app/data/klines_daily"),  # Docker mount
+        Path(__file__).parent.parent / "data" / "klines_daily",  # Local
     ]
-    
+
     for path in possible_paths:
         if path.exists() and path.is_dir():
             # Check if it has parquet files
-            if list(path.glob('*_daily_*.parquet')):
+            if list(path.glob("*_daily_*.parquet")):
                 print(f"📅 Using daily data directory: {path}")
                 return path
-    
+
     # Default fallback
-    default = Path('/workspace/data/klines_daily')
+    default = Path("/workspace/data/klines_daily")
     print(f"⚠️  No daily data directory found, using default: {default}")
     return default
 
+
 DAILY_DATA_DIR = find_daily_data_directory()
+
 
 # Configure index data directory
 def find_index_directory():
     """Find the index directory by checking common locations."""
     possible_paths = [
-        Path('/workspace/data/klines_index'),  # Container workspace
-        Path('/app/data/klines_index'),  # Docker mount
-        Path(__file__).parent.parent / 'data' / 'klines_index',  # Local
+        Path("/workspace/data/klines_index"),  # Container workspace
+        Path("/app/data/klines_index"),  # Docker mount
+        Path(__file__).parent.parent / "data" / "klines_index",  # Local
     ]
-    
+
     for path in possible_paths:
         if path.exists() and path.is_dir():
-            if list(path.glob('*.parquet')):
+            if list(path.glob("*.parquet")):
                 print(f"📊 Using index directory: {path}")
                 return path
-    
-    default = Path('/workspace/data/klines_index')
+
+    default = Path("/workspace/data/klines_index")
     print(f"⚠️  No index directory found, using default: {default}")
     return default
 
+
 INDEX_DIR = find_index_directory()
+
 
 # Configure results directory for saving backtest runs
 def find_results_directory():
     """Find or create the results directory for saving backtest runs."""
     # Use the explicitly mounted writable directory from docker-compose
-    results_path = Path('/app/backtest_results')
-    
+    results_path = Path("/app/backtest_results")
+
     try:
         results_path.mkdir(parents=True, exist_ok=True)
         print(f"💾 Results directory ready: {results_path}")
     except Exception as e:
         print(f"⚠️  Cannot create {results_path}: {e}")
-    
+
     return results_path
+
 
 RESULTS_DIR = find_results_directory()
 
@@ -142,44 +152,45 @@ UNIVERSES = {
     "all": {
         "name": "All Symbols",
         "description": "All available symbols (no filter)",
-        "filter": None
+        "filter": None,
     },
     "top10": {
         "name": "Top 10 (Mega Cap)",
         "description": "Top 10 symbols by ADV - highest liquidity",
         "index": "IX10",
-        "filter": "IX10"
+        "filter": "IX10",
     },
     "top10_exbtc": {
         "name": "Top 10 ex-BTC (Alt Mega)",
         "description": "Top 10 excluding BTC - largest altcoins",
         "index": "IX10EXBTC",
-        "filter": "IX10EXBTC"
+        "filter": "IX10EXBTC",
     },
     "mid60": {
         "name": "Mid 60 (Mid Cap)",
         "description": "Mid-tier 60 symbols by ADV",
         "index": "IX60",
-        "filter": "IXMID"
+        "filter": "IXMID",
     },
     "small100": {
         "name": "Small 100 (Small Cap)",
         "description": "Smaller 100 symbols by ADV",
         "index": "IX100",
-        "filter": "IXSMALL"
+        "filter": "IXSMALL",
     },
     "tiny130": {
         "name": "Tiny 130 (Micro Cap)",
         "description": "Micro-cap 130 symbols - lowest liquidity tier",
         "index": "IX130",
-        "filter": "IX130TINY"
-    }
+        "filter": "IX130TINY",
+    },
 }
 
-def save_aggregate_backtest_result(result_type, symbols, params, results, universe='all'):
+
+def save_aggregate_backtest_result(result_type, symbols, params, results, universe="all"):
     """
     Save aggregate backtest results (one row per backtest run, not per symbol).
-    
+
     Args:
         result_type: 'minute' or 'daily'
         symbols: List of symbols tested
@@ -189,100 +200,114 @@ def save_aggregate_backtest_result(result_type, symbols, params, results, univer
     """
     try:
         # Filter successful results
-        successful_results = [r for r in results if r.get('success', False) and r.get('summary')]
-        
+        successful_results = [r for r in results if r.get("success", False) and r.get("summary")]
+
         if not successful_results:
             print("⚠️  No successful results to save")
             return
-        
+
         # Calculate aggregate statistics
         total_symbols = len(successful_results)
-        total_trades = sum(r['summary'].get('num_trades', 0) for r in successful_results)
-        total_gross_profit = sum(r['summary'].get('gross_profit', 0) for r in successful_results)
-        total_fees = sum(r['summary'].get('total_fees', 0) for r in successful_results)
-        total_net_profit = sum(r['summary'].get('net_profit', 0) for r in successful_results)
-        
+        total_trades = sum(r["summary"].get("num_trades", 0) for r in successful_results)
+        total_gross_profit = sum(r["summary"].get("gross_profit", 0) for r in successful_results)
+        total_fees = sum(r["summary"].get("total_fees", 0) for r in successful_results)
+        total_net_profit = sum(r["summary"].get("net_profit", 0) for r in successful_results)
+
         # Calculate averages
         avg_profit_per_symbol = total_net_profit / total_symbols if total_symbols > 0 else 0
         avg_profit_per_trade = total_net_profit / total_trades if total_trades > 0 else 0
-        avg_win_rate = sum(r['summary'].get('win_rate', 0) for r in successful_results) / total_symbols if total_symbols > 0 else 0
-        avg_sharpe = sum(r['summary'].get('net_sharpe_ratio', 0) for r in successful_results) / total_symbols if total_symbols > 0 else 0
-        
+        avg_win_rate = (
+            sum(r["summary"].get("win_rate", 0) for r in successful_results) / total_symbols
+            if total_symbols > 0
+            else 0
+        )
+        avg_sharpe = (
+            sum(r["summary"].get("net_sharpe_ratio", 0) for r in successful_results) / total_symbols
+            if total_symbols > 0
+            else 0
+        )
+
         # Calculate portfolio Sharpe ratio from cumulative PnL series if available
         portfolio_sharpe = 0.0
         try:
             # Collect all PnL series and merge by date
             import numpy as np
+
             daily_pnls = []
-            
+
             for r in successful_results:
-                if 'cumulative_pnl_series' in r and len(r['cumulative_pnl_series']) > 0:
+                if "cumulative_pnl_series" in r and len(r["cumulative_pnl_series"]) > 0:
                     # Extract daily changes from cumulative PnL
-                    series = r['cumulative_pnl_series']
+                    series = r["cumulative_pnl_series"]
                     for i in range(1, len(series)):
-                        daily_change = series[i]['pnl'] - series[i-1]['pnl']
+                        daily_change = series[i]["pnl"] - series[i - 1]["pnl"]
                         daily_pnls.append(daily_change)
-            
+
             if len(daily_pnls) > 1:
                 daily_pnls_array = np.array(daily_pnls)
                 mean_daily_pnl = np.mean(daily_pnls_array)
                 std_daily_pnl = np.std(daily_pnls_array, ddof=1)
-                
+
                 if std_daily_pnl > 0:
                     # Sharpe = mean(daily_pnl) / std(daily_pnl) * sqrt(252)
                     portfolio_sharpe = (mean_daily_pnl / std_daily_pnl) * np.sqrt(252)
         except Exception as e:
             print(f"⚠️  Could not calculate portfolio Sharpe: {e}")
-        
-        profitable_symbols = sum(1 for r in successful_results if r['summary'].get('net_profit', 0) > 0)
-        
+
+        profitable_symbols = sum(
+            1 for r in successful_results if r["summary"].get("net_profit", 0) > 0
+        )
+
         # Aggregate ROI
-        total_position_size = params.get('position_size', 1000) * total_symbols
+        total_position_size = params.get("position_size", 1000) * total_symbols
         aggregate_roi = total_net_profit / total_position_size if total_position_size > 0 else 0
-        
+
         timestamp = datetime.now()
-        
+
         # Create aggregate result record
         result_record = {
-            'timestamp': timestamp,
-            'result_type': result_type,
-            'universe': universe,
-            'num_symbols': total_symbols,
-            'symbol_list': ','.join([r['symbol'] for r in successful_results[:10]]) + ('...' if total_symbols > 10 else ''),
+            "timestamp": timestamp,
+            "result_type": result_type,
+            "universe": universe,
+            "num_symbols": total_symbols,
+            "symbol_list": ",".join([r["symbol"] for r in successful_results[:10]])
+            + ("..." if total_symbols > 10 else ""),
             # Parameters
-            'up_threshold': params.get('up_threshold'),
-            'up_direction': params.get('up_direction'),
-            'down_threshold': params.get('down_threshold'),
-            'down_direction': params.get('down_direction'),
-            'detection_window': params.get('detection_window'),
-            'hold_window': params.get('hold_window'),
-            'position_size': params.get('position_size'),
-            'position_limit': params.get('position_limit'),
-            'fee_rate': params.get('fee_rate'),
-            'num_accounts': params.get('num_accounts'),
-            'start_date': params.get('start_date'),
+            "up_threshold": params.get("up_threshold"),
+            "up_direction": params.get("up_direction"),
+            "down_threshold": params.get("down_threshold"),
+            "down_direction": params.get("down_direction"),
+            "detection_window": params.get("detection_window"),
+            "hold_window": params.get("hold_window"),
+            "position_size": params.get("position_size"),
+            "position_limit": params.get("position_limit"),
+            "fee_rate": params.get("fee_rate"),
+            "num_accounts": params.get("num_accounts"),
+            "start_date": params.get("start_date"),
             # Aggregate results
-            'total_trades': total_trades,
-            'total_gross_profit': total_gross_profit,
-            'total_fees': total_fees,
-            'total_net_profit': total_net_profit,
-            'aggregate_roi': aggregate_roi,
-            'avg_profit_per_symbol': avg_profit_per_symbol,
-            'avg_profit_per_trade': avg_profit_per_trade,
-            'avg_win_rate': avg_win_rate,
-            'avg_sharpe_ratio': avg_sharpe,
-            'portfolio_sharpe_ratio': portfolio_sharpe,
-            'profitable_symbols': profitable_symbols,
-            'profitable_pct': (profitable_symbols / total_symbols * 100) if total_symbols > 0 else 0,
+            "total_trades": total_trades,
+            "total_gross_profit": total_gross_profit,
+            "total_fees": total_fees,
+            "total_net_profit": total_net_profit,
+            "aggregate_roi": aggregate_roi,
+            "avg_profit_per_symbol": avg_profit_per_symbol,
+            "avg_profit_per_trade": avg_profit_per_trade,
+            "avg_win_rate": avg_win_rate,
+            "avg_sharpe_ratio": avg_sharpe,
+            "portfolio_sharpe_ratio": portfolio_sharpe,
+            "profitable_symbols": profitable_symbols,
+            "profitable_pct": (
+                (profitable_symbols / total_symbols * 100) if total_symbols > 0 else 0
+            ),
         }
-        
+
         # Convert to DataFrame
         df = pl.DataFrame([result_record])
-        
+
         # Determine filename
         filename = f"backtest_results_{result_type}.parquet"
         filepath = RESULTS_DIR / filename
-        
+
         # Append or create
         if filepath.exists():
             existing_df = pl.read_parquet(filepath)
@@ -290,105 +315,105 @@ def save_aggregate_backtest_result(result_type, symbols, params, results, univer
             combined_df.write_parquet(filepath)
         else:
             df.write_parquet(filepath)
-        
-        print(f"✅ Saved aggregate result: {total_symbols} symbols, {total_trades} trades, ${total_net_profit:.2f}")
-        
+
+        print(
+            f"✅ Saved aggregate result: {total_symbols} symbols, {total_trades} trades, ${total_net_profit:.2f}"
+        )
+
     except Exception as e:
         print(f"⚠️ Failed to save aggregate result: {e}")
         import traceback
+
         print(traceback.format_exc())
 
-@app.route('/api/symbols', methods=['GET'])
+
+@app.route("/api/symbols", methods=["GET"])
 def get_symbols():
     """Get list of available symbols from parquet files and aggregate (includes indexes)."""
     try:
         # Get symbols from minute-level parquet files (real trading pairs)
         parquet_files = list(DATA_DIR.glob("*_1m_*.parquet"))
-        
+
         # Extract unique symbols
         symbols = set()
         for file in parquet_files:
             # Extract symbol from filename (e.g., BTCUSDT_1m_2024-01-01_2025-01-01.parquet)
             filename = file.stem
-            symbol = filename.split('_1m_')[0]
+            symbol = filename.split("_1m_")[0]
             symbols.add(symbol)
-        
+
         # Also check aggregate file for additional symbols (indexes)
         # This allows indexes to appear in the daily market data visualization
         try:
-            agg_dir = Path('/app/data/klines_aggregate') if Path('/app/data/klines_aggregate').exists() else Path(__file__).parent.parent / 'data' / 'klines_aggregate'
-            
+            agg_dir = (
+                Path("/app/data/klines_aggregate")
+                if Path("/app/data/klines_aggregate").exists()
+                else Path(__file__).parent.parent / "data" / "klines_aggregate"
+            )
+
             # Prefer AGG_WITH_INDEXES file (includes both Binance + indexes)
-            agg_files = list(agg_dir.glob('AGG_WITH_INDEXES_*.pq'))
-            
+            agg_files = list(agg_dir.glob("AGG_WITH_INDEXES_*.pq"))
+
             if not agg_files:
                 # Fallback to regular AGG file
-                agg_files = list(agg_dir.glob('AGG_*.pq'))
-            
+                agg_files = list(agg_dir.glob("AGG_*.pq"))
+
             if agg_files:
                 agg_file = sorted(agg_files)[-1]
                 df = pl.read_parquet(agg_file)
-                
+
                 # Get unique symbols from aggregate
-                agg_symbols = df.select('symbol').unique()['symbol'].to_list()
+                agg_symbols = df.select("symbol").unique()["symbol"].to_list()
                 symbols.update(agg_symbols)
-                
-                print(f"DEBUG: Added {len(agg_symbols)} symbols from aggregate file (includes indexes)")
+
+                print(
+                    f"DEBUG: Added {len(agg_symbols)} symbols from aggregate file (includes indexes)"
+                )
         except Exception as e:
             print(f"DEBUG: Could not load symbols from aggregate: {e}")
             # Continue with just the minute-level symbols
-        
-        return jsonify({
-            "success": True,
-            "symbols": sorted(list(symbols))
-        })
+
+        return jsonify({"success": True, "symbols": sorted(list(symbols))})
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('/api/symbol-info/<symbol>', methods=['GET'])
+@app.route("/api/symbol-info/<symbol>", methods=["GET"])
 def get_symbol_info(symbol):
     """Get date range and row count for a symbol."""
     try:
         # Find matching parquet file
         matching_files = list(DATA_DIR.glob(f"{symbol}_1m_*.parquet"))
-        
+
         if not matching_files:
-            return jsonify({
-                "success": False,
-                "error": f"No data found for symbol {symbol}"
-            }), 404
-        
+            return jsonify({"success": False, "error": f"No data found for symbol {symbol}"}), 404
+
         # Use most recent file
         parquet_file = sorted(matching_files)[-1]
-        
+
         # Read metadata
         df = pl.read_parquet(parquet_file)
-        
-        return jsonify({
-            "success": True,
-            "symbol": symbol,
-            "file": str(parquet_file.name),
-            "start_date": str(df["open_time"].min()),
-            "end_date": str(df["open_time"].max()),
-            "rows": len(df),
-            "data_points": len(df)
-        })
+
+        return jsonify(
+            {
+                "success": True,
+                "symbol": symbol,
+                "file": str(parquet_file.name),
+                "start_date": str(df["open_time"].min()),
+                "end_date": str(df["open_time"].max()),
+                "rows": len(df),
+                "data_points": len(df),
+            }
+        )
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('/api/backtest', methods=['POST'])
+@app.route("/api/backtest", methods=["POST"])
 def run_backtest():
     """
     Run backtest with provided parameters.
-    
+
     Expected JSON body:
     {
         "symbol": "BTCUSDT",
@@ -410,47 +435,44 @@ def run_backtest():
     try:
         # Get parameters from request
         params = request.json
-        
+
         print(f"DEBUG: Received backtest request for symbol: {params.get('symbol')}")
         print(f"DEBUG: start_date value: {repr(params.get('start_date'))}")
-        
-        symbol = params.get('symbol')
-        up_threshold = float(params.get('up_threshold'))
-        up_direction = params.get('up_direction', 'B')
-        down_threshold = float(params.get('down_threshold'))
-        down_direction = params.get('down_direction', 'S')
-        detection_window = int(params.get('detection_window'))
-        hold_window = int(params.get('hold_window'))
-        position_size = float(params.get('position_size'))
-        position_limit = int(params.get('position_limit', 1))
-        fee_rate = float(params.get('fee_rate', 0.0003))
-        num_accounts = int(params.get('num_accounts', 1))
-        start_date = params.get('start_date')
-        
+
+        symbol = params.get("symbol")
+        up_threshold = float(params.get("up_threshold"))
+        up_direction = params.get("up_direction", "B")
+        down_threshold = float(params.get("down_threshold"))
+        down_direction = params.get("down_direction", "S")
+        detection_window = int(params.get("detection_window"))
+        hold_window = int(params.get("hold_window"))
+        position_size = float(params.get("position_size"))
+        position_limit = int(params.get("position_limit", 1))
+        fee_rate = float(params.get("fee_rate", 0.0003))
+        num_accounts = int(params.get("num_accounts", 1))
+        start_date = params.get("start_date")
+
         # Performance optimizations: allow skipping expensive operations
-        include_plot = params.get('include_plot', False)
-        include_trades = params.get('include_trades', False)
-        
+        include_plot = params.get("include_plot", False)
+        include_trades = params.get("include_trades", False)
+
         print(f"DEBUG: Parsed start_date: {repr(start_date)}")
-        
+
         # Validate inputs
         if up_threshold <= 0:
             return jsonify({"success": False, "error": "Up threshold must be positive"}), 400
         if down_threshold >= 0:
             return jsonify({"success": False, "error": "Down threshold must be negative"}), 400
-        
+
         # Find parquet file
         matching_files = list(DATA_DIR.glob(f"{symbol}_1m_*.parquet"))
-        
+
         if not matching_files:
-            return jsonify({
-                "success": False,
-                "error": f"No data found for symbol {symbol}"
-            }), 404
-        
+            return jsonify({"success": False, "error": f"No data found for symbol {symbol}"}), 404
+
         # Use most recent file
         parquet_file = str(sorted(matching_files)[-1])
-        
+
         # Run simulation (suppress verbose output)
         # Run the simulation using window_sim module
         trades_df, summary = window_sim.run_simulation_from_file(
@@ -466,9 +488,9 @@ def run_backtest():
             position_limit,
             fee_rate,
             num_accounts,
-            verbose=False
+            verbose=False,
         )
-        
+
         # Generate cumulative PnL plot as base64 (OPTIONAL - expensive)
         plot_base64 = None
         if include_plot and len(trades_df) > 0:
@@ -477,7 +499,7 @@ def run_backtest():
         plot_base64 = None
         if include_plot and len(trades_df) > 0:
             plot_base64 = generate_plot_base64(trades_df, symbol)
-        
+
         # Extract cumulative PnL time series for aggregation
         cumulative_pnl_series = []
         if len(trades_df) > 0:
@@ -486,46 +508,52 @@ def run_backtest():
                 [pl.col("net_profit_dollars").cum_sum().alias("cumulative_pnl")]
             )
             cumulative_pnl_series = [
-                {"time": row["exit_time"].isoformat() if hasattr(row["exit_time"], 'isoformat') else str(row["exit_time"]), 
-                 "pnl": row["cumulative_pnl"]}
+                {
+                    "time": (
+                        row["exit_time"].isoformat()
+                        if hasattr(row["exit_time"], "isoformat")
+                        else str(row["exit_time"])
+                    ),
+                    "pnl": row["cumulative_pnl"],
+                }
                 for row in trades_sorted.select(["exit_time", "cumulative_pnl"]).to_dicts()
             ]
-        
+
         # Prepare response
         response = {
             "success": True,
             "summary": summary,
             "num_trades": len(trades_df),
-            "cumulative_pnl_series": cumulative_pnl_series  # Time series for aggregation
+            "cumulative_pnl_series": cumulative_pnl_series,  # Time series for aggregation
         }
-        
+
         # Add optional expensive data only if requested
         if include_plot:
             response["plot"] = plot_base64
         if include_trades:
             response["trades"] = trades_df.head(100).to_dicts() if len(trades_df) > 0 else []
-        
+
         return jsonify(response)
-        
+
     except Exception as e:
         import traceback
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+
+        return (
+            jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}),
+            500,
+        )
 
 
 def process_single_symbol(symbol: str, data_dir: Path, params: dict) -> dict:
     """
     Worker function to process a single symbol backtest.
     Designed to be called by ProcessPoolExecutor for parallel execution.
-    
+
     Args:
         symbol: Trading symbol (e.g., 'BTCUSDT')
         data_dir: Path to data directory
         params: Dictionary with backtest parameters
-        
+
     Returns:
         Dictionary with result or error information
     """
@@ -534,41 +562,41 @@ def process_single_symbol(symbol: str, data_dir: Path, params: dict) -> dict:
         import polars as pl
         import sys
         from pathlib import Path
-        
+
         # Re-import window_sim in worker process
         sys.path.insert(0, str(Path(__file__).parent))
         try:
             from signal_utils import window_sim
         except ImportError:
-            sys.path.insert(0, str(Path(__file__).parent.parent / 'src' / 'research'))
+            sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "research"))
             from signal_utils import window_sim
-        
+
         # Find parquet file
         matching_files = list(data_dir.glob(f"{symbol}_1m_*.parquet"))
-        
+
         if not matching_files:
             return {
                 "symbol": symbol,
                 "success": False,
-                "error": f"No data found for symbol {symbol}"
+                "error": f"No data found for symbol {symbol}",
             }
-        
+
         # Use most recent file
         parquet_file = str(sorted(matching_files)[-1])
-        
+
         # Extract parameters
-        start_date = params.get('start_date')
-        up_threshold = params['up_threshold']
-        up_direction = params['up_direction']
-        down_threshold = params['down_threshold']
-        down_direction = params['down_direction']
-        detection_window = params['detection_window']
-        hold_window = params['hold_window']
-        position_size = params['position_size']
-        position_limit = params['position_limit']
-        fee_rate = params['fee_rate']
-        num_accounts = params['num_accounts']
-        
+        start_date = params.get("start_date")
+        up_threshold = params["up_threshold"]
+        up_direction = params["up_direction"]
+        down_threshold = params["down_threshold"]
+        down_direction = params["down_direction"]
+        detection_window = params["detection_window"]
+        hold_window = params["hold_window"]
+        position_size = params["position_size"]
+        position_limit = params["position_limit"]
+        fee_rate = params["fee_rate"]
+        num_accounts = params["num_accounts"]
+
         # Run simulation
         trades_df, summary = window_sim.run_simulation_from_file(
             parquet_file,
@@ -583,9 +611,9 @@ def process_single_symbol(symbol: str, data_dir: Path, params: dict) -> dict:
             position_limit,
             fee_rate,
             num_accounts,
-            verbose=False
+            verbose=False,
         )
-        
+
         # Extract cumulative PnL time series
         cumulative_pnl_series = []
         if len(trades_df) > 0:
@@ -594,35 +622,42 @@ def process_single_symbol(symbol: str, data_dir: Path, params: dict) -> dict:
                 [pl.col("net_profit_dollars").cum_sum().alias("cumulative_pnl")]
             )
             cumulative_pnl_series = [
-                {"time": row["exit_time"].isoformat() if hasattr(row["exit_time"], 'isoformat') else str(row["exit_time"]), 
-                 "pnl": row["cumulative_pnl"]}
+                {
+                    "time": (
+                        row["exit_time"].isoformat()
+                        if hasattr(row["exit_time"], "isoformat")
+                        else str(row["exit_time"])
+                    ),
+                    "pnl": row["cumulative_pnl"],
+                }
                 for row in trades_sorted.select(["exit_time", "cumulative_pnl"]).to_dicts()
             ]
-        
+
         return {
             "symbol": symbol,
             "success": True,
             "summary": summary,
             "num_trades": len(trades_df),
-            "cumulative_pnl_series": cumulative_pnl_series
+            "cumulative_pnl_series": cumulative_pnl_series,
         }
-        
+
     except Exception as e:
         import traceback
+
         return {
             "symbol": symbol,
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            "traceback": traceback.format_exc(),
         }
 
 
-@app.route('/api/backtest/batch', methods=['POST'])
+@app.route("/api/backtest/batch", methods=["POST"])
 def run_batch_backtest():
     """
     Run backtests for multiple symbols with same parameters.
     More efficient than calling /api/backtest multiple times.
-    
+
     Expected JSON body:
     {
         "symbols": ["BTCUSDT", "ETHUSDT", ...],
@@ -643,69 +678,72 @@ def run_batch_backtest():
     """
     try:
         data = request.json
-        symbols = data.get('symbols', [])
-        params = data.get('params', {})
-        universe = data.get('universe', 'all')
-        
+        symbols = data.get("symbols", [])
+        params = data.get("params", {})
+        universe = data.get("universe", "all")
+
         if not symbols:
             return jsonify({"success": False, "error": "No symbols provided"}), 400
-        
+
         print(f"DEBUG: Batch backtest for {len(symbols)} symbols using parallel processing")
-        
+
         # Extract and validate parameters
-        up_threshold = float(params.get('up_threshold'))
-        up_direction = params.get('up_direction', 'B')
-        down_threshold = float(params.get('down_threshold'))
-        down_direction = params.get('down_direction', 'S')
-        detection_window = int(params.get('detection_window'))
-        hold_window = int(params.get('hold_window'))
-        position_size = float(params.get('position_size'))
-        position_limit = int(params.get('position_limit', 1))
-        fee_rate = float(params.get('fee_rate', 0.0003))
-        num_accounts = int(params.get('num_accounts', 1))
-        start_date = params.get('start_date')
-        
+        up_threshold = float(params.get("up_threshold"))
+        up_direction = params.get("up_direction", "B")
+        down_threshold = float(params.get("down_threshold"))
+        down_direction = params.get("down_direction", "S")
+        detection_window = int(params.get("detection_window"))
+        hold_window = int(params.get("hold_window"))
+        position_size = float(params.get("position_size"))
+        position_limit = int(params.get("position_limit", 1))
+        fee_rate = float(params.get("fee_rate", 0.0003))
+        num_accounts = int(params.get("num_accounts", 1))
+        start_date = params.get("start_date")
+
         # Validate inputs
         if up_threshold <= 0:
             return jsonify({"success": False, "error": "Up threshold must be positive"}), 400
         if down_threshold >= 0:
             return jsonify({"success": False, "error": "Down threshold must be negative"}), 400
-        
+
         # Prepare parameters dict for worker function
         worker_params = {
-            'up_threshold': up_threshold,
-            'up_direction': up_direction,
-            'down_threshold': down_threshold,
-            'down_direction': down_direction,
-            'detection_window': detection_window,
-            'hold_window': hold_window,
-            'position_size': position_size,
-            'position_limit': position_limit,
-            'fee_rate': fee_rate,
-            'num_accounts': num_accounts,
-            'start_date': start_date
+            "up_threshold": up_threshold,
+            "up_direction": up_direction,
+            "down_threshold": down_threshold,
+            "down_direction": down_direction,
+            "detection_window": detection_window,
+            "hold_window": hold_window,
+            "position_size": position_size,
+            "position_limit": position_limit,
+            "fee_rate": fee_rate,
+            "num_accounts": num_accounts,
+            "start_date": start_date,
         }
-        
+
         # Use ThreadPoolExecutor for compatibility with Flask
         # (ProcessPoolExecutor has issues with spawn and Flask's request context)
         max_workers = min(len(symbols), multiprocessing.cpu_count())
         print(f"DEBUG: Using {max_workers} parallel workers (ThreadPool)", flush=True)
-        
+
         results = []
         executor = None
-        
+
         try:
             print(f"DEBUG: Creating ThreadPoolExecutor...", flush=True)
             executor = ThreadPoolExecutor(max_workers=max_workers)
             print(f"DEBUG: Executor created, submitting {len(symbols)} jobs...", flush=True)
-            
+
             # Submit all jobs
             future_to_symbol = {
                 executor.submit(process_single_symbol, symbol, DATA_DIR, worker_params): symbol
                 for symbol in symbols
             }
-            print(f"DEBUG: All {len(future_to_symbol)} jobs submitted, waiting for completion...", flush=True)
-            
+            print(
+                f"DEBUG: All {len(future_to_symbol)} jobs submitted, waiting for completion...",
+                flush=True,
+            )
+
             # Collect results as they complete
             completed = 0
             for future in as_completed(future_to_symbol):
@@ -715,201 +753,204 @@ def run_batch_backtest():
                     result = future.result(timeout=120)  # 2 minute timeout per symbol
                     results.append(result)
                     completed += 1
-                    print(f"DEBUG: Completed {completed}/{len(symbols)}: {symbol} - {result.get('num_trades', 0)} trades", flush=True)
+                    print(
+                        f"DEBUG: Completed {completed}/{len(symbols)}: {symbol} - {result.get('num_trades', 0)} trades",
+                        flush=True,
+                    )
                 except Exception as e:
                     import traceback
+
                     print(f"ERROR: Exception processing {symbol}: {str(e)}", flush=True)
                     print(f"ERROR: Traceback: {traceback.format_exc()}", flush=True)
-                    results.append({
-                        "symbol": symbol,
-                        "success": False,
-                        "error": str(e),
-                        "traceback": traceback.format_exc()
-                    })
+                    results.append(
+                        {
+                            "symbol": symbol,
+                            "success": False,
+                            "error": str(e),
+                            "traceback": traceback.format_exc(),
+                        }
+                    )
         finally:
             # Explicitly shutdown and cleanup the executor
             if executor is not None:
                 print(f"DEBUG: Shutting down executor with {max_workers} workers", flush=True)
                 executor.shutdown(wait=True, cancel_futures=False)
                 print(f"DEBUG: Executor shutdown complete", flush=True)
-        
+
         # Save aggregate results after all backtests complete
         save_aggregate_backtest_result(
-            result_type='minute',
+            result_type="minute",
             symbols=symbols,
             params=worker_params,
             results=results,
-            universe=universe
+            universe=universe,
         )
-        
-        return jsonify({
-            "success": True,
-            "results": results,
-            "total_symbols": len(symbols),
-            "successful": sum(1 for r in results if r.get("success", False))
-        })
-        
+
+        return jsonify(
+            {
+                "success": True,
+                "results": results,
+                "total_symbols": len(symbols),
+                "successful": sum(1 for r in results if r.get("success", False)),
+            }
+        )
+
     except Exception as e:
         import traceback
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+
+        return (
+            jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}),
+            500,
+        )
 
 
 # ============================================================================
 # Daily Backtest API Endpoints
 # ============================================================================
 
-@app.route('/api/daily-symbols', methods=['GET'])
+
+@app.route("/api/daily-symbols", methods=["GET"])
 def get_daily_symbols():
     """Get list of available symbols from daily parquet files."""
     try:
         # Find all daily parquet files
         parquet_files = list(DAILY_DATA_DIR.glob("*_daily_*.parquet"))
-        
+
         # Extract unique symbols
         symbols = set()
         for file in parquet_files:
             # Extract symbol from filename (e.g., BTCUSDT_daily_2024-01_2025-10.parquet)
             filename = file.stem
-            symbol = filename.split('_daily_')[0]
+            symbol = filename.split("_daily_")[0]
             symbols.add(symbol)
-        
-        return jsonify({
-            "success": True,
-            "symbols": sorted(list(symbols))
-        })
+
+        return jsonify({"success": True, "symbols": sorted(list(symbols))})
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('/api/universes', methods=['GET'])
+@app.route("/api/universes", methods=["GET"])
 def get_universes():
     """Get list of available universe/segment definitions."""
     try:
-        return jsonify({
-            "success": True,
-            "universes": UNIVERSES
-        })
+        return jsonify({"success": True, "universes": UNIVERSES})
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('/api/universe-symbols', methods=['GET'])
+@app.route("/api/universe-symbols", methods=["GET"])
 def get_universe_symbols():
     """Get symbols for a specific universe by reading the index weights file."""
     try:
-        universe_id = request.args.get('universe', 'all')
-        
-        if universe_id == 'all' or universe_id not in UNIVERSES:
+        universe_id = request.args.get("universe", "all")
+
+        if universe_id == "all" or universe_id not in UNIVERSES:
             # Return all symbols
             parquet_files = list(DAILY_DATA_DIR.glob("*_daily_*.parquet"))
             symbols = set()
             for file in parquet_files:
                 filename = file.stem
-                symbol = filename.split('_daily_')[0]
+                symbol = filename.split("_daily_")[0]
                 # Exclude index symbols from "all" category
-                if not symbol.startswith('IX'):
+                if not symbol.startswith("IX"):
                     symbols.add(symbol)
-            
-            return jsonify({
-                "success": True,
-                "universe": universe_id,
-                "symbols": sorted(list(symbols))
-            })
-        
+
+            return jsonify(
+                {"success": True, "universe": universe_id, "symbols": sorted(list(symbols))}
+            )
+
         # Get universe config
         universe_config = UNIVERSES[universe_id]
-        
+
         # Try to find the most recent weights file for this index
         # Match by filename pattern that includes DROP information
-        agg_dir = Path('/workspace/data/klines_aggregate') if Path('/workspace/data/klines_aggregate').exists() else Path('/app/data/klines_aggregate')
-        
+        agg_dir = (
+            Path("/workspace/data/klines_aggregate")
+            if Path("/workspace/data/klines_aggregate").exists()
+            else Path("/app/data/klines_aggregate")
+        )
+
         # Determine the WEIGHTS file pattern based on universe
         # Pattern includes the drop-n parameter encoded in filename
         weights_patterns = {
-            'top10': 'WEIGHTS_10_1_MONTH_*.pq',  # Top 10 including BTC (no DROP)
-            'top10_exbtc': 'WEIGHTS_10_DROP1_1_MONTH_*.pq',  # Top 10 excluding BTC (DROP1)
-            'mid60': 'WEIGHTS_70_DROP10_1_MONTH_*.pq',  # Mid 60: top 70 drop 10
-            'small100': 'WEIGHTS_170_DROP70_1_MONTH_*.pq',  # Small 100: top 170 drop 70
-            'tiny130': 'WEIGHTS_300_DROP170_1_MONTH_*.pq'  # Tiny 130: top 300 drop 170
+            "top10": "WEIGHTS_10_1_MONTH_*.pq",  # Top 10 including BTC (no DROP)
+            "top10_exbtc": "WEIGHTS_10_DROP1_1_MONTH_*.pq",  # Top 10 excluding BTC (DROP1)
+            "mid60": "WEIGHTS_70_DROP10_1_MONTH_*.pq",  # Mid 60: top 70 drop 10
+            "small100": "WEIGHTS_170_DROP70_1_MONTH_*.pq",  # Small 100: top 170 drop 70
+            "tiny130": "WEIGHTS_300_DROP170_1_MONTH_*.pq",  # Tiny 130: top 300 drop 170
         }
-        
+
         # Try to find matching weights file by pattern
         pattern = weights_patterns.get(universe_id)
         if pattern:
             weights_files = sorted(agg_dir.glob(pattern))
-            
+
             if weights_files:
                 # Use the most recent file
                 weights_file = weights_files[-1]
                 try:
                     df = pl.read_parquet(weights_file)
-                    
+
                     # Get the most recent period
-                    last_period = df.select('end_date').max().item()
-                    period_df = df.filter(pl.col('end_date') == last_period)
-                    
-                    symbols = period_df.select('symbol').to_series().to_list()
-                    
+                    last_period = df.select("end_date").max().item()
+                    period_df = df.filter(pl.col("end_date") == last_period)
+
+                    symbols = period_df.select("symbol").to_series().to_list()
+
                     # Add the index symbol itself if defined
-                    if 'index' in universe_config:
-                        index_symbol = universe_config['index']
+                    if "index" in universe_config:
+                        index_symbol = universe_config["index"]
                         if index_symbol not in symbols:
                             symbols.append(index_symbol)
-                    
-                    return jsonify({
-                        "success": True,
-                        "universe": universe_id,
-                        "symbols": sorted(symbols),
-                        "source": "weights_file",
-                        "file": str(weights_file.name),
-                        "symbol_count": len(symbols)
-                    })
+
+                    return jsonify(
+                        {
+                            "success": True,
+                            "universe": universe_id,
+                            "symbols": sorted(symbols),
+                            "source": "weights_file",
+                            "file": str(weights_file.name),
+                            "symbol_count": len(symbols),
+                        }
+                    )
                 except Exception as e:
                     print(f"Error reading weights file {weights_file}: {e}")
-        
+
         # Fallback: use all symbols
         parquet_files = list(DAILY_DATA_DIR.glob("*_daily_*.parquet"))
         all_symbols = []
         for file in parquet_files:
             filename = file.stem
-            symbol = filename.split('_daily_')[0]
-            if not symbol.startswith('IX'):
+            symbol = filename.split("_daily_")[0]
+            if not symbol.startswith("IX"):
                 all_symbols.append(symbol)
-        
+
         # For now, return all non-index symbols as fallback
         # TODO: implement ADV-based ranking and filtering
-        return jsonify({
-            "success": True,
-            "universe": universe_id,
-            "symbols": sorted(all_symbols),
-            "source": "fallback",
-            "warning": "No weights file found, returning all symbols"
-        })
-        
+        return jsonify(
+            {
+                "success": True,
+                "universe": universe_id,
+                "symbols": sorted(all_symbols),
+                "source": "fallback",
+                "warning": "No weights file found, returning all symbols",
+            }
+        )
+
     except Exception as e:
         import traceback
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+
+        return (
+            jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}),
+            500,
+        )
 
 
-@app.route('/api/daily-backtest', methods=['POST'])
+@app.route("/api/daily-backtest", methods=["POST"])
 def run_daily_backtest():
     """
     Run daily backtest with provided parameters.
-    
+
     Expected JSON body:
     {
         "symbol": "BTCUSDT",
@@ -929,34 +970,34 @@ def run_daily_backtest():
     try:
         # Get parameters from request
         params = request.json
-        
+
         print(f"DEBUG: Received daily backtest request for symbol: {params.get('symbol')}")
-        
-        symbol = params.get('symbol')
-        up_threshold = float(params.get('up_threshold'))
-        up_direction = params.get('up_direction', 'B')
-        down_threshold = float(params.get('down_threshold'))
-        down_direction = params.get('down_direction', 'S')
-        detection_window = int(params.get('detection_window'))
-        hold_window = int(params.get('hold_window'))
-        position_size = float(params.get('position_size'))
-        position_limit = int(params.get('position_limit', 1))
-        fee_rate = float(params.get('fee_rate', 0.001))
-        num_accounts = int(params.get('num_accounts', 1))
-        start_date = params.get('start_date')
-        
+
+        symbol = params.get("symbol")
+        up_threshold = float(params.get("up_threshold"))
+        up_direction = params.get("up_direction", "B")
+        down_threshold = float(params.get("down_threshold"))
+        down_direction = params.get("down_direction", "S")
+        detection_window = int(params.get("detection_window"))
+        hold_window = int(params.get("hold_window"))
+        position_size = float(params.get("position_size"))
+        position_limit = int(params.get("position_limit", 1))
+        fee_rate = float(params.get("fee_rate", 0.001))
+        num_accounts = int(params.get("num_accounts", 1))
+        start_date = params.get("start_date")
+
         # Find parquet file(s) with wildcard pattern
         matching_files = sorted(DAILY_DATA_DIR.glob(f"{symbol}_daily_*.parquet"))
-        
+
         if not matching_files:
-            return jsonify({
-                "success": False,
-                "error": f"No daily data found for symbol {symbol}"
-            }), 404
-        
+            return (
+                jsonify({"success": False, "error": f"No daily data found for symbol {symbol}"}),
+                404,
+            )
+
         # Use most recent file
         parquet_file = str(matching_files[-1])
-        
+
         # Run simulation using daily_sim module
         trades_df, summary = daily_sim.run_simulation_from_file(
             parquet_file,
@@ -970,9 +1011,9 @@ def run_daily_backtest():
             fee_rate,
             num_accounts,
             up_direction,
-            down_direction
+            down_direction,
         )
-        
+
         # Extract cumulative PnL time series for aggregation
         cumulative_pnl_series = []
         if len(trades_df) > 0:
@@ -981,40 +1022,46 @@ def run_daily_backtest():
                 [pl.col("net_profit_dollars").cum_sum().alias("cumulative_pnl")]
             )
             cumulative_pnl_series = [
-                {"time": row["exit_time"].isoformat() if hasattr(row["exit_time"], 'isoformat') else str(row["exit_time"]), 
-                 "pnl": row["cumulative_pnl"]}
+                {
+                    "time": (
+                        row["exit_time"].isoformat()
+                        if hasattr(row["exit_time"], "isoformat")
+                        else str(row["exit_time"])
+                    ),
+                    "pnl": row["cumulative_pnl"],
+                }
                 for row in trades_sorted.select(["exit_time", "cumulative_pnl"]).to_dicts()
             ]
-        
+
         # Prepare response
         response = {
             "success": True,
             "summary": summary,
             "num_trades": len(trades_df),
-            "cumulative_pnl_series": cumulative_pnl_series
+            "cumulative_pnl_series": cumulative_pnl_series,
         }
-        
+
         return jsonify(response)
-        
+
     except Exception as e:
         import traceback
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+
+        return (
+            jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}),
+            500,
+        )
 
 
 def process_single_daily_symbol(symbol: str, data_dir: Path, params: dict) -> dict:
     """
     Worker function to process a single symbol daily backtest.
     Designed to be called by ThreadPoolExecutor for parallel execution.
-    
+
     Args:
         symbol: Trading symbol (e.g., 'BTCUSDT')
         data_dir: Path to daily data directory
         params: Dictionary with backtest parameters
-        
+
     Returns:
         Dictionary with result or error information
     """
@@ -1023,41 +1070,41 @@ def process_single_daily_symbol(symbol: str, data_dir: Path, params: dict) -> di
         import polars as pl
         import sys
         from pathlib import Path
-        
+
         # Re-import daily_sim in worker process
         sys.path.insert(0, str(Path(__file__).parent))
         try:
             from signal_utils import daily_sim
         except ImportError:
-            sys.path.insert(0, str(Path(__file__).parent.parent / 'src' / 'research'))
+            sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "research"))
             from signal_utils import daily_sim
-        
+
         # Find parquet file(s) with wildcard pattern
         matching_files = sorted(data_dir.glob(f"{symbol}_daily_*.parquet"))
-        
+
         if not matching_files:
             return {
                 "symbol": symbol,
                 "success": False,
-                "error": f"No daily data found for symbol {symbol}"
+                "error": f"No daily data found for symbol {symbol}",
             }
-        
+
         # Use most recent file
         parquet_file = str(matching_files[-1])
-        
+
         # Extract parameters
-        start_date = params.get('start_date')
-        up_threshold = params['up_threshold']
-        up_direction = params['up_direction']
-        down_threshold = params['down_threshold']
-        down_direction = params['down_direction']
-        detection_window = params['detection_window']
-        hold_window = params['hold_window']
-        position_size = params['position_size']
-        position_limit = params['position_limit']
-        fee_rate = params['fee_rate']
-        num_accounts = params['num_accounts']
-        
+        start_date = params.get("start_date")
+        up_threshold = params["up_threshold"]
+        up_direction = params["up_direction"]
+        down_threshold = params["down_threshold"]
+        down_direction = params["down_direction"]
+        detection_window = params["detection_window"]
+        hold_window = params["hold_window"]
+        position_size = params["position_size"]
+        position_limit = params["position_limit"]
+        fee_rate = params["fee_rate"]
+        num_accounts = params["num_accounts"]
+
         # Run simulation
         trades_df, summary = daily_sim.run_simulation_from_file(
             parquet_file,
@@ -1071,9 +1118,9 @@ def process_single_daily_symbol(symbol: str, data_dir: Path, params: dict) -> di
             fee_rate,
             num_accounts,
             up_direction,
-            down_direction
+            down_direction,
         )
-        
+
         # Extract cumulative PnL time series
         cumulative_pnl_series = []
         if len(trades_df) > 0:
@@ -1082,35 +1129,42 @@ def process_single_daily_symbol(symbol: str, data_dir: Path, params: dict) -> di
                 [pl.col("net_profit_dollars").cum_sum().alias("cumulative_pnl")]
             )
             cumulative_pnl_series = [
-                {"time": row["exit_time"].isoformat() if hasattr(row["exit_time"], 'isoformat') else str(row["exit_time"]), 
-                 "pnl": row["cumulative_pnl"]}
+                {
+                    "time": (
+                        row["exit_time"].isoformat()
+                        if hasattr(row["exit_time"], "isoformat")
+                        else str(row["exit_time"])
+                    ),
+                    "pnl": row["cumulative_pnl"],
+                }
                 for row in trades_sorted.select(["exit_time", "cumulative_pnl"]).to_dicts()
             ]
-        
+
         return {
             "symbol": symbol,
             "success": True,
             "summary": summary,
             "num_trades": len(trades_df),
-            "cumulative_pnl_series": cumulative_pnl_series
+            "cumulative_pnl_series": cumulative_pnl_series,
         }
-        
+
     except Exception as e:
         import traceback
+
         return {
             "symbol": symbol,
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            "traceback": traceback.format_exc(),
         }
 
 
-@app.route('/api/daily-backtest/batch', methods=['POST'])
+@app.route("/api/daily-backtest/batch", methods=["POST"])
 def run_batch_daily_backtest():
     """
     Run daily backtests for multiple symbols with same parameters.
     More efficient than calling /api/daily-backtest multiple times.
-    
+
     Expected JSON body:
     {
         "symbols": ["BTCUSDT", "ETHUSDT", ...],
@@ -1131,62 +1185,70 @@ def run_batch_daily_backtest():
     """
     try:
         data = request.json
-        symbols = data.get('symbols', [])
-        params = data.get('params', {})
-        universe = data.get('universe', 'all')
-        
+        symbols = data.get("symbols", [])
+        params = data.get("params", {})
+        universe = data.get("universe", "all")
+
         if not symbols:
             return jsonify({"success": False, "error": "No symbols provided"}), 400
-        
+
         print(f"DEBUG: Batch daily backtest for {len(symbols)} symbols using parallel processing")
-        
+
         # Extract and validate parameters
-        up_threshold = float(params.get('up_threshold'))
-        up_direction = params.get('up_direction', 'B')
-        down_threshold = float(params.get('down_threshold'))
-        down_direction = params.get('down_direction', 'S')
-        detection_window = int(params.get('detection_window'))
-        hold_window = int(params.get('hold_window'))
-        position_size = float(params.get('position_size'))
-        position_limit = int(params.get('position_limit', 1))
-        fee_rate = float(params.get('fee_rate', 0.001))
-        num_accounts = int(params.get('num_accounts', 1))
-        start_date = params.get('start_date')
-        
+        up_threshold = float(params.get("up_threshold"))
+        up_direction = params.get("up_direction", "B")
+        down_threshold = float(params.get("down_threshold"))
+        down_direction = params.get("down_direction", "S")
+        detection_window = int(params.get("detection_window"))
+        hold_window = int(params.get("hold_window"))
+        position_size = float(params.get("position_size"))
+        position_limit = int(params.get("position_limit", 1))
+        fee_rate = float(params.get("fee_rate", 0.001))
+        num_accounts = int(params.get("num_accounts", 1))
+        start_date = params.get("start_date")
+
         # Prepare parameters dict for worker function
         worker_params = {
-            'up_threshold': up_threshold,
-            'up_direction': up_direction,
-            'down_threshold': down_threshold,
-            'down_direction': down_direction,
-            'detection_window': detection_window,
-            'hold_window': hold_window,
-            'position_size': position_size,
-            'position_limit': position_limit,
-            'fee_rate': fee_rate,
-            'num_accounts': num_accounts,
-            'start_date': start_date
+            "up_threshold": up_threshold,
+            "up_direction": up_direction,
+            "down_threshold": down_threshold,
+            "down_direction": down_direction,
+            "detection_window": detection_window,
+            "hold_window": hold_window,
+            "position_size": position_size,
+            "position_limit": position_limit,
+            "fee_rate": fee_rate,
+            "num_accounts": num_accounts,
+            "start_date": start_date,
         }
-        
+
         # Use ThreadPoolExecutor for compatibility with Flask
         max_workers = min(len(symbols), multiprocessing.cpu_count())
-        print(f"DEBUG: Using {max_workers} parallel workers (ThreadPool) for daily backtests", flush=True)
-        
+        print(
+            f"DEBUG: Using {max_workers} parallel workers (ThreadPool) for daily backtests",
+            flush=True,
+        )
+
         results = []
         executor = None
-        
+
         try:
             print(f"DEBUG: Creating ThreadPoolExecutor...", flush=True)
             executor = ThreadPoolExecutor(max_workers=max_workers)
             print(f"DEBUG: Executor created, submitting {len(symbols)} daily jobs...", flush=True)
-            
+
             # Submit all jobs
             future_to_symbol = {
-                executor.submit(process_single_daily_symbol, symbol, DAILY_DATA_DIR, worker_params): symbol
+                executor.submit(
+                    process_single_daily_symbol, symbol, DAILY_DATA_DIR, worker_params
+                ): symbol
                 for symbol in symbols
             }
-            print(f"DEBUG: All {len(future_to_symbol)} jobs submitted, waiting for completion...", flush=True)
-            
+            print(
+                f"DEBUG: All {len(future_to_symbol)} jobs submitted, waiting for completion...",
+                flush=True,
+            )
+
             # Collect results as they complete
             completed = 0
             for future in as_completed(future_to_symbol):
@@ -1196,97 +1258,105 @@ def run_batch_daily_backtest():
                     result = future.result(timeout=120)  # 2 minute timeout per symbol
                     results.append(result)
                     completed += 1
-                    print(f"DEBUG: Completed {completed}/{len(symbols)}: {symbol} - {result.get('num_trades', 0)} trades", flush=True)
+                    print(
+                        f"DEBUG: Completed {completed}/{len(symbols)}: {symbol} - {result.get('num_trades', 0)} trades",
+                        flush=True,
+                    )
                 except Exception as e:
                     import traceback
+
                     print(f"ERROR: Exception processing {symbol}: {str(e)}", flush=True)
                     print(f"ERROR: Traceback: {traceback.format_exc()}", flush=True)
-                    results.append({
-                        "symbol": symbol,
-                        "success": False,
-                        "error": str(e),
-                        "traceback": traceback.format_exc()
-                    })
+                    results.append(
+                        {
+                            "symbol": symbol,
+                            "success": False,
+                            "error": str(e),
+                            "traceback": traceback.format_exc(),
+                        }
+                    )
         finally:
             # Explicitly shutdown and cleanup the executor
             if executor is not None:
                 print(f"DEBUG: Shutting down executor with {max_workers} workers", flush=True)
                 executor.shutdown(wait=True, cancel_futures=False)
                 print(f"DEBUG: Executor shutdown complete", flush=True)
-        
+
         # Save aggregate results after all backtests complete
         save_aggregate_backtest_result(
-            result_type='daily',
+            result_type="daily",
             symbols=symbols,
             params=worker_params,
             results=results,
-            universe=universe
+            universe=universe,
         )
-        
-        return jsonify({
-            "success": True,
-            "results": results,
-            "total_symbols": len(symbols),
-            "successful": sum(1 for r in results if r.get("success", False))
-        })
-        
+
+        return jsonify(
+            {
+                "success": True,
+                "results": results,
+                "total_symbols": len(symbols),
+                "successful": sum(1 for r in results if r.get("success", False)),
+            }
+        )
+
     except Exception as e:
         import traceback
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+
+        return (
+            jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}),
+            500,
+        )
 
 
 def generate_plot_base64(trades_df: pl.DataFrame, symbol: str) -> str:
     """Generate cumulative PnL plot and return as base64 string."""
     # Sort by exit time
     trades_df = trades_df.sort("exit_time")
-    
+
     # Calculate cumulative PnL
     trades_df = trades_df.with_columns(
         [pl.col("net_profit_dollars").cum_sum().alias("cumulative_pnl")]
     )
-    
+
     # Create plot
     plt.figure(figsize=(12, 6))
-    
+
     exit_times = trades_df["exit_time"].to_list()
     cum_pnl = trades_df["cumulative_pnl"].to_list()
-    
+
     plt.plot(exit_times, cum_pnl, linewidth=2, color="steelblue")
     plt.axhline(y=0, color="red", linestyle="--", alpha=0.5, linewidth=1)
-    
+
     plt.xlabel("Date", fontsize=12)
     plt.ylabel("Cumulative PnL ($)", fontsize=12)
     plt.title(f"Cumulative PnL - {symbol}", fontsize=14, fontweight="bold")
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    
+
     # Save to BytesIO
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    plt.savefig(buf, format="png", dpi=150, bbox_inches="tight")
     buf.seek(0)
     plt.close()
-    
+
     # Encode as base64 (return just the base64 string, JS will add the data URI prefix)
-    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    img_base64 = base64.b64encode(buf.read()).decode("utf-8")
     return img_base64
 
 
-@app.route('/api/daily-data', methods=['POST'])
+@app.route("/api/daily-data", methods=["POST"])
 def get_daily_data():
     """
     Get daily OHLCV data for selected symbols from aggregate file.
-    
+
     Expected JSON body:
     {
         "symbols": ["BTCUSDT", "ETHUSDT", ...],
         "start_date": "2024-07-01" (optional),
         "end_date": "2025-09-30" (optional)
     }
-    
+
     Returns:
     {
         "success": true,
@@ -1309,101 +1379,125 @@ def get_daily_data():
     """
     try:
         data = request.json
-        symbols = data.get('symbols', [])
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
-        
+        symbols = data.get("symbols", [])
+        start_date = data.get("start_date")
+        end_date = data.get("end_date")
+
         if not symbols:
             return jsonify({"success": False, "error": "No symbols provided"}), 400
-        
+
         # Find aggregate parquet file
-        agg_dir = Path('/app/data/klines_aggregate') if Path('/app/data/klines_aggregate').exists() else Path(__file__).parent.parent / 'data' / 'klines_aggregate'
-        
+        agg_dir = (
+            Path("/app/data/klines_aggregate")
+            if Path("/app/data/klines_aggregate").exists()
+            else Path(__file__).parent.parent / "data" / "klines_aggregate"
+        )
+
         # Look for AGG_WITH_INDEXES_*.pq file first (includes both Binance data and indexes)
         # If not found, fall back to regular AGG_*.pq file (Binance data only)
-        agg_files = list(agg_dir.glob('AGG_WITH_INDEXES_*.pq'))
-        
+        agg_files = list(agg_dir.glob("AGG_WITH_INDEXES_*.pq"))
+
         if not agg_files:
             print("DEBUG: No AGG_WITH_INDEXES file found, falling back to regular AGG file")
-            agg_files = list(agg_dir.glob('AGG_*.pq'))
-        
+            agg_files = list(agg_dir.glob("AGG_*.pq"))
+
         if not agg_files:
             return jsonify({"success": False, "error": "No aggregate data file found"}), 404
-        
+
         # Use most recent file (sort by filename which includes date)
         agg_file = sorted(agg_files)[-1]
         print(f"DEBUG: Using aggregate file: {agg_file}")
-        
+
         # Read aggregate data
         df = pl.read_parquet(agg_file)
-        
+
         # Filter by symbols
-        df = df.filter(pl.col('symbol').is_in(symbols))
-        
+        df = df.filter(pl.col("symbol").is_in(symbols))
+
         # Filter by date range if provided
         if start_date:
-            start_dt = pl.datetime(year=int(start_date[:4]), month=int(start_date[5:7]), day=int(start_date[8:10]))
-            df = df.filter(pl.col('open_time') >= start_dt)
-        
+            start_dt = pl.datetime(
+                year=int(start_date[:4]), month=int(start_date[5:7]), day=int(start_date[8:10])
+            )
+            df = df.filter(pl.col("open_time") >= start_dt)
+
         if end_date:
-            end_dt = pl.datetime(year=int(end_date[:4]), month=int(end_date[5:7]), day=int(end_date[8:10]))
-            df = df.filter(pl.col('open_time') <= end_dt)
-        
+            end_dt = pl.datetime(
+                year=int(end_date[:4]), month=int(end_date[5:7]), day=int(end_date[8:10])
+            )
+            df = df.filter(pl.col("open_time") <= end_dt)
+
         # Sort by symbol and time
-        df = df.sort(['symbol', 'open_time'])
-        
+        df = df.sort(["symbol", "open_time"])
+
         # Group by symbol and prepare response
         result_data = {}
         for symbol in symbols:
-            symbol_df = df.filter(pl.col('symbol') == symbol)
-            
+            symbol_df = df.filter(pl.col("symbol") == symbol)
+
             if len(symbol_df) == 0:
                 result_data[symbol] = []
                 continue
-            
+
             # Convert to list of dictionaries
             symbol_data = [
                 {
-                    "date": row["open_time"].isoformat() if hasattr(row["open_time"], 'isoformat') else str(row["open_time"]),
+                    "date": (
+                        row["open_time"].isoformat()
+                        if hasattr(row["open_time"], "isoformat")
+                        else str(row["open_time"])
+                    ),
                     "open": row["open"],
                     "high": row["high"],
                     "low": row["low"],
                     "close": row["close"],
-                    "volume": row["volume"]
+                    "volume": row["volume"],
                 }
-                for row in symbol_df.select(["open_time", "open", "high", "low", "close", "volume"]).to_dicts()
+                for row in symbol_df.select(
+                    ["open_time", "open", "high", "low", "close", "volume"]
+                ).to_dicts()
             ]
             result_data[symbol] = symbol_data
-        
+
         # Get actual date range from data
         actual_start = df["open_time"].min()
         actual_end = df["open_time"].max()
-        
-        return jsonify({
-            "success": True,
-            "data": result_data,
-            "date_range": {
-                "start": actual_start.isoformat() if hasattr(actual_start, 'isoformat') else str(actual_start),
-                "end": actual_end.isoformat() if hasattr(actual_end, 'isoformat') else str(actual_end)
-            },
-            "total_symbols": len(symbols),
-            "file": agg_file.name
-        })
-        
+
+        return jsonify(
+            {
+                "success": True,
+                "data": result_data,
+                "date_range": {
+                    "start": (
+                        actual_start.isoformat()
+                        if hasattr(actual_start, "isoformat")
+                        else str(actual_start)
+                    ),
+                    "end": (
+                        actual_end.isoformat()
+                        if hasattr(actual_end, "isoformat")
+                        else str(actual_end)
+                    ),
+                },
+                "total_symbols": len(symbols),
+                "file": agg_file.name,
+            }
+        )
+
     except Exception as e:
         import traceback
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+
+        return (
+            jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}),
+            500,
+        )
 
 
-@app.route('/api/calculate-adv', methods=['POST'])
+@app.route("/api/calculate-adv", methods=["POST"])
 def calculate_adv():
     """
     Calculate Average Daily Volume (ADV) for top symbols.
-    
+
     Expected JSON body:
     {
         "units": "months" or "weeks",
@@ -1411,7 +1505,7 @@ def calculate_adv():
         "top_n": 1-100,
         "drop_n": 0-99 (optional, default 0)
     }
-    
+
     Returns:
     {
         "success": true,
@@ -1430,112 +1524,136 @@ def calculate_adv():
     """
     try:
         data = request.json
-        units = data.get('units', 'months')
-        interval = int(data.get('interval', 1))
-        top_n = int(data.get('top_n', 10))
-        drop_n = int(data.get('drop_n', 0))
-        
+        units = data.get("units", "months")
+        interval = int(data.get("interval", 1))
+        top_n = int(data.get("top_n", 10))
+        drop_n = int(data.get("drop_n", 0))
+
         # Validate inputs
-        if units not in ['months', 'weeks']:
+        if units not in ["months", "weeks"]:
             return jsonify({"success": False, "error": "units must be 'months' or 'weeks'"}), 400
-        
+
         if interval < 1 or interval > 12:
             return jsonify({"success": False, "error": "interval must be between 1 and 12"}), 400
-        
+
         if top_n < 1 or top_n > 500:
             return jsonify({"success": False, "error": "top_n must be between 1 and 500"}), 400
-        
+
         if drop_n < 0 or drop_n >= top_n:
-            return jsonify({"success": False, "error": f"drop_n must be between 0 and {top_n - 1}"}), 400
-        
+            return (
+                jsonify({"success": False, "error": f"drop_n must be between 0 and {top_n - 1}"}),
+                400,
+            )
+
         # Find aggregate parquet file
-        agg_dir = Path('/workspace/data/klines_aggregate') if Path('/workspace/data/klines_aggregate').exists() else Path('/app/data/klines_aggregate') if Path('/app/data/klines_aggregate').exists() else Path(__file__).parent.parent / 'data' / 'klines_aggregate'
-        
+        agg_dir = (
+            Path("/workspace/data/klines_aggregate")
+            if Path("/workspace/data/klines_aggregate").exists()
+            else (
+                Path("/app/data/klines_aggregate")
+                if Path("/app/data/klines_aggregate").exists()
+                else Path(__file__).parent.parent / "data" / "klines_aggregate"
+            )
+        )
+
         # Look for AGG_WITH_INDEXES_*.pq file first, fallback to regular AGG_*.pq
-        agg_files = list(agg_dir.glob('AGG_WITH_INDEXES_*.pq'))
-        
+        agg_files = list(agg_dir.glob("AGG_WITH_INDEXES_*.pq"))
+
         if not agg_files:
             print("DEBUG: No AGG_WITH_INDEXES file found for ADV, using regular AGG file")
-            agg_files = list(agg_dir.glob('AGG_*.pq'))
-        
+            agg_files = list(agg_dir.glob("AGG_*.pq"))
+
         if not agg_files:
             return jsonify({"success": False, "error": "No aggregate data file found"}), 404
-        
+
         # Use most recent file (sort by filename which includes date)
         agg_file = sorted(agg_files)[-1]
         print(f"DEBUG: Using aggregate file for ADV: {agg_file}")
-        
+
         # Read aggregate data
         df = pl.read_parquet(agg_file)
-        
+
         # Filter to USDT symbols (default behavior)
-        df = df.filter(pl.col('symbol').str.ends_with('USDT'))
-        
+        df = df.filter(pl.col("symbol").str.ends_with("USDT"))
+
         if drop_n > 0:
             remaining = top_n - drop_n
-            print(f"DEBUG: Calculating {interval}-{units} ADV for top {top_n}, dropping top {drop_n}, keeping ranks {drop_n + 1}-{top_n} ({remaining} symbols)...")
+            print(
+                f"DEBUG: Calculating {interval}-{units} ADV for top {top_n}, dropping top {drop_n}, keeping ranks {drop_n + 1}-{top_n} ({remaining} symbols)..."
+            )
         else:
             print(f"DEBUG: Calculating {interval}-{units} ADV for top {top_n} symbols...")
         print(f"DEBUG: Input data: {len(df)} rows, {df['symbol'].n_unique()} unique symbols")
-        
+
         # Check if calc_adv module is available
         if calc_adv_module is None:
-            return jsonify({
-                "success": False,
-                "error": "calc_adv module not available. Please check server logs."
-            }), 500
-        
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "calc_adv module not available. Please check server logs.",
+                    }
+                ),
+                500,
+            )
+
         # Calculate ADV using calc_adv module
         result_df = calc_adv_module.calculate_adv(
-            df=df,
-            interval=interval,
-            units=units,
-            top_n=top_n,
-            drop_n=drop_n
+            df=df, interval=interval, units=units, top_n=top_n, drop_n=drop_n
         )
-        
+
         print(f"DEBUG: Result: {len(result_df)} rows")
-        
+
         # Convert to list of dictionaries for JSON response
         result_data = []
         for row in result_df.to_dicts():
             item = {
-                "begin_date": row["begin_date"].isoformat() if hasattr(row["begin_date"], 'isoformat') else str(row["begin_date"]),
-                "end_date": row["end_date"].isoformat() if hasattr(row["end_date"], 'isoformat') else str(row["end_date"]),
+                "begin_date": (
+                    row["begin_date"].isoformat()
+                    if hasattr(row["begin_date"], "isoformat")
+                    else str(row["begin_date"])
+                ),
+                "end_date": (
+                    row["end_date"].isoformat()
+                    if hasattr(row["end_date"], "isoformat")
+                    else str(row["end_date"])
+                ),
                 "symbol": row["symbol"],
                 "adv": float(row["adv"]),
-                "weight": float(row["weight"])
+                "weight": float(row["weight"]),
             }
             # Add rank if present (will be present when top_n is specified)
             if "rank" in row:
                 item["rank"] = int(row["rank"])
             result_data.append(item)
-        
-        return jsonify({
-            "success": True,
-            "data": result_data,
-            "total_periods": len(set(r["begin_date"] for r in result_data)),
-            "total_symbols": len(set(r["symbol"] for r in result_data)),
-            "file": agg_file.name,
-            "drop_n": drop_n
-        })
-        
+
+        return jsonify(
+            {
+                "success": True,
+                "data": result_data,
+                "total_periods": len(set(r["begin_date"] for r in result_data)),
+                "total_symbols": len(set(r["symbol"] for r in result_data)),
+                "file": agg_file.name,
+                "drop_n": drop_n,
+            }
+        )
+
     except Exception as e:
         import traceback
+
         print(f"ERROR: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return (
+            jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}),
+            500,
+        )
 
 
-@app.route('/api/daily-correlation', methods=['POST'])
+@app.route("/api/daily-correlation", methods=["POST"])
 def calculate_correlation():
     """
     Calculate correlation matrix for selected symbols using daily returns.
-    
+
     Expected JSON body:
     {
         "symbols": ["BTCUSDT", "ETHUSDT", "IX10USDT", ...],
@@ -1543,7 +1661,7 @@ def calculate_correlation():
         "end_date": "2025-09-30" (optional),
         "window_days": 30 (optional, for rolling correlation)
     }
-    
+
     Returns:
     {
         "success": true,
@@ -1559,94 +1677,105 @@ def calculate_correlation():
     """
     try:
         data = request.json
-        symbols = data.get('symbols', [])
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
-        
+        symbols = data.get("symbols", [])
+        start_date = data.get("start_date")
+        end_date = data.get("end_date")
+
         if not symbols or len(symbols) < 2:
             return jsonify({"success": False, "error": "At least 2 symbols required"}), 400
-        
+
         # Find aggregate parquet file
-        agg_dir = Path('/workspace/data/klines_aggregate') if Path('/workspace/data/klines_aggregate').exists() else Path('/app/data/klines_aggregate') if Path('/app/data/klines_aggregate').exists() else Path(__file__).parent.parent / 'data' / 'klines_aggregate'
-        
+        agg_dir = (
+            Path("/workspace/data/klines_aggregate")
+            if Path("/workspace/data/klines_aggregate").exists()
+            else (
+                Path("/app/data/klines_aggregate")
+                if Path("/app/data/klines_aggregate").exists()
+                else Path(__file__).parent.parent / "data" / "klines_aggregate"
+            )
+        )
+
         # Look for AGG_WITH_INDEXES_*.pq file first (includes both Binance data and indexes)
-        agg_files = list(agg_dir.glob('AGG_WITH_INDEXES_*.pq'))
-        
+        agg_files = list(agg_dir.glob("AGG_WITH_INDEXES_*.pq"))
+
         if not agg_files:
             # Fallback to regular AGG_*.pq file
-            agg_files = list(agg_dir.glob('AGG_*.pq'))
-        
+            agg_files = list(agg_dir.glob("AGG_*.pq"))
+
         if not agg_files:
             return jsonify({"success": False, "error": "No aggregate file found"}), 404
-        
+
         # Use the most recent file
         agg_file = max(agg_files, key=lambda p: p.stat().st_mtime)
-        
+
         print(f"DEBUG: Reading {agg_file.name} for correlation calculation")
         print(f"DEBUG: Symbols requested: {symbols}")
-        
+
         # Read the aggregate file
         df = pl.read_parquet(agg_file)
-        
+
         # Filter by symbols
         df = df.filter(pl.col("symbol").is_in(symbols))
-        
+
         if len(df) == 0:
             return jsonify({"success": False, "error": "No data found for requested symbols"}), 404
-        
+
         # Filter by date range if provided
         if start_date:
             try:
                 start_dt = datetime.strptime(start_date, "%Y-%m-%d")
                 df = df.filter(pl.col("open_time") >= start_dt)
             except ValueError:
-                return jsonify({"success": False, "error": "Invalid start_date format. Use YYYY-MM-DD"}), 400
-        
+                return (
+                    jsonify(
+                        {"success": False, "error": "Invalid start_date format. Use YYYY-MM-DD"}
+                    ),
+                    400,
+                )
+
         if end_date:
             try:
                 end_dt = datetime.strptime(end_date, "%Y-%m-%d")
                 df = df.filter(pl.col("open_time") <= end_dt)
             except ValueError:
-                return jsonify({"success": False, "error": "Invalid end_date format. Use YYYY-MM-DD"}), 400
-        
+                return (
+                    jsonify({"success": False, "error": "Invalid end_date format. Use YYYY-MM-DD"}),
+                    400,
+                )
+
         # Calculate daily returns for each symbol
         df = df.sort(["symbol", "open_time"])
-        df = df.with_columns([
-            pl.col("close").pct_change().over("symbol").alias("return")
-        ])
-        
+        df = df.with_columns([pl.col("close").pct_change().over("symbol").alias("return")])
+
         # Remove first row for each symbol (NaN returns)
         df = df.filter(pl.col("return").is_not_null())
-        
+
         print(f"DEBUG: Data before pivot - {len(df)} rows, columns: {df.columns}")
         print(f"DEBUG: Unique symbols: {df['symbol'].unique().to_list()}")
         print(f"DEBUG: Sample data:\n{df.head(5)}")
-        
+
         # Pivot to get symbols as columns
         try:
-            pivot_df = df.pivot(
-                index="open_time",
-                on="symbol",
-                values="return"
-            ).sort("open_time")
+            pivot_df = df.pivot(index="open_time", on="symbol", values="return").sort("open_time")
         except Exception as e:
             print(f"ERROR during pivot: {e}")
             import traceback
+
             print(traceback.format_exc())
             raise
-        
+
         # Drop rows with any null values (days where not all symbols traded)
         pivot_df = pivot_df.drop_nulls()
-        
+
         if len(pivot_df) < 2:
             return jsonify({"success": False, "error": "Insufficient overlapping data points"}), 400
-        
+
         print(f"DEBUG: Calculating correlation with {len(pivot_df)} data points")
-        
+
         # Calculate correlation matrix
         # Get all symbol columns (exclude open_time)
         symbol_cols = [col for col in pivot_df.columns if col != "open_time"]
-        
+
         # Build correlation matrix
         corr_matrix = {}
         for sym1 in symbol_cols:
@@ -1658,108 +1787,116 @@ def calculate_correlation():
                     # Calculate Pearson correlation using Polars
                     # Method 1: Use select with corr expression
                     try:
-                        corr_value = pivot_df.select([
-                            pl.corr(sym1, sym2).alias("correlation")
-                        ])["correlation"][0]
-                        corr_matrix[sym1][sym2] = float(corr_value) if corr_value is not None else 0.0
+                        corr_value = pivot_df.select([pl.corr(sym1, sym2).alias("correlation")])[
+                            "correlation"
+                        ][0]
+                        corr_matrix[sym1][sym2] = (
+                            float(corr_value) if corr_value is not None else 0.0
+                        )
                     except Exception as e:
                         print(f"Warning: Could not calculate correlation for {sym1} vs {sym2}: {e}")
                         corr_matrix[sym1][sym2] = 0.0
-        
+
         # Get actual date range from data
         actual_start = pivot_df["open_time"].min()
         actual_end = pivot_df["open_time"].max()
-        
-        return jsonify({
-            "success": True,
-            "correlation_matrix": corr_matrix,
-            "symbols": symbol_cols,
-            "date_range": {
-                "start": actual_start.isoformat() if hasattr(actual_start, 'isoformat') else str(actual_start),
-                "end": actual_end.isoformat() if hasattr(actual_end, 'isoformat') else str(actual_end)
-            },
-            "data_points": len(pivot_df),
-            "file": agg_file.name
-        })
-        
+
+        return jsonify(
+            {
+                "success": True,
+                "correlation_matrix": corr_matrix,
+                "symbols": symbol_cols,
+                "date_range": {
+                    "start": (
+                        actual_start.isoformat()
+                        if hasattr(actual_start, "isoformat")
+                        else str(actual_start)
+                    ),
+                    "end": (
+                        actual_end.isoformat()
+                        if hasattr(actual_end, "isoformat")
+                        else str(actual_end)
+                    ),
+                },
+                "data_points": len(pivot_df),
+                "file": agg_file.name,
+            }
+        )
+
     except Exception as e:
         import traceback
+
         print(f"ERROR: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return (
+            jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}),
+            500,
+        )
 
 
-@app.route('/health', methods=['GET'])
+@app.route("/health", methods=["GET"])
 def health_check():
     """Health check endpoint."""
     return jsonify({"status": "healthy", "service": "backtest-api"})
 
 
-@app.route('/api/backtest-results', methods=['GET'])
+@app.route("/api/backtest-results", methods=["GET"])
 def get_backtest_results():
     """Get saved backtest results with optional filtering."""
     try:
-        result_type = request.args.get('type')  # 'minute' or 'daily'
-        universe = request.args.get('universe')
-        min_pnl = request.args.get('min_pnl')  # Minimum net profit filter
-        limit = int(request.args.get('limit', 100))
-        
+        result_type = request.args.get("type")  # 'minute' or 'daily'
+        universe = request.args.get("universe")
+        min_pnl = request.args.get("min_pnl")  # Minimum net profit filter
+        limit = int(request.args.get("limit", 100))
+
         results = []
-        
+
         # Determine which file(s) to read
         files_to_read = []
-        if result_type == 'minute':
-            files_to_read.append(RESULTS_DIR / 'backtest_results_minute.parquet')
-        elif result_type == 'daily':
-            files_to_read.append(RESULTS_DIR / 'backtest_results_daily.parquet')
+        if result_type == "minute":
+            files_to_read.append(RESULTS_DIR / "backtest_results_minute.parquet")
+        elif result_type == "daily":
+            files_to_read.append(RESULTS_DIR / "backtest_results_daily.parquet")
         else:
             # Read both
-            files_to_read.append(RESULTS_DIR / 'backtest_results_minute.parquet')
-            files_to_read.append(RESULTS_DIR / 'backtest_results_daily.parquet')
-        
+            files_to_read.append(RESULTS_DIR / "backtest_results_minute.parquet")
+            files_to_read.append(RESULTS_DIR / "backtest_results_daily.parquet")
+
         for filepath in files_to_read:
             if not filepath.exists():
                 continue
-            
+
             df = pl.read_parquet(filepath)
-            
+
             # Apply filters
             if universe:
-                df = df.filter(pl.col('universe') == universe)
-            if min_pnl is not None and min_pnl != '':
+                df = df.filter(pl.col("universe") == universe)
+            if min_pnl is not None and min_pnl != "":
                 min_pnl_val = float(min_pnl)
-                df = df.filter(pl.col('total_net_profit') >= min_pnl_val)
-            
+                df = df.filter(pl.col("total_net_profit") >= min_pnl_val)
+
             # Sort by timestamp descending (most recent first)
-            df = df.sort('timestamp', descending=True)
-            
+            df = df.sort("timestamp", descending=True)
+
             # Convert to dicts
             for row in df.head(limit).to_dicts():
                 # Convert timestamp to ISO string
-                if 'timestamp' in row and row['timestamp']:
-                    row['timestamp'] = row['timestamp'].isoformat()
+                if "timestamp" in row and row["timestamp"]:
+                    row["timestamp"] = row["timestamp"].isoformat()
                 results.append(row)
-        
+
         # Sort combined results by timestamp
-        results.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-        
-        return jsonify({
-            "success": True,
-            "results": results[:limit],
-            "count": len(results[:limit])
-        })
-        
+        results.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+
+        return jsonify({"success": True, "results": results[:limit], "count": len(results[:limit])})
+
     except Exception as e:
         import traceback
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+
+        return (
+            jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}),
+            500,
+        )
 
 
 # ============================================================================
@@ -1769,74 +1906,79 @@ def get_backtest_results():
 # Determine frontend directory based on environment
 # In Docker: /app/frontend (mounted from python/backtest/frontend)
 # Locally: ../frontend relative to this file
-FRONTEND_DIR = Path('/app/frontend') if Path('/app/frontend').exists() else Path(__file__).parent.parent / 'frontend'
+FRONTEND_DIR = (
+    Path("/app/frontend")
+    if Path("/app/frontend").exists()
+    else Path(__file__).parent.parent / "frontend"
+)
 
-@app.route('/')
+
+@app.route("/")
 def landing():
     """Serve the landing page (index.html)."""
-    return send_file(FRONTEND_DIR / 'index.html')
+    return send_file(FRONTEND_DIR / "index.html")
 
 
-@app.route('/multisymbol.html')
+@app.route("/multisymbol.html")
 def multisymbol_page():
     """Serve the multi-symbol backtest page."""
-    return send_file(FRONTEND_DIR / 'multisymbol.html')
+    return send_file(FRONTEND_DIR / "multisymbol.html")
 
 
-@app.route('/single-symbol.html')
+@app.route("/single-symbol.html")
 def single_symbol_page():
     """Serve the single-symbol backtest page."""
-    return send_file(FRONTEND_DIR / 'single-symbol.html')
+    return send_file(FRONTEND_DIR / "single-symbol.html")
 
 
-@app.route('/multisymbol.js')
+@app.route("/multisymbol.js")
 def multisymbol_js():
     """Serve the multi-symbol JavaScript."""
-    return send_file(FRONTEND_DIR / 'multisymbol.js', mimetype='application/javascript')
+    return send_file(FRONTEND_DIR / "multisymbol.js", mimetype="application/javascript")
 
 
-@app.route('/single-symbol.js')
+@app.route("/single-symbol.js")
 def single_symbol_js():
     """Serve the single-symbol JavaScript."""
-    return send_file(FRONTEND_DIR / 'single-symbol.js', mimetype='application/javascript')
+    return send_file(FRONTEND_DIR / "single-symbol.js", mimetype="application/javascript")
 
 
-@app.route('/daily.html')
+@app.route("/daily.html")
 def daily_page():
     """Serve the daily data visualization page."""
-    return send_file(FRONTEND_DIR / 'daily.html')
+    return send_file(FRONTEND_DIR / "daily.html")
 
 
-@app.route('/daily.js')
+@app.route("/daily.js")
 def daily_js():
     """Serve the daily data JavaScript."""
-    return send_file(FRONTEND_DIR / 'daily.js', mimetype='application/javascript')
+    return send_file(FRONTEND_DIR / "daily.js", mimetype="application/javascript")
 
 
-@app.route('/adv.html')
+@app.route("/adv.html")
 def adv_page():
     """Serve the ADV analysis page."""
-    return send_file(FRONTEND_DIR / 'adv.html')
+    return send_file(FRONTEND_DIR / "adv.html")
 
 
-@app.route('/adv.js')
+@app.route("/adv.js")
 def adv_js():
     """Serve the ADV analysis JavaScript."""
-    return send_file(FRONTEND_DIR / 'adv.js', mimetype='application/javascript')
+    return send_file(FRONTEND_DIR / "adv.js", mimetype="application/javascript")
 
 
-@app.route('/daily-multisymbol.html')
+@app.route("/daily-multisymbol.html")
 def daily_multisymbol_page():
     """Serve the daily multi-symbol backtest page."""
-    return send_file(FRONTEND_DIR / 'daily-multisymbol.html')
+    return send_file(FRONTEND_DIR / "daily-multisymbol.html")
 
 
-@app.route('/daily-multisymbol.js')
+@app.route("/daily-multisymbol.js")
 def daily_multisymbol_js():
     """Serve the daily multi-symbol JavaScript."""
-    return send_file(FRONTEND_DIR / 'daily-multisymbol.js', mimetype='application/javascript')
+    return send_file(FRONTEND_DIR / "daily-multisymbol.js", mimetype="application/javascript")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # For development
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

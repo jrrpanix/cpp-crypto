@@ -50,7 +50,9 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> None:
 
 def _git_commit_short() -> Optional[str]:
     try:
-        out = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL)
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL
+        )
         return out.decode().strip()
     except Exception:
         return None
@@ -170,6 +172,7 @@ def update_run(
 
 
 # --- Optional: write metrics to Parquet (fallback to JSON Lines) ---
+
 
 def write_metrics(
     records: Iterable[Dict[str, Any]],

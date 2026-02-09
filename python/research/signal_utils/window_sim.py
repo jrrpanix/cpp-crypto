@@ -41,10 +41,10 @@ def detect_signals(
 ) -> pl.DataFrame:
     """
     Detect when price change exceeds thresholds within detection window.
-    
+
     For each bar, calculates return from the open of the bar detection_window periods ago
     to the close of the current bar. Signals when this return exceeds threshold.
-    
+
     Optionally filters for idiosyncratic moves by comparing to an index:
     - If index_df provided, calculates idiosyncratic_return = symbol_return - index_return
     - Only triggers signal if abs(idiosyncratic_return) > index_threshold
@@ -72,9 +72,9 @@ def detect_signals(
     # return = (current_close - open_N_periods_ago) / open_N_periods_ago
     df = df.with_columns(
         [
-            (
-                (pl.col("close") - pl.col("window_start_open")) / pl.col("window_start_open")
-            ).alias("window_return")
+            ((pl.col("close") - pl.col("window_start_open")) / pl.col("window_start_open")).alias(
+                "window_return"
+            )
         ]
     )
 
@@ -89,36 +89,37 @@ def detect_signals(
         index_df = index_df.with_columns(
             [
                 (
-                    (pl.col("close") - pl.col("index_window_start_open")) / pl.col("index_window_start_open")
+                    (pl.col("close") - pl.col("index_window_start_open"))
+                    / pl.col("index_window_start_open")
                 ).alias("index_window_return")
             ]
         )
-        
+
         # Join index returns to symbol data by timestamp
         df = df.join(
-            index_df.select(["open_time", "index_window_return"]),
-            on="open_time",
-            how="left"
+            index_df.select(["open_time", "index_window_return"]), on="open_time", how="left"
         )
-        
+
         # Calculate idiosyncratic return (symbol return - index return)
         df = df.with_columns(
             [
-                (pl.col("window_return") - pl.col("index_window_return")).alias("idiosyncratic_return")
+                (pl.col("window_return") - pl.col("index_window_return")).alias(
+                    "idiosyncratic_return"
+                )
             ]
         )
-        
+
         # Create signal flags with idiosyncratic filter
         # Only signal if the idiosyncratic component is large enough
         df = df.with_columns(
             [
                 (
-                    (pl.col("window_return") > up_threshold) & 
-                    (pl.col("idiosyncratic_return") > index_threshold)
+                    (pl.col("window_return") > up_threshold)
+                    & (pl.col("idiosyncratic_return") > index_threshold)
                 ).alias("signal_up"),
                 (
-                    (pl.col("window_return") < down_threshold) & 
-                    (pl.col("idiosyncratic_return") < -index_threshold)
+                    (pl.col("window_return") < down_threshold)
+                    & (pl.col("idiosyncratic_return") < -index_threshold)
                 ).alias("signal_down"),
             ]
         )
@@ -135,7 +136,14 @@ def detect_signals(
 
 
 def simulate_trades(
-    df: pl.DataFrame, hold_window: int, position_size: float, position_limit: int = 1, fee_rate: float = 0.001, num_accounts: int = 1, up_direction: str = "B", down_direction: str = "S"
+    df: pl.DataFrame,
+    hold_window: int,
+    position_size: float,
+    position_limit: int = 1,
+    fee_rate: float = 0.001,
+    num_accounts: int = 1,
+    up_direction: str = "B",
+    down_direction: str = "S",
 ) -> tuple[pl.DataFrame, dict]:
     """
     Simulate trades based on up and down signals.
@@ -155,11 +163,19 @@ def simulate_trades(
     """
     # Check for up signals
     up_signals_df = df.filter(pl.col("signal_up") == True)
-    up_signal_indices = up_signals_df.select(pl.col("index")).to_series().to_list() if len(up_signals_df) > 0 else []
+    up_signal_indices = (
+        up_signals_df.select(pl.col("index")).to_series().to_list()
+        if len(up_signals_df) > 0
+        else []
+    )
 
     # Check for down signals
     down_signals_df = df.filter(pl.col("signal_down") == True)
-    down_signal_indices = down_signals_df.select(pl.col("index")).to_series().to_list() if len(down_signals_df) > 0 else []
+    down_signal_indices = (
+        down_signals_df.select(pl.col("index")).to_series().to_list()
+        if len(down_signals_df) > 0
+        else []
+    )
 
     if len(up_signal_indices) == 0 and len(down_signal_indices) == 0:
         return pl.DataFrame(), {
@@ -202,17 +218,17 @@ def simulate_trades(
     trades = []
     rejected_up_signals = 0
     rejected_down_signals = 0
-    
+
     # Combine and sort all signals by index
     all_signals = []
     for idx in up_signal_indices:
         all_signals.append((idx, "UP", up_direction))
     for idx in down_signal_indices:
         all_signals.append((idx, "DOWN", down_direction))
-    
+
     # Sort by signal index (chronological order)
     all_signals.sort(key=lambda x: x[0])
-    
+
     # Track open positions differently based on num_accounts
     if num_accounts == 1:
         # Single account: track net position (long=positive, short=negative)
@@ -222,9 +238,9 @@ def simulate_trades(
         # Multiple accounts: track long and short separately
         # List of (entry_idx, exit_idx, direction)
         open_positions = []
-    
+
     max_concurrent_positions = 0
-    
+
     # Process every signal with position limit enforcement
     for signal_idx, signal_type, trade_direction in all_signals:
         # Entry: next bar after signal (signal_idx + 1)
@@ -239,37 +255,49 @@ def simulate_trades(
 
         if num_accounts == 1:
             # Single account logic: close opposite positions and reverse
-            # Remove positions that have already exited  
-            open_positions = [(e_idx, x_idx, d, e_time, x_time) for e_idx, x_idx, d, e_time, x_time in open_positions if x_idx > entry_idx]
-            
+            # Remove positions that have already exited
+            open_positions = [
+                (e_idx, x_idx, d, e_time, x_time)
+                for e_idx, x_idx, d, e_time, x_time in open_positions
+                if x_idx > entry_idx
+            ]
+
             # Check if we have opposite direction positions
             opposite_direction = "S" if trade_direction == "B" else "B"
             opposite_positions = [p for p in open_positions if p[2] == opposite_direction]
             same_direction_positions = [p for p in open_positions if p[2] == trade_direction]
-            
+
             if opposite_positions:
                 # Close opposite positions and reverse
-                for opp_entry_idx, opp_exit_idx, opp_dir, opp_entry_time, opp_exit_time in opposite_positions:
+                for (
+                    opp_entry_idx,
+                    opp_exit_idx,
+                    opp_dir,
+                    opp_entry_time,
+                    opp_exit_time,
+                ) in opposite_positions:
                     # Find and update the existing trade record for this position
                     # The trade was already added to the trades list when it was opened
                     # We need to update its exit_idx and recalculate profit
                     for trade in trades:
-                        if (trade["entry_idx"] == opp_entry_idx and 
-                            trade["direction"] == opp_dir and
-                            trade["exit_idx"] == opp_exit_idx):  # Match the original scheduled exit
+                        if (
+                            trade["entry_idx"] == opp_entry_idx
+                            and trade["direction"] == opp_dir
+                            and trade["exit_idx"] == opp_exit_idx
+                        ):  # Match the original scheduled exit
                             # Update to early exit
                             entry_row_for_early = df.row(entry_idx, named=True)
                             early_exit_price = entry_row_for_early["open"]
-                            
+
                             # Get original entry price
                             opp_entry_row = df.row(opp_entry_idx, named=True)
                             opp_entry_price = opp_entry_row["open"]
-                            
+
                             # Calculate fees for early exit
                             entry_fee = position_size * fee_rate
                             exit_fee = position_size * fee_rate
                             total_fees = entry_fee + exit_fee
-                            
+
                             if opp_dir == "B":
                                 # Long trade being closed: profit = (exit - entry) / entry
                                 profit_pct = (early_exit_price / opp_entry_price) - 1
@@ -282,7 +310,7 @@ def simulate_trades(
                                 gross_profit_dollars = position_size * profit_pct
                                 net_profit_dollars = gross_profit_dollars - total_fees
                                 net_profit_pct = net_profit_dollars / position_size
-                            
+
                             # Update the existing trade record
                             trade["exit_idx"] = entry_idx  # Early exit
                             trade["exit_time"] = entry_row_for_early["open_time"]
@@ -293,17 +321,17 @@ def simulate_trades(
                             trade["fees"] = total_fees
                             trade["net_profit_dollars"] = net_profit_dollars
                             break  # Found and updated the trade
-                
+
                 # Remove all opposite positions
                 open_positions = same_direction_positions
             else:
                 # No opposite positions, just keep same direction
                 open_positions = same_direction_positions
-            
+
             # DETECTION: Log state right before limit check
             check_count = len(open_positions)
             will_reject = check_count >= position_limit
-            
+
             # Check position limit for same direction
             if check_count >= position_limit:
                 if signal_type == "UP":
@@ -311,16 +339,18 @@ def simulate_trades(
                 else:
                     rejected_down_signals += 1
                 continue
-            
+
             # DETECTION: If we get here, we're accepting the trade
             # Store this info for breach detection
             accepted_with_count = check_count
-                
+
         else:
             # Multiple accounts logic: track long and short separately
             # Close any positions that have already exited
-            open_positions = [(e_idx, x_idx, d) for e_idx, x_idx, d in open_positions if x_idx > entry_idx]
-            
+            open_positions = [
+                (e_idx, x_idx, d) for e_idx, x_idx, d in open_positions if x_idx > entry_idx
+            ]
+
             # Check position limit by direction - each account has its own limit
             same_direction_positions = [p for p in open_positions if p[2] == trade_direction]
             if len(same_direction_positions) >= position_limit:
@@ -357,15 +387,25 @@ def simulate_trades(
 
         # Add to open positions
         if num_accounts == 1:
-            open_positions.append((entry_idx, exit_idx, trade_direction, entry_row["open_time"], exit_row["close_time"]))
-            
+            open_positions.append(
+                (
+                    entry_idx,
+                    exit_idx,
+                    trade_direction,
+                    entry_row["open_time"],
+                    exit_row["close_time"],
+                )
+            )
+
             # DETECTION: Check if we've exceeded the limit for this direction (should never happen)
             same_dir_in_list = [p for p in open_positions if p[2] == trade_direction]
             if len(same_dir_in_list) > position_limit:
-                print(f"\n⚠️  BREACH! {trade_direction} positions: {len(same_dir_in_list)} > limit {position_limit} at entry_idx={entry_idx}\n")
+                print(
+                    f"\n⚠️  BREACH! {trade_direction} positions: {len(same_dir_in_list)} > limit {position_limit} at entry_idx={entry_idx}\n"
+                )
         else:
             open_positions.append((entry_idx, exit_idx, trade_direction))
-        
+
         # Track maximum concurrent positions
         if len(open_positions) > max_concurrent_positions:
             max_concurrent_positions = len(open_positions)
@@ -376,7 +416,9 @@ def simulate_trades(
                 "entry_idx": entry_idx,
                 "exit_idx": exit_idx,
                 "entry_time": entry_row["open_time"],
-                "exit_time": exit_row["open_time"],  # Use open_time: position exits at start of exit bar
+                "exit_time": exit_row[
+                    "open_time"
+                ],  # Use open_time: position exits at start of exit bar
                 "signal_type": signal_type,
                 "direction": trade_direction,
                 "entry_price": entry_price,
@@ -429,40 +471,48 @@ def simulate_trades(
 
     # Create trades DataFrame
     trades_df = pl.DataFrame(trades)
-    
-    print(f"DEBUG: Position limit: {position_limit}, Max concurrent during execution: {max_concurrent_positions}")
+
+    print(
+        f"DEBUG: Position limit: {position_limit}, Max concurrent during execution: {max_concurrent_positions}"
+    )
 
     # Calculate date range
     first_date = trades_df["entry_time"].min()
     last_date = trades_df["exit_time"].max()
     date_range = f"{first_date} to {last_date}"
-    
+
     # Calculate number of days
-    num_days = (last_date - first_date).days if hasattr((last_date - first_date), 'days') else 0
+    num_days = (last_date - first_date).days if hasattr((last_date - first_date), "days") else 0
     if num_days == 0:  # Less than a day or same day
         num_days = 1
-    
+
     # Calculate maximum exposure (long and short positions) efficiently
     # Create events for entry (+1) and exit (-1) for each direction
     # Use bar indices instead of timestamps to match execution logic
     long_events = []
     short_events = []
-    
+
     num_long_in_trades = sum(1 for t in trades if t["direction"] == "B")
     num_short_in_trades = sum(1 for t in trades if t["direction"] == "S")
-    print(f"DEBUG PRE: Long (B) trades in list: {num_long_in_trades}, Short (S) trades in list: {num_short_in_trades}")
-    
+    print(
+        f"DEBUG PRE: Long (B) trades in list: {num_long_in_trades}, Short (S) trades in list: {num_short_in_trades}"
+    )
+
     for trade in trades:
         if trade["direction"] == "B":
-            long_events.append((trade["entry_idx"], 1, trade["entry_time"]))    # Long entry
-            long_events.append((trade["exit_idx"], -1, trade["exit_time"]))      # Long exit
+            long_events.append((trade["entry_idx"], 1, trade["entry_time"]))  # Long entry
+            long_events.append((trade["exit_idx"], -1, trade["exit_time"]))  # Long exit
         else:  # "S"
-            short_events.append((trade["entry_idx"], 1, trade["entry_time"]))   # Short entry
-            short_events.append((trade["exit_idx"], -1, trade["exit_time"]))    # Short exit
-    
-    print(f"DEBUG POST: Long events created: {len(long_events)}, Short events created: {len(short_events)}")
-    print(f"DEBUG POST: Expected long: {num_long_in_trades * 2}, Expected short: {num_short_in_trades * 2}")
-    
+            short_events.append((trade["entry_idx"], 1, trade["entry_time"]))  # Short entry
+            short_events.append((trade["exit_idx"], -1, trade["exit_time"]))  # Short exit
+
+    print(
+        f"DEBUG POST: Long events created: {len(long_events)}, Short events created: {len(short_events)}"
+    )
+    print(
+        f"DEBUG POST: Expected long: {num_long_in_trades * 2}, Expected short: {num_short_in_trades * 2}"
+    )
+
     # Debug: Count entries vs exits
     long_entries = sum(1 for idx, delta, time in long_events if delta == 1)
     long_exits = sum(1 for idx, delta, time in long_events if delta == -1)
@@ -470,21 +520,21 @@ def simulate_trades(
     short_exits = sum(1 for idx, delta, time in short_events if delta == -1)
     print(f"DEBUG: Long entries: {long_entries}, exits: {long_exits}")
     print(f"DEBUG: Short entries: {short_entries}, exits: {short_exits}")
-    
+
     # Sort events by bar index, with exits before entries at same index
     # This matches the execution logic where we filter out positions with exit_idx >= entry_idx
     long_events.sort(key=lambda x: (x[0], x[1]))  # Sort by (index, delta)
     short_events.sort(key=lambda x: (x[0], x[1]))
-    
+
     # Calculate max long exposure
     max_long_exposure = 0.0
     current_long_count = 0
     max_long_count = 0
     max_long_time = None
-    
+
     # Debug: check for negative counts
     min_long_count = 0
-    
+
     for idx, delta, time in long_events:
         current_long_count += delta
         if current_long_count < min_long_count:
@@ -495,16 +545,16 @@ def simulate_trades(
         current_exposure = current_long_count * position_size
         if current_exposure > max_long_exposure:
             max_long_exposure = current_exposure
-    
+
     # Calculate max short exposure
     max_short_exposure = 0.0
     current_short_count = 0
     max_short_count = 0
     max_short_time = None
-    
+
     # Debug: check for negative counts
     min_short_count = 0
-    
+
     for idx, delta, time in short_events:
         current_short_count += delta
         if current_short_count < min_short_count:
@@ -515,43 +565,75 @@ def simulate_trades(
         current_exposure = current_short_count * position_size
         if current_exposure > max_short_exposure:
             max_short_exposure = current_exposure
-    
+
     # Debug: print max counts
     print(f"DEBUG: Max long count: {max_long_count} (min: {min_long_count}) at {max_long_time}")
     print(f"DEBUG: Max short count: {max_short_count} (min: {min_short_count}) at {max_short_time}")
     print(f"DEBUG: Long events: {len(long_events)}, Short events: {len(short_events)}")
-    
+
     # Debug: Find which trades were active at max times
     if max_long_time:
-        overlapping_longs = [t for t in trades if t["direction"] == "B" and t["entry_time"] <= max_long_time < t["exit_time"]]
+        overlapping_longs = [
+            t
+            for t in trades
+            if t["direction"] == "B" and t["entry_time"] <= max_long_time < t["exit_time"]
+        ]
         print(f"DEBUG: Trades active at max long time (showing all {len(overlapping_longs)}):")
         for i, t in enumerate(overlapping_longs):
-            print(f"  Trade {i+1}: entry_idx={t['entry_idx']}, exit_idx={t['exit_idx']}, entry_time={t['entry_time']}, exit_time={t['exit_time']}")
-    
+            print(
+                f"  Trade {i+1}: entry_idx={t['entry_idx']}, exit_idx={t['exit_idx']}, entry_time={t['entry_time']}, exit_time={t['exit_time']}"
+            )
+
     if max_short_time:
-        overlapping_shorts = [t for t in trades if t["direction"] == "S" and t["entry_time"] <= max_short_time < t["exit_time"]]
+        overlapping_shorts = [
+            t
+            for t in trades
+            if t["direction"] == "S" and t["entry_time"] <= max_short_time < t["exit_time"]
+        ]
         print(f"DEBUG: Trades active at max short time:")
         for i, t in enumerate(overlapping_shorts[:5]):  # Show first 5
-            print(f"  Trade {i+1}: entry_idx={t['entry_idx']}, exit_idx={t['exit_idx']}, entry_time={t['entry_time']}, exit_time={t['exit_time']}")
-    
+            print(
+                f"  Trade {i+1}: entry_idx={t['entry_idx']}, exit_idx={t['exit_idx']}, entry_time={t['entry_time']}, exit_time={t['exit_time']}"
+            )
+
     # Debug: Count active trades at max times
     if max_long_time and max_short_time:
         # Count how many trades were actually active at max_long_time
-        active_long_at_max = sum(1 for t in trades if t["direction"] == "B" and t["entry_time"] <= max_long_time < t["exit_time"])
-        active_short_at_max_long = sum(1 for t in trades if t["direction"] == "S" and t["entry_time"] <= max_long_time < t["exit_time"])
-        print(f"DEBUG: At max long time ({max_long_time}): {active_long_at_max} long, {active_short_at_max_long} short")
-        
-        # Count how many trades were actually active at max_short_time  
-        active_short_at_max = sum(1 for t in trades if t["direction"] == "S" and t["entry_time"] <= max_short_time < t["exit_time"])
-        active_long_at_max_short = sum(1 for t in trades if t["direction"] == "B" and t["entry_time"] <= max_short_time < t["exit_time"])
-        print(f"DEBUG: At max short time ({max_short_time}): {active_long_at_max_short} long, {active_short_at_max} short")
-    
+        active_long_at_max = sum(
+            1
+            for t in trades
+            if t["direction"] == "B" and t["entry_time"] <= max_long_time < t["exit_time"]
+        )
+        active_short_at_max_long = sum(
+            1
+            for t in trades
+            if t["direction"] == "S" and t["entry_time"] <= max_long_time < t["exit_time"]
+        )
+        print(
+            f"DEBUG: At max long time ({max_long_time}): {active_long_at_max} long, {active_short_at_max_long} short"
+        )
+
+        # Count how many trades were actually active at max_short_time
+        active_short_at_max = sum(
+            1
+            for t in trades
+            if t["direction"] == "S" and t["entry_time"] <= max_short_time < t["exit_time"]
+        )
+        active_long_at_max_short = sum(
+            1
+            for t in trades
+            if t["direction"] == "B" and t["entry_time"] <= max_short_time < t["exit_time"]
+        )
+        print(
+            f"DEBUG: At max short time ({max_short_time}): {active_long_at_max_short} long, {active_short_at_max} short"
+        )
+
     # Debug: Sample some trades to verify direction
     sample_long = [t for t in trades if t["direction"] == "B"][:3]
     sample_short = [t for t in trades if t["direction"] == "S"][:3]
     print(f"DEBUG: Sample Long (B) trade directions: {[t['direction'] for t in sample_long]}")
     print(f"DEBUG: Sample Short (S) trade directions: {[t['direction'] for t in sample_short]}")
-    
+
     # Calculate summary statistics overall
     total_gross_profit = trades_df["gross_profit_dollars"].sum()
     total_net_profit = trades_df["net_profit_dollars"].sum()
@@ -574,29 +656,37 @@ def simulate_trades(
     # Using profit_pct as gross returns, net_profit_pct as net returns
     # Annualized with sqrt(252) for trading days per year
     std_gross_return = trades_df["profit_pct"].std()
-    gross_sharpe_ratio = (avg_profit_pct / std_gross_return * (252 ** 0.5)) if (std_gross_return is not None and std_gross_return > 0) else 0.0
-    
+    gross_sharpe_ratio = (
+        (avg_profit_pct / std_gross_return * (252**0.5))
+        if (std_gross_return is not None and std_gross_return > 0)
+        else 0.0
+    )
+
     avg_net_profit_pct = trades_df["net_profit_pct"].mean()
     std_net_return = trades_df["net_profit_pct"].std()
-    net_sharpe_ratio = (avg_net_profit_pct / std_net_return * (252 ** 0.5)) if (std_net_return is not None and std_net_return > 0) else 0.0
+    net_sharpe_ratio = (
+        (avg_net_profit_pct / std_net_return * (252**0.5))
+        if (std_net_return is not None and std_net_return > 0)
+        else 0.0
+    )
 
     # Calculate statistics by direction
     long_trades = trades_df.filter(pl.col("direction") == "B")
     short_trades = trades_df.filter(pl.col("direction") == "S")
-    
+
     num_long_trades = len(long_trades)
     num_short_trades = len(short_trades)
-    
+
     # Long trades: gross, fees, net
     gross_long_profit = long_trades["gross_profit_dollars"].sum() if num_long_trades > 0 else 0.0
     long_fees = long_trades["fees"].sum() if num_long_trades > 0 else 0.0
     net_long_profit = long_trades["net_profit_dollars"].sum() if num_long_trades > 0 else 0.0
-    
+
     # Short trades: gross, fees, net
     gross_short_profit = short_trades["gross_profit_dollars"].sum() if num_short_trades > 0 else 0.0
     short_fees = short_trades["fees"].sum() if num_short_trades > 0 else 0.0
     net_short_profit = short_trades["net_profit_dollars"].sum() if num_short_trades > 0 else 0.0
-    
+
     # Calculate total fees
     total_fees = trades_df["fees"].sum()
 
@@ -664,25 +754,25 @@ def plot_cumulative_pnl(trades_df: pl.DataFrame, symbol: str) -> None:
 
     # Create the plot
     plt.figure(figsize=(12, 6))
-    
+
     # Convert exit_time to list for plotting
     exit_times = trades_df["exit_time"].to_list()
     cum_pnl = trades_df["cumulative_pnl"].to_list()
-    
+
     plt.plot(exit_times, cum_pnl, linewidth=2, color="steelblue")
     plt.axhline(y=0, color="red", linestyle="--", alpha=0.5, linewidth=1)
-    
+
     plt.xlabel("Date", fontsize=12)
     plt.ylabel("Cumulative PnL ($)", fontsize=12)
     plt.title(f"Cumulative PnL - {crypto_name.upper()}", fontsize=14, fontweight="bold")
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    
+
     # Save to file
     output_filename = f"{crypto_name}_cumpnl.png"
     plt.savefig(output_filename, dpi=300, bbox_inches="tight")
     plt.close()
-    
+
     print(f"Cumulative PnL chart saved to: {output_filename}")
 
 
@@ -727,18 +817,18 @@ def run_simulation(
         Tuple of (trades DataFrame, summary statistics dict)
     """
     # Validate input DataFrame
-    required_columns = ['open_time', 'open', 'close']
+    required_columns = ["open_time", "open", "close"]
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
         raise ValueError(f"DataFrame missing required columns: {missing_columns}")
-    
+
     if len(df) == 0:
         raise ValueError("DataFrame is empty")
 
     # Add index column for reference if not present
     if "index" not in df.columns:
         df = df.with_row_index("index")
-    
+
     # Capture data range info
     data_start_date = df["open_time"].min()
     data_end_date = df["open_time"].max()
@@ -756,11 +846,22 @@ def run_simulation(
         pass
 
     # Detect signals (with optional index filtering)
-    df = detect_signals(df, up_threshold, down_threshold, detection_window, index_df, index_threshold)
+    df = detect_signals(
+        df, up_threshold, down_threshold, detection_window, index_df, index_threshold
+    )
 
     # Simulate trades
-    trades_df, summary = simulate_trades(df, hold_window, position_size, position_limit, fee_rate, num_accounts, up_direction, down_direction)
-    
+    trades_df, summary = simulate_trades(
+        df,
+        hold_window,
+        position_size,
+        position_limit,
+        fee_rate,
+        num_accounts,
+        up_direction,
+        down_direction,
+    )
+
     # Add data range info to summary
     summary["data_start_date"] = data_start_date
     summary["data_end_date"] = data_end_date
@@ -774,20 +875,28 @@ def run_simulation(
         # Count total signals detected
         num_up_signals = df.filter(pl.col("signal_up") == True).height
         num_down_signals = df.filter(pl.col("signal_down") == True).height
-        
+
         print("\n" + "=" * 80)
         print("TRADE SIMULATION RESULTS")
         print("=" * 80)
         if symbol:
             print(f"\nSymbol: {symbol.upper()}")
         print(f"\nParameters:")
-        print(f"  Up threshold: {up_threshold:.4f} ({up_threshold*100:.2f}%) → {up_direction} ({'Buy/Long' if up_direction == 'B' else 'Sell/Short'})")
-        print(f"  Down threshold: {down_threshold:.4f} ({down_threshold*100:.2f}%) → {down_direction} ({'Buy/Long' if down_direction == 'B' else 'Sell/Short'})")
+        print(
+            f"  Up threshold: {up_threshold:.4f} ({up_threshold*100:.2f}%) → {up_direction} ({'Buy/Long' if up_direction == 'B' else 'Sell/Short'})"
+        )
+        print(
+            f"  Down threshold: {down_threshold:.4f} ({down_threshold*100:.2f}%) → {down_direction} ({'Buy/Long' if down_direction == 'B' else 'Sell/Short'})"
+        )
         print(f"  Detection window: {detection_window} periods")
         print(f"  Hold window: {hold_window} periods")
         print(f"  Position size: ${position_size:,.2f}")
-        print(f"  Position limit: {summary['position_limit']} concurrent trades (max exposure: ${summary['position_limit'] * position_size:,.2f})")
-        print(f"  Number of accounts: {summary['num_accounts']} {'(position reversal)' if summary['num_accounts'] == 1 else '(separate long/short)'}")
+        print(
+            f"  Position limit: {summary['position_limit']} concurrent trades (max exposure: ${summary['position_limit'] * position_size:,.2f})"
+        )
+        print(
+            f"  Number of accounts: {summary['num_accounts']} {'(position reversal)' if summary['num_accounts'] == 1 else '(separate long/short)'}"
+        )
         print(f"  Fee rate: {summary['fee_rate']:.4f} ({summary['fee_rate']*100:.2f}%)")
         print(f"\nSignals Detected:")
         print(f"  UP signals: {num_up_signals}")
@@ -795,7 +904,9 @@ def run_simulation(
         print(f"  Total signals: {num_up_signals + num_down_signals}")
         print(f"  Rejected UP (at limit): {summary['rejected_up_signals']}")
         print(f"  Rejected DOWN (at limit): {summary['rejected_down_signals']}")
-        print(f"  Total rejected: {summary['rejected_up_signals'] + summary['rejected_down_signals']}")
+        print(
+            f"  Total rejected: {summary['rejected_up_signals'] + summary['rejected_down_signals']}"
+        )
         print(f"\nTrades Executed:")
         print(f"  Date range: {summary['date_range']}")
         print(f"  Number of days: {summary['num_days']}")
@@ -856,7 +967,7 @@ def run_simulation_from_file(
 ) -> tuple[pl.DataFrame, dict]:
     """
     Run trading simulation by loading data from a parquet file.
-    
+
     This is a convenience wrapper around run_simulation() that handles file loading
     and date filtering.
 
@@ -882,7 +993,7 @@ def run_simulation_from_file(
     """
     # Load the parquet file
     df = pl.read_parquet(parquet_file)
-    
+
     # Filter by start date if provided
     if start_date:
         # Convert start_date string to datetime for proper comparison
@@ -892,23 +1003,23 @@ def run_simulation_from_file(
             df = df.filter(pl.col("open_time") >= start_date_dt)
         else:
             df = df.filter(pl.col("open_time") >= start_date)
-    
+
     # Extract symbol name from filename (e.g., "btc_klines.parquet" -> "btc")
     parquet_path = Path(parquet_file)
     filename = parquet_path.stem
     symbol = filename.split("_")[0] if "_" in filename else filename
-    
+
     # Load index data if specified
     index_df = None
     if index_symbol and index_threshold is not None:
         # Find index parquet file in same directory
         data_dir = parquet_path.parent
         index_files = list(data_dir.glob(f"{index_symbol}_1m_*.parquet"))
-        
+
         if index_files:
             index_file = sorted(index_files)[-1]  # Use most recent
             index_df = pl.read_parquet(index_file)
-            
+
             # Filter by same date range
             if start_date:
                 if isinstance(start_date, str):
@@ -916,13 +1027,15 @@ def run_simulation_from_file(
                     index_df = index_df.filter(pl.col("open_time") >= start_date_dt)
                 else:
                     index_df = index_df.filter(pl.col("open_time") >= start_date)
-            
+
             if verbose:
                 print(f"Loaded index data: {index_symbol} ({len(index_df)} rows)")
         else:
             if verbose:
-                print(f"Warning: Index symbol {index_symbol} specified but no data found. Proceeding without index filter.")
-    
+                print(
+                    f"Warning: Index symbol {index_symbol} specified but no data found. Proceeding without index filter."
+                )
+
     # Run the simulation with the loaded data
     return run_simulation(
         df=df,
@@ -984,14 +1097,14 @@ def multisymbol_simulation(
         - Aggregated summary statistics across all symbols
     """
     from pathlib import Path
-    
+
     data_dir = Path(data_directory)
     if not data_dir.exists():
         raise ValueError(f"Data directory not found: {data_directory}")
-    
+
     results = {}
     failed_symbols = []
-    
+
     # Aggregate metrics
     total_trades = 0
     total_gross_profit = 0.0
@@ -1000,7 +1113,7 @@ def multisymbol_simulation(
     total_num_winners = 0
     total_num_losers = 0
     all_returns = []
-    
+
     if verbose:
         print("\n" + "=" * 80)
         print("MULTI-SYMBOL SIMULATION")
@@ -1018,22 +1131,22 @@ def multisymbol_simulation(
         if start_date:
             print(f"  Start date: {start_date}")
         print()
-    
+
     # Run simulation for each symbol
     for i, symbol in enumerate(symbol_list, 1):
         if verbose:
             print(f"[{i}/{len(symbol_list)}] Processing {symbol.upper()}...")
-        
+
         # Find parquet file for this symbol
         pattern = f"{symbol.lower()}_klines*.parquet"
         matching_files = list(data_dir.glob(pattern))
-        
+
         if not matching_files:
             if verbose:
                 print(f"  ⚠️  No data file found for {symbol.upper()} (pattern: {pattern})")
             failed_symbols.append(symbol)
             continue
-        
+
         # Use most recent file if multiple exist
         if len(matching_files) > 1:
             matching_files.sort()
@@ -1042,7 +1155,7 @@ def multisymbol_simulation(
                 print(f"  Using: {Path(parquet_file).name}")
         else:
             parquet_file = str(matching_files[0])
-        
+
         try:
             # Run simulation for this symbol
             trades_df, summary = run_simulation_from_file(
@@ -1058,12 +1171,12 @@ def multisymbol_simulation(
                 position_limit,
                 fee_rate,
                 num_accounts,
-                verbose=False  # Suppress individual symbol output
+                verbose=False,  # Suppress individual symbol output
             )
-            
+
             # Store results
             results[symbol] = (trades_df, summary)
-            
+
             # Aggregate metrics
             total_trades += summary["num_trades"]
             total_gross_profit += summary["gross_profit"]
@@ -1071,31 +1184,32 @@ def multisymbol_simulation(
             total_fees += summary["total_fees"]
             total_num_winners += summary["num_winners"]
             total_num_losers += summary["num_losers"]
-            
+
             # Collect individual trade returns for aggregate Sharpe
             if len(trades_df) > 0:
                 returns = (trades_df["net_profit_dollars"] / position_size).to_list()
                 all_returns.extend(returns)
-            
+
             if verbose:
                 print(f"  ✓ {summary['num_trades']} trades, Net PnL: ${summary['net_profit']:,.2f}")
-        
+
         except Exception as e:
             if verbose:
                 print(f"  ❌ Error: {str(e)}")
             failed_symbols.append(symbol)
             continue
-    
+
     # Calculate aggregated statistics
     successful_symbols = len(results)
-    
+
     if total_trades > 0:
         aggregate_win_rate = (total_num_winners / total_trades) * 100
         aggregate_avg_net_profit = total_net_profit / total_trades
-        
+
         # Calculate aggregate Sharpe ratio
         if len(all_returns) > 1:
             import statistics
+
             avg_return = statistics.mean(all_returns)
             std_return = statistics.stdev(all_returns)
             aggregate_sharpe = (avg_return / std_return) if std_return > 0 else 0.0
@@ -1105,7 +1219,7 @@ def multisymbol_simulation(
         aggregate_win_rate = 0.0
         aggregate_avg_net_profit = 0.0
         aggregate_sharpe = 0.0
-    
+
     aggregate_summary = {
         "num_symbols": len(symbol_list),
         "successful_symbols": successful_symbols,
@@ -1121,9 +1235,11 @@ def multisymbol_simulation(
         "aggregate_avg_net_profit": aggregate_avg_net_profit,
         "aggregate_sharpe_ratio": aggregate_sharpe,
         "avg_trades_per_symbol": total_trades / successful_symbols if successful_symbols > 0 else 0,
-        "avg_net_profit_per_symbol": total_net_profit / successful_symbols if successful_symbols > 0 else 0,
+        "avg_net_profit_per_symbol": (
+            total_net_profit / successful_symbols if successful_symbols > 0 else 0
+        ),
     }
-    
+
     if verbose:
         print("\n" + "=" * 80)
         print("AGGREGATE RESULTS")
@@ -1142,7 +1258,7 @@ def multisymbol_simulation(
         print(f"Avg net profit per trade: ${aggregate_avg_net_profit:.2f}")
         print(f"Aggregate Sharpe ratio: {aggregate_sharpe:.3f}")
         print("=" * 80)
-    
+
     return results, aggregate_summary
 
 
@@ -1172,28 +1288,34 @@ Examples:
 
     parser.add_argument("symbol", help="Symbol (e.g., BTC, ETH) or full path to parquet file")
     parser.add_argument(
-        "up_threshold", type=float, help="Price movement threshold for UP signal (e.g., 0.01 for 1%)"
+        "up_threshold",
+        type=float,
+        help="Price movement threshold for UP signal (e.g., 0.01 for 1%)",
     )
     parser.add_argument(
-        "up_direction", type=str, choices=["B", "S"], help="Trade direction for UP threshold: B=Buy/Long, S=Sell/Short"
+        "up_direction",
+        type=str,
+        choices=["B", "S"],
+        help="Trade direction for UP threshold: B=Buy/Long, S=Sell/Short",
     )
     parser.add_argument(
-        "down_threshold", type=float, help="Price movement threshold for DOWN signal (e.g., -0.01 for -1%)"
+        "down_threshold",
+        type=float,
+        help="Price movement threshold for DOWN signal (e.g., -0.01 for -1%)",
     )
     parser.add_argument(
-        "down_direction", type=str, choices=["B", "S"], help="Trade direction for DOWN threshold: B=Buy/Long, S=Sell/Short"
+        "down_direction",
+        type=str,
+        choices=["B", "S"],
+        help="Trade direction for DOWN threshold: B=Buy/Long, S=Sell/Short",
     )
     parser.add_argument(
         "detection_window",
         type=int,
         help="Number of periods to detect signal over",
     )
-    parser.add_argument(
-        "hold_window", type=int, help="Number of periods to hold position"
-    )
-    parser.add_argument(
-        "position_size", type=float, help="Dollar amount to invest per trade"
-    )
+    parser.add_argument("hold_window", type=int, help="Number of periods to hold position")
+    parser.add_argument("position_size", type=float, help="Dollar amount to invest per trade")
     parser.add_argument(
         "--position-limit",
         "-p",
@@ -1248,7 +1370,7 @@ Examples:
     args = parser.parse_args()
 
     # Construct full path if symbol provided instead of full path
-    if args.symbol.endswith('.parquet'):
+    if args.symbol.endswith(".parquet"):
         # Full path provided
         parquet_file = args.symbol
     else:
@@ -1257,9 +1379,11 @@ Examples:
         data_dir = Path(args.data_dir)
         symbol_with_suffix = f"{args.symbol}{args.suffix}"
         matching_files = list(data_dir.glob(f"{symbol_with_suffix}_1m_*.parquet"))
-        
+
         if not matching_files:
-            parser.error(f"No files found matching pattern: {symbol_with_suffix}_1m_*.parquet in {data_dir}")
+            parser.error(
+                f"No files found matching pattern: {symbol_with_suffix}_1m_*.parquet in {data_dir}"
+            )
         elif len(matching_files) > 1:
             # Use the most recent file (by filename, which includes date range)
             matching_files.sort()
@@ -1267,7 +1391,7 @@ Examples:
             print(f"Multiple files found, using most recent: {parquet_file}")
         else:
             parquet_file = str(matching_files[0])
-    
+
     # Validate inputs
     if args.up_threshold <= 0:
         parser.error("Up threshold must be positive")
@@ -1285,10 +1409,11 @@ Examples:
         parser.error("Fee rate must be non-negative")
     if not Path(parquet_file).exists():
         parser.error(f"File not found: {parquet_file}")
-    
+
     # Validate start date format if provided
     if args.start_date:
         from datetime import datetime
+
         try:
             datetime.strptime(args.start_date, "%Y-%m-%d")
         except ValueError:

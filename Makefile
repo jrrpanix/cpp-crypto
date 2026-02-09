@@ -121,12 +121,24 @@ logs:
 # Format Python code
 format:
 	@echo "🎨 Formatting Python code..."
-	@$(EXEC) bash -c "cd python && uv run black ."
+	@if command -v docker >/dev/null 2>&1 && docker ps | grep -q $(DEV_CONTAINER); then \
+		$(EXEC) bash -c "cd python && uv sync --extra dev && uv run black ."; \
+	elif [ -f /.dockerenv ]; then \
+		cd python && uv sync --extra dev && uv run black .; \
+	else \
+		echo "⚠️  Dev container not running. Start with 'make dev' first."; \
+	fi
 
 # Run tests
 test:
-	@echo "🧪 Running tests..."
-	@$(EXEC) bash -c "cd python && uv run pytest research/tests" || echo "No tests found"
+	@echo "🧪 Running C++ tests..."
+	@if command -v docker >/dev/null 2>&1 && docker ps | grep -q $(DEV_CONTAINER); then \
+		$(EXEC) bash -c "cd cpp/src/binance && ./build_local.sh && cd build && ./test_simd_parser ../test_data/sample.json && ./test_json_times ../test_data/sample.json && ./test_lookup && ./test_clock_time"; \
+	elif [ -f /.dockerenv ]; then \
+		cd cpp/src/binance && ./build_local.sh && cd build && ./test_simd_parser ../test_data/sample.json && ./test_json_times ../test_data/sample.json && ./test_lookup && ./test_clock_time; \
+	else \
+		echo "⚠️  Dev container not running. Start with 'make dev' first."; \
+	fi
 
 # ==============================================================================
 # Cleanup

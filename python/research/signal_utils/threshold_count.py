@@ -49,10 +49,9 @@ def count_threshold_events(
     # Calculate rolling window return
     df = df.with_columns(
         [
-            (
-                (pl.col("close") - pl.col("window_start_open"))
-                / pl.col("window_start_open")
-            ).alias("window_return")
+            ((pl.col("close") - pl.col("window_start_open")) / pl.col("window_start_open")).alias(
+                "window_return"
+            )
         ]
     )
 
@@ -77,16 +76,16 @@ def count_threshold_events(
         min_return = events_df["window_return"].min()
         max_return = events_df["window_return"].max()
         avg_return = events_df["window_return"].mean()
-        
+
         first_time = events_df["open_time"].min()
         last_time = events_df["close_time"].max()
         date_range = f"{first_time} to {last_time}"
-        
+
         # Calculate time span
-        num_days = (last_time - first_time).days if hasattr((last_time - first_time), 'days') else 0
+        num_days = (last_time - first_time).days if hasattr((last_time - first_time), "days") else 0
         if num_days == 0:
             num_days = 1
-        
+
         events_per_day = num_events / num_days
     else:
         min_return = 0.0
@@ -144,9 +143,7 @@ Examples:
         type=int,
         help="Number of periods for rolling window",
     )
-    parser.add_argument(
-        "--quiet", "-q", action="store_true", help="Only print event count"
-    )
+    parser.add_argument("--quiet", "-q", action="store_true", help="Only print event count")
 
     args = parser.parse_args()
 
@@ -186,13 +183,13 @@ Examples:
             print(f"  Number of events: {result['num_events']:,}")
             print(f"  Event rate: {result['event_rate']:.2f}%")
             print(f"  Events per day: {result['events_per_day']:.2f}")
-            
-            if result['num_events'] > 0:
+
+            if result["num_events"] > 0:
                 print(f"\nEvent Statistics:")
                 print(f"  Min return: {result['min_return']:.4f} ({result['min_return']*100:.2f}%)")
                 print(f"  Max return: {result['max_return']:.4f} ({result['max_return']*100:.2f}%)")
                 print(f"  Avg return: {result['avg_return']:.4f} ({result['avg_return_pct']:.2f}%)")
-            
+
             print("=" * 80 + "\n")
 
         return 0

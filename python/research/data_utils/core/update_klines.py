@@ -12,13 +12,13 @@ from cli_utils import add_dir_arg
 def read_binance_zip(zip_path: str, existing_schema: dict = None) -> pl.DataFrame:
     """
     Read a Binance kline CSV from a zip file and optionally match schema.
-    
+
     This function can be imported by other scripts that need to read Binance zip files.
-    
+
     Args:
         zip_path: Path to the zip file
         existing_schema: Optional schema dict to match column types
-        
+
     Returns:
         Polars DataFrame with the kline data
     """
@@ -27,12 +27,12 @@ def read_binance_zip(zip_path: str, existing_schema: dict = None) -> pl.DataFram
         with z.open(csv_name) as f:
             # polars can't read directly from the zip stream, so read into bytes
             csv_bytes = f.read()
-            
+
             # Always read CSV with default inference first
             # Use infer_schema_length=0 to scan all rows for proper type inference
             # This prevents issues where early rows have integer-like floats
             df = pl.read_csv(io.BytesIO(csv_bytes), has_header=True, infer_schema_length=0)
-            
+
             # Convert timestamp columns from milliseconds to datetime
             # Timestamps can be either Int64 or String in the CSV
             if "open_time" in df.columns:
@@ -43,9 +43,11 @@ def read_binance_zip(zip_path: str, existing_schema: dict = None) -> pl.DataFram
                 elif df["open_time"].dtype == pl.String or df["open_time"].dtype == pl.Utf8:
                     # Parse string as int64 first, then convert to datetime
                     df = df.with_columns(
-                        pl.from_epoch(pl.col("open_time").cast(pl.Int64), time_unit="ms").alias("open_time")
+                        pl.from_epoch(pl.col("open_time").cast(pl.Int64), time_unit="ms").alias(
+                            "open_time"
+                        )
                     )
-            
+
             if "close_time" in df.columns:
                 if df["close_time"].dtype == pl.Int64:
                     df = df.with_columns(
@@ -54,9 +56,11 @@ def read_binance_zip(zip_path: str, existing_schema: dict = None) -> pl.DataFram
                 elif df["close_time"].dtype == pl.String or df["close_time"].dtype == pl.Utf8:
                     # Parse string as int64 first, then convert to datetime
                     df = df.with_columns(
-                        pl.from_epoch(pl.col("close_time").cast(pl.Int64), time_unit="ms").alias("close_time")
+                        pl.from_epoch(pl.col("close_time").cast(pl.Int64), time_unit="ms").alias(
+                            "close_time"
+                        )
                     )
-            
+
             # If schema is provided, cast columns to match
             if existing_schema:
                 for col_name, col_type in existing_schema.items():
@@ -64,14 +68,12 @@ def read_binance_zip(zip_path: str, existing_schema: dict = None) -> pl.DataFram
                         # Only cast if types don't match
                         if df[col_name].dtype != col_type:
                             try:
-                                df = df.with_columns(
-                                    pl.col(col_name).cast(col_type)
-                                )
+                                df = df.with_columns(pl.col(col_name).cast(col_type))
                             except Exception as e:
                                 print(
                                     f"    ⚠️ Could not cast column '{col_name}' to {col_type}. Error: {e}"
                                 )
-            
+
             return df
 
 
@@ -199,13 +201,13 @@ def main():
         parser,
         "kline-dir",
         required=True,
-        help_text="Directory containing the existing kline files (e.g., in Parquet format)"
+        help_text="Directory containing the existing kline files (e.g., in Parquet format)",
     )
     add_dir_arg(
         parser,
         "download-dir",
         required=True,
-        help_text="Directory containing the latest monthly Binance downloads (zip files)"
+        help_text="Directory containing the latest monthly Binance downloads (zip files)",
     )
 
     args = parser.parse_args()

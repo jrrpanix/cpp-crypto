@@ -62,7 +62,9 @@ def load_daily_concat(
     if use_latest:
         files = latest_per_symbol(files)
     if not files:
-        raise FileNotFoundError(f"No parquet files found in {directory} matching glob {glob} (symbol={symbol})")
+        raise FileNotFoundError(
+            f"No parquet files found in {directory} matching glob {glob} (symbol={symbol})"
+        )
 
     lf = pl.scan_parquet(files)
     return lf.collect()
@@ -82,7 +84,9 @@ def load_daily_lazy(
     if use_latest:
         files = latest_per_symbol(files)
     if not files:
-        raise FileNotFoundError(f"No parquet files found in {directory} matching glob {glob} (symbol={symbol})")
+        raise FileNotFoundError(
+            f"No parquet files found in {directory} matching glob {glob} (symbol={symbol})"
+        )
     return pl.scan_parquet(files)
 
 

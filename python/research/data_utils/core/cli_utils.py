@@ -7,127 +7,94 @@ import argparse
 from pathlib import Path
 
 
-def add_io_args(parser: argparse.ArgumentParser, 
-                input_default: str = None,
-                output_default: str = None,
-                input_help: str = "Input directory",
-                output_help: str = "Output directory") -> None:
+def add_io_args(
+    parser: argparse.ArgumentParser,
+    input_default: str = None,
+    output_default: str = None,
+    input_help: str = "Input directory",
+    output_help: str = "Output directory",
+) -> None:
     """Add common input/output directory arguments."""
     if input_default:
         parser.add_argument(
             "--input-dir",
             type=str,
             default=input_default,
-            help=f"{input_help} (default: {input_default})"
+            help=f"{input_help} (default: {input_default})",
         )
     else:
-        parser.add_argument(
-            "--input-dir",
-            type=str,
-            required=True,
-            help=input_help
-        )
-    
+        parser.add_argument("--input-dir", type=str, required=True, help=input_help)
+
     if output_default:
         parser.add_argument(
             "--output-dir",
             type=str,
             default=output_default,
-            help=f"{output_help} (default: {output_default})"
+            help=f"{output_help} (default: {output_default})",
         )
     else:
-        parser.add_argument(
-            "--output-dir",
-            type=str,
-            required=True,
-            help=output_help
-        )
+        parser.add_argument("--output-dir", type=str, required=True, help=output_help)
 
 
 def add_dry_run_arg(parser: argparse.ArgumentParser) -> None:
     """Add --dry-run flag."""
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be done without making changes"
+        "--dry-run", action="store_true", help="Show what would be done without making changes"
     )
 
 
-def add_symbol_filter_arg(parser: argparse.ArgumentParser, 
-                          help_text: str = "Filter to specific symbol (e.g., BTCUSDT)") -> None:
+def add_symbol_filter_arg(
+    parser: argparse.ArgumentParser, help_text: str = "Filter to specific symbol (e.g., BTCUSDT)"
+) -> None:
     """Add --symbol filter argument."""
-    parser.add_argument(
-        "--symbol",
-        type=str,
-        help=help_text
-    )
+    parser.add_argument("--symbol", type=str, help=help_text)
 
 
-def add_date_range_args(parser: argparse.ArgumentParser,
-                       start_required: bool = False,
-                       end_required: bool = False) -> None:
+def add_date_range_args(
+    parser: argparse.ArgumentParser, start_required: bool = False, end_required: bool = False
+) -> None:
     """Add --start-date and --end-date arguments."""
     parser.add_argument(
-        "--start-date",
-        type=str,
-        required=start_required,
-        help="Start date (YYYY-MM-DD format)"
+        "--start-date", type=str, required=start_required, help="Start date (YYYY-MM-DD format)"
     )
     parser.add_argument(
-        "--end-date",
-        type=str,
-        required=end_required,
-        help="End date (YYYY-MM-DD format)"
+        "--end-date", type=str, required=end_required, help="End date (YYYY-MM-DD format)"
     )
 
 
-def add_file_pattern_arg(parser: argparse.ArgumentParser,
-                        default: str = "*.parquet") -> None:
+def add_file_pattern_arg(parser: argparse.ArgumentParser, default: str = "*.parquet") -> None:
     """Add --pattern argument for file matching."""
     parser.add_argument(
-        "--pattern",
-        type=str,
-        default=default,
-        help=f"File pattern to match (default: {default})"
+        "--pattern", type=str, default=default, help=f"File pattern to match (default: {default})"
     )
 
 
 def add_verbosity_arg(parser: argparse.ArgumentParser) -> None:
     """Add --verbose flag."""
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Enable verbose output"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
 
 
-def add_output_file_arg(parser: argparse.ArgumentParser,
-                       default: str = None,
-                       required: bool = False,
-                       help_text: str = "Output file path") -> None:
+def add_output_file_arg(
+    parser: argparse.ArgumentParser,
+    default: str = None,
+    required: bool = False,
+    help_text: str = "Output file path",
+) -> None:
     """Add --output-file argument."""
     if default:
         parser.add_argument(
-            "--output-file",
-            type=str,
-            default=default,
-            help=f"{help_text} (default: {default})"
+            "--output-file", type=str, default=default, help=f"{help_text} (default: {default})"
         )
     else:
-        parser.add_argument(
-            "--output-file",
-            type=str,
-            required=required,
-            help=help_text
-        )
+        parser.add_argument("--output-file", type=str, required=required, help=help_text)
 
 
 # Preset parser builders for common use cases
 
-def create_transform_parser(description: str,
-                           input_default: str = None,
-                           output_default: str = None) -> argparse.ArgumentParser:
+
+def create_transform_parser(
+    description: str, input_default: str = None, output_default: str = None
+) -> argparse.ArgumentParser:
     """
     Create parser for data transformation scripts.
     Includes: input-dir, output-dir, dry-run, pattern, verbose
@@ -140,8 +107,7 @@ def create_transform_parser(description: str,
     return parser
 
 
-def create_analysis_parser(description: str,
-                          input_default: str = None) -> argparse.ArgumentParser:
+def create_analysis_parser(description: str, input_default: str = None) -> argparse.ArgumentParser:
     """
     Create parser for analysis scripts.
     Includes: input-dir, symbol filter, date range, verbose
@@ -151,7 +117,11 @@ def create_analysis_parser(description: str,
         "--input-dir",
         type=str,
         default=input_default,
-        help="Input directory" if not input_default else f"Input directory (default: {input_default})"
+        help=(
+            "Input directory"
+            if not input_default
+            else f"Input directory (default: {input_default})"
+        ),
     )
     add_symbol_filter_arg(parser)
     add_date_range_args(parser)
@@ -164,18 +134,18 @@ def add_dir_arg(
     name: str,
     default: str = None,
     required: bool = False,
-    help_text: str = None
+    help_text: str = None,
 ) -> None:
     """
     Add a directory argument with consistent naming patterns.
-    
+
     Args:
         parser: ArgumentParser to add argument to
         name: Directory argument name (e.g., 'kline-dir', 'download-dir')
         default: Default directory path (optional)
         required: Whether the argument is required
         help_text: Custom help text (optional)
-        
+
     Example:
         add_dir_arg(parser, "kline-dir", required=True, help_text="Directory containing kline files")
         add_dir_arg(parser, "aggregate-dir", default="/workspace/data/klines_aggregate")
@@ -185,14 +155,8 @@ def add_dir_arg(
         help_text = f"Directory path for {name.replace('-', ' ')}"
     if default:
         help_text += f" (default: {default})"
-    
-    parser.add_argument(
-        arg_name,
-        type=str,
-        default=default,
-        required=required,
-        help=help_text
-    )
+
+    parser.add_argument(arg_name, type=str, default=default, required=required, help=help_text)
 
 
 __all__ = [

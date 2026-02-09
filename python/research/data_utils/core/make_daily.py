@@ -18,7 +18,7 @@ from cli_utils import add_io_args, add_file_pattern_arg, add_dry_run_arg
 def aggregate_to_daily(df: pl.DataFrame) -> pl.DataFrame:
     """
     Aggregate minute bars to daily bars.
-    
+
     For each day:
     - open: first bar's open
     - high: max high price
@@ -30,12 +30,10 @@ def aggregate_to_daily(df: pl.DataFrame) -> pl.DataFrame:
     - taker_buy_volume: sum of taker_buy_volume (if exists)
     - taker_buy_quote_volume: sum of taker_buy_quote_volume (if exists)
     """
-    
+
     # Extract date from open_time
-    df = df.with_columns(
-        pl.col("open_time").dt.date().alias("date")
-    )
-    
+    df = df.with_columns(pl.col("open_time").dt.date().alias("date"))
+
     # Build aggregation expressions dynamically based on available columns
     agg_exprs = [
         pl.col("open").first().alias("open"),
@@ -44,75 +42,77 @@ def aggregate_to_daily(df: pl.DataFrame) -> pl.DataFrame:
         pl.col("close").last().alias("close"),
         pl.col("volume").sum().alias("volume"),
     ]
-    
+
     # Add optional columns if they exist
     if "quote_volume" in df.columns:
         agg_exprs.append(pl.col("quote_volume").sum().alias("quote_volume"))
-    
+
     if "count" in df.columns:
         agg_exprs.append(pl.col("count").sum().alias("count"))
     elif "trades" in df.columns:
         agg_exprs.append(pl.col("trades").sum().alias("trades"))
-    
+
     if "taker_buy_volume" in df.columns:
         agg_exprs.append(pl.col("taker_buy_volume").sum().alias("taker_buy_volume"))
-    
+
     if "taker_buy_quote_volume" in df.columns:
         agg_exprs.append(pl.col("taker_buy_quote_volume").sum().alias("taker_buy_quote_volume"))
-    
+
     # Use the first open_time and last close_time for the day
-    agg_exprs.extend([
-        pl.col("open_time").first().alias("open_time"),
-    ])
-    
+    agg_exprs.extend(
+        [
+            pl.col("open_time").first().alias("open_time"),
+        ]
+    )
+
     if "close_time" in df.columns:
         agg_exprs.append(pl.col("close_time").last().alias("close_time"))
-    
+
     # Group by date and aggregate
     daily_df = df.group_by("date").agg(agg_exprs)
-    
+
     # Sort by date and drop the temporary date column
     daily_df = daily_df.sort("date").drop("date")
-    
+
     return daily_df
 
 
 def process_file(input_path: Path, output_dir: Path, dry_run: bool = False) -> None:
     """
     Process a single parquet file and create daily aggregated version.
-    
+
     Args:
         input_path: Path to input minute-bar parquet file
         output_dir: Directory to write daily-bar parquet file
         dry_run: If True, don't write output, just print what would be done
     """
     print(f"Processing: {input_path.name}")
-    
+
     # Read the parquet file
     try:
         df = pl.read_parquet(input_path)
     except Exception as e:
         print(f"  ❌ Error reading file: {e}")
         return
-    
+
     print(f"  Input: {len(df):,} rows")
-    
+
     # Aggregate to daily
     try:
         daily_df = aggregate_to_daily(df)
     except Exception as e:
         print(f"  ❌ Error aggregating: {e}")
         return
-    
+
     print(f"  Output: {len(daily_df):,} rows (daily bars)")
-    
+
     # Create output filename by replacing _1m with _daily
     output_filename = input_path.name.replace("_1m_", "_daily_")
-    
+
     if dry_run:
         print(f"  [DRY RUN] Would write to: {output_dir / output_filename}")
         return
-    
+
     # Write output file
     output_path = output_dir / output_filename
     try:
@@ -125,18 +125,18 @@ def process_file(input_path: Path, output_dir: Path, dry_run: bool = False) -> N
 def process_directory(input_dir: Path | str, output_dir: Path | str, dry_run: bool = False) -> None:
     """
     Process all minute-bar parquet files in input_dir to daily bars in output_dir.
-    
+
     This is a batch wrapper around process_file() for use by the pipeline orchestrator.
     """
     input_dir = Path(input_dir)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     parquet_files = sorted(input_dir.glob("*.parquet"))
     if not parquet_files:
         print(f"No parquet files found in {input_dir}")
         return
-    
+
     print(f"Processing {len(parquet_files)} files from {input_dir} → {output_dir}")
     for pf in parquet_files:
         process_file(pf, output_dir, dry_run=dry_run)
@@ -147,41 +147,37 @@ def main():
     parser = argparse.ArgumentParser(
         description="Convert minute-bar parquet files to daily-bar summaries."
     )
-    
+
     # Use common CLI utilities
     add_io_args(
         parser,
         input_default="/workspace/data/klines",
         output_default="/workspace/data/klines_daily",
         input_help="Input directory containing minute-bar parquet files",
-        output_help="Output directory for daily-bar parquet files"
+        output_help="Output directory for daily-bar parquet files",
     )
     add_file_pattern_arg(parser)
     add_dry_run_arg(parser)
-    
-    parser.add_argument(
-        "--file",
-        type=str,
-        help="Process only a specific file (by name)"
-    )
-    
+
+    parser.add_argument("--file", type=str, help="Process only a specific file (by name)")
+
     args = parser.parse_args()
-    
+
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
-    
+
     # Validate input directory
     if not input_dir.exists():
         print(f"❌ Error: Input directory not found: {input_dir}")
         return
-    
+
     # Create output directory if it doesn't exist
     if not args.dry_run:
         output_dir.mkdir(parents=True, exist_ok=True)
         print(f"Output directory: {output_dir}\n")
     else:
         print(f"[DRY RUN] Output directory would be: {output_dir}\n")
-    
+
     # Get list of files to process
     if args.file:
         files = [input_dir / args.file]
@@ -190,18 +186,18 @@ def main():
             return
     else:
         files = sorted(input_dir.glob(args.pattern))
-    
+
     if not files:
         print(f"❌ No files found matching pattern: {args.pattern}")
         return
-    
+
     print(f"Found {len(files)} file(s) to process\n")
-    
+
     # Process each file
     for file_path in files:
         process_file(file_path, output_dir, dry_run=args.dry_run)
         print()
-    
+
     if not args.dry_run:
         print(f"✅ Complete! Processed {len(files)} file(s)")
     else:

@@ -72,8 +72,9 @@ def demo():
     print("\n3️⃣  Join runs table with metrics (if available):")
     try:
         con = build_con(runs_db=db_path, attach_sqlite=True)
-        result = con.execute(
-            f"""
+        result = (
+            con.execute(
+                f"""
             SELECT 
                 r.id,
                 r.created_at,
@@ -85,7 +86,10 @@ def demo():
             GROUP BY r.id, r.created_at, r.status
             LIMIT 5
             """
-        ).df().to_dict('records')
+            )
+            .df()
+            .to_dict("records")
+        )
         con.close()
         for row in result:
             print(f"   {row}")

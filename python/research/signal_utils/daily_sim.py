@@ -49,10 +49,10 @@ def detect_signals(
 ) -> pl.DataFrame:
     """
     Detect when price change exceeds thresholds within detection window (days).
-    
+
     For each day, calculates return from the open of the day detection_window periods ago
     to the close of the current day. Signals when this return exceeds threshold.
-    
+
     Optionally filters for idiosyncratic moves by comparing to an index:
     - If index_df provided, calculates idiosyncratic_return = symbol_return - index_return
     - Only triggers signal if abs(idiosyncratic_return) > index_threshold
@@ -80,9 +80,9 @@ def detect_signals(
     # return = (current_close - open_N_periods_ago) / open_N_periods_ago
     df = df.with_columns(
         [
-            (
-                (pl.col("close") - pl.col("window_start_open")) / pl.col("window_start_open")
-            ).alias("window_return")
+            ((pl.col("close") - pl.col("window_start_open")) / pl.col("window_start_open")).alias(
+                "window_return"
+            )
         ]
     )
 
@@ -97,36 +97,37 @@ def detect_signals(
         index_df = index_df.with_columns(
             [
                 (
-                    (pl.col("close") - pl.col("index_window_start_open")) / pl.col("index_window_start_open")
+                    (pl.col("close") - pl.col("index_window_start_open"))
+                    / pl.col("index_window_start_open")
                 ).alias("index_window_return")
             ]
         )
-        
+
         # Join index returns to symbol data by timestamp
         df = df.join(
-            index_df.select(["open_time", "index_window_return"]),
-            on="open_time",
-            how="left"
+            index_df.select(["open_time", "index_window_return"]), on="open_time", how="left"
         )
-        
+
         # Calculate idiosyncratic return (symbol return - index return)
         df = df.with_columns(
             [
-                (pl.col("window_return") - pl.col("index_window_return")).alias("idiosyncratic_return")
+                (pl.col("window_return") - pl.col("index_window_return")).alias(
+                    "idiosyncratic_return"
+                )
             ]
         )
-        
+
         # Create signal flags with idiosyncratic filter
         # Only signal if the idiosyncratic component is large enough
         df = df.with_columns(
             [
                 (
-                    (pl.col("window_return") > up_threshold) & 
-                    (pl.col("idiosyncratic_return") > index_threshold)
+                    (pl.col("window_return") > up_threshold)
+                    & (pl.col("idiosyncratic_return") > index_threshold)
                 ).alias("signal_up"),
                 (
-                    (pl.col("window_return") < down_threshold) & 
-                    (pl.col("idiosyncratic_return") < -index_threshold)
+                    (pl.col("window_return") < down_threshold)
+                    & (pl.col("idiosyncratic_return") < -index_threshold)
                 ).alias("signal_down"),
             ]
         )
@@ -143,14 +144,14 @@ def detect_signals(
 
 
 def simulate_trades(
-    df: pl.DataFrame, 
-    hold_window: int, 
-    position_size: float, 
-    position_limit: int = 1, 
-    fee_rate: float = 0.001, 
-    num_accounts: int = 1, 
-    up_direction: str = "B", 
-    down_direction: str = "S"
+    df: pl.DataFrame,
+    hold_window: int,
+    position_size: float,
+    position_limit: int = 1,
+    fee_rate: float = 0.001,
+    num_accounts: int = 1,
+    up_direction: str = "B",
+    down_direction: str = "S",
 ) -> tuple[pl.DataFrame, dict]:
     """
     Simulate trades based on up and down signals.
@@ -170,11 +171,19 @@ def simulate_trades(
     """
     # Check for up signals
     up_signals_df = df.filter(pl.col("signal_up") == True)
-    up_signal_indices = up_signals_df.select(pl.col("index")).to_series().to_list() if len(up_signals_df) > 0 else []
+    up_signal_indices = (
+        up_signals_df.select(pl.col("index")).to_series().to_list()
+        if len(up_signals_df) > 0
+        else []
+    )
 
     # Check for down signals
     down_signals_df = df.filter(pl.col("signal_down") == True)
-    down_signal_indices = down_signals_df.select(pl.col("index")).to_series().to_list() if len(down_signals_df) > 0 else []
+    down_signal_indices = (
+        down_signals_df.select(pl.col("index")).to_series().to_list()
+        if len(down_signals_df) > 0
+        else []
+    )
 
     if len(up_signal_indices) == 0 and len(down_signal_indices) == 0:
         return pl.DataFrame(), {
@@ -217,20 +226,20 @@ def simulate_trades(
     trades = []
     rejected_up_signals = 0
     rejected_down_signals = 0
-    
+
     # Combine and sort all signals by index
     all_signals = []
     for idx in up_signal_indices:
         all_signals.append((idx, "UP", up_direction))
     for idx in down_signal_indices:
         all_signals.append((idx, "DOWN", down_direction))
-    
+
     # Sort by signal index (chronological order)
     all_signals.sort(key=lambda x: x[0])
-    
+
     # Track open positions
     open_positions = []
-    
+
     # Process every signal with position limit enforcement
     for signal_idx, signal_type, trade_direction in all_signals:
         # Entry: next day after signal
@@ -245,33 +254,45 @@ def simulate_trades(
 
         if num_accounts == 1:
             # Single account logic: close opposite positions and reverse
-            open_positions = [(e_idx, x_idx, d, e_date, x_date) for e_idx, x_idx, d, e_date, x_date in open_positions if x_idx > entry_idx]
-            
+            open_positions = [
+                (e_idx, x_idx, d, e_date, x_date)
+                for e_idx, x_idx, d, e_date, x_date in open_positions
+                if x_idx > entry_idx
+            ]
+
             # Check if we have opposite direction positions
             opposite_direction = "S" if trade_direction == "B" else "B"
             opposite_positions = [p for p in open_positions if p[2] == opposite_direction]
             same_direction_positions = [p for p in open_positions if p[2] == trade_direction]
-            
+
             if opposite_positions:
                 # Close opposite positions and reverse
-                for opp_entry_idx, opp_exit_idx, opp_dir, opp_entry_date, opp_exit_date in opposite_positions:
+                for (
+                    opp_entry_idx,
+                    opp_exit_idx,
+                    opp_dir,
+                    opp_entry_date,
+                    opp_exit_date,
+                ) in opposite_positions:
                     for trade in trades:
-                        if (trade["entry_idx"] == opp_entry_idx and 
-                            trade["direction"] == opp_dir and
-                            trade["exit_idx"] == opp_exit_idx):
+                        if (
+                            trade["entry_idx"] == opp_entry_idx
+                            and trade["direction"] == opp_dir
+                            and trade["exit_idx"] == opp_exit_idx
+                        ):
                             # Update to early exit
                             entry_row_for_early = df.row(entry_idx, named=True)
                             early_exit_price = entry_row_for_early["open"]
-                            
+
                             # Get original entry price
                             opp_entry_row = df.row(opp_entry_idx, named=True)
                             opp_entry_price = opp_entry_row["open"]
-                            
+
                             # Calculate fees
                             entry_fee = position_size * fee_rate
                             exit_fee = position_size * fee_rate
                             total_fees = entry_fee + exit_fee
-                            
+
                             if opp_dir == "B":
                                 profit_pct = (early_exit_price / opp_entry_price) - 1
                                 gross_profit_dollars = position_size * profit_pct
@@ -282,7 +303,7 @@ def simulate_trades(
                                 gross_profit_dollars = position_size * profit_pct
                                 net_profit_dollars = gross_profit_dollars - total_fees
                                 net_profit_pct = net_profit_dollars / position_size
-                            
+
                             # Update the existing trade record
                             trade["exit_idx"] = entry_idx
                             trade["exit_time"] = entry_row_for_early["open_time"]
@@ -293,12 +314,12 @@ def simulate_trades(
                             trade["fees"] = total_fees
                             trade["net_profit_dollars"] = net_profit_dollars
                             break
-                
+
                 # Remove all opposite positions
                 open_positions = same_direction_positions
             else:
                 open_positions = same_direction_positions
-            
+
             # Check position limit for same direction
             same_direction_positions = [p for p in open_positions if p[2] == trade_direction]
             if len(same_direction_positions) >= position_limit:
@@ -309,8 +330,12 @@ def simulate_trades(
                 continue
         else:
             # num_accounts == 2: separate long and short accounts
-            open_positions = [(e_idx, x_idx, d, e_date, x_date) for e_idx, x_idx, d, e_date, x_date in open_positions if x_idx > entry_idx]
-            
+            open_positions = [
+                (e_idx, x_idx, d, e_date, x_date)
+                for e_idx, x_idx, d, e_date, x_date in open_positions
+                if x_idx > entry_idx
+            ]
+
             # Check position limit for this direction
             same_direction_positions = [p for p in open_positions if p[2] == trade_direction]
             if len(same_direction_positions) >= position_limit:
@@ -364,7 +389,7 @@ def simulate_trades(
             "net_profit_pct": net_profit_pct,
             "signal_type": signal_type,
         }
-        
+
         trades.append(trade_record)
         open_positions.append((entry_idx, exit_idx, trade_direction, entry_time, exit_time))
 
@@ -413,42 +438,46 @@ def simulate_trades(
     num_trades = len(trades)
     long_trades = [t for t in trades if t["direction"] == "B"]
     short_trades = [t for t in trades if t["direction"] == "S"]
-    
+
     num_long_trades = len(long_trades)
     num_short_trades = len(short_trades)
-    
+
     # Long statistics
     gross_long_profit = sum(t["gross_profit_dollars"] for t in long_trades)
     long_fees = sum(t["fees"] for t in long_trades)
     net_long_profit = sum(t["net_profit_dollars"] for t in long_trades)
-    
+
     # Short statistics
     gross_short_profit = sum(t["gross_profit_dollars"] for t in short_trades)
     short_fees = sum(t["fees"] for t in short_trades)
     net_short_profit = sum(t["net_profit_dollars"] for t in short_trades)
-    
+
     # Overall statistics
     gross_profit = gross_long_profit + gross_short_profit
     total_fees = long_fees + short_fees
     net_profit = net_long_profit + net_short_profit
-    
+
     total_capital_deployed = num_trades * position_size
-    gross_profit_pct = (gross_profit / total_capital_deployed * 100) if total_capital_deployed > 0 else 0.0
-    net_profit_pct = (net_profit / total_capital_deployed * 100) if total_capital_deployed > 0 else 0.0
-    
+    gross_profit_pct = (
+        (gross_profit / total_capital_deployed * 100) if total_capital_deployed > 0 else 0.0
+    )
+    net_profit_pct = (
+        (net_profit / total_capital_deployed * 100) if total_capital_deployed > 0 else 0.0
+    )
+
     # ROI as percentage of initial capital (one position_size)
     gross_roi = (gross_profit / position_size * 100) if position_size > 0 else 0.0
     net_roi = (net_profit / position_size * 100) if position_size > 0 else 0.0
-    
+
     avg_net_profit = net_profit / num_trades if num_trades > 0 else 0.0
     avg_profit_pct = trades_df.select(pl.col("net_profit_pct").mean()).item() * 100
-    
+
     # Win rate
     winners = trades_df.filter(pl.col("net_profit_dollars") > 0)
     num_winners = len(winners)
     num_losers = num_trades - num_winners
     win_rate = (num_winners / num_trades * 100) if num_trades > 0 else 0.0
-    
+
     # Sharpe ratio (annualized, assuming 252 trading days)
     returns = trades_df.select(pl.col("net_profit_pct")).to_series()
     mean_return = returns.mean()
@@ -456,23 +485,35 @@ def simulate_trades(
     gross_returns = trades_df.select(pl.col("profit_pct")).to_series()
     gross_mean_return = gross_returns.mean()
     gross_std_return = gross_returns.std()
-    
+
     # Annualize (252 trading days per year)
-    gross_sharpe_ratio = (gross_mean_return * 252 / gross_std_return) if gross_std_return > 0 else 0.0
+    gross_sharpe_ratio = (
+        (gross_mean_return * 252 / gross_std_return) if gross_std_return > 0 else 0.0
+    )
     net_sharpe_ratio = (mean_return * 252 / std_return) if std_return > 0 else 0.0
-    
+
     # Date range
     first_time = df.row(0, named=True)["open_time"]
     last_time = df.row(len(df) - 1, named=True)["open_time"]
     date_range = f"{first_time} to {last_time}"
     num_days = len(df)
     avg_trades_per_day = num_trades / num_days if num_days > 0 else 0.0
-    
+
     # Max exposure (concurrent positions)
-    max_long_exposure = max([sum(1 for p in open_positions if p[2] == "B") for open_positions in [[]]] + 
-                           [position_limit]) * position_size
-    max_short_exposure = max([sum(1 for p in open_positions if p[2] == "S") for open_positions in [[]]] + 
-                            [position_limit]) * position_size
+    max_long_exposure = (
+        max(
+            [sum(1 for p in open_positions if p[2] == "B") for open_positions in [[]]]
+            + [position_limit]
+        )
+        * position_size
+    )
+    max_short_exposure = (
+        max(
+            [sum(1 for p in open_positions if p[2] == "S") for open_positions in [[]]]
+            + [position_limit]
+        )
+        * position_size
+    )
 
     summary = {
         "num_trades": num_trades,
@@ -554,37 +595,37 @@ def run_simulation_from_file(
     """
     # Load daily data - if pattern provided, load all matching files
     file_path_obj = Path(file_path)
-    if '*' in file_path or not file_path_obj.exists():
+    if "*" in file_path or not file_path_obj.exists():
         # Pattern or missing file - try glob pattern
         parent_dir = file_path_obj.parent
         pattern = file_path_obj.name
         matching_files = sorted(parent_dir.glob(pattern))
-        
+
         if not matching_files:
             raise FileNotFoundError(f"No files found matching pattern: {file_path}")
-        
+
         # Load and concatenate all matching files
         dfs = [pl.read_parquet(str(f)) for f in matching_files]
         df = pl.concat(dfs)
-        
+
         # Sort by open_time and remove duplicates
         df = df.sort("open_time").unique(subset=["open_time"], keep="last")
     else:
         # Single file
         df = pl.read_parquet(file_path)
-    
+
     # Filter by start date if provided
     if start_date:
         # Convert string date to datetime for proper comparison
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         df = df.filter(pl.col("open_time") >= start_dt)
-    
+
     # Add index column for tracking
     df = df.with_row_index("index")
-    
+
     # Calculate returns
     df = calculate_returns(df)
-    
+
     # Load index data if specified
     index_df = None
     if index_symbol and index_threshold is not None:
@@ -592,22 +633,24 @@ def run_simulation_from_file(
         file_path_obj = Path(file_path)
         data_dir = file_path_obj.parent
         index_files = list(data_dir.glob(f"{index_symbol}_daily_*.parquet"))
-        
+
         if index_files:
             index_file = sorted(index_files)[-1]  # Use most recent
             index_df = pl.read_parquet(index_file)
-            
+
             # Filter by same date range
             if start_date:
                 start_dt = datetime.strptime(start_date, "%Y-%m-%d")
                 index_df = index_df.filter(pl.col("open_time") >= start_dt)
-            
+
             # Calculate returns for index
             index_df = calculate_returns(index_df)
-    
+
     # Detect signals (with optional index filtering)
-    df = detect_signals(df, up_threshold, down_threshold, detection_window, index_df, index_threshold)
-    
+    df = detect_signals(
+        df, up_threshold, down_threshold, detection_window, index_df, index_threshold
+    )
+
     # Simulate trades
     trades_df, summary = simulate_trades(
         df,
@@ -619,7 +662,7 @@ def run_simulation_from_file(
         up_direction,
         down_direction,
     )
-    
+
     return trades_df, summary
 
 
@@ -698,7 +741,9 @@ Default directories:
   Note: Script automatically finds and uses the most recent file matching the symbol
         """,
     )
-    parser.add_argument("symbol", help="Symbol to backtest (e.g., BTCUSDT) or full path to parquet file")
+    parser.add_argument(
+        "symbol", help="Symbol to backtest (e.g., BTCUSDT) or full path to parquet file"
+    )
     parser.add_argument(
         "--up-threshold",
         "-u",
@@ -795,7 +840,7 @@ Default directories:
     args = parser.parse_args()
 
     # Construct full path if symbol provided instead of full path
-    if args.symbol.endswith('.parquet'):
+    if args.symbol.endswith(".parquet"):
         # Full path provided
         parquet_file = args.symbol
     else:
@@ -803,16 +848,18 @@ Default directories:
         data_dir = Path(args.data_dir)
         pattern = f"{args.symbol}_daily_*.parquet"
         matching_files = sorted(data_dir.glob(pattern))
-        
+
         if not matching_files:
             parser.error(f"No files found matching pattern: {data_dir / pattern}")
-        
+
         # Use the most recent file (last in sorted list)
         parquet_file = str(matching_files[-1])
-    
+
     # Validate inputs
     if args.up_threshold <= 0 and args.down_threshold >= 0:
-        parser.error("At least one threshold must be enabled (up_threshold > 0 or down_threshold < 0)")
+        parser.error(
+            "At least one threshold must be enabled (up_threshold > 0 or down_threshold < 0)"
+        )
     if args.detection_window < 1:
         parser.error("Detection window must be at least 1")
     if args.hold_window < 1:
@@ -825,10 +872,11 @@ Default directories:
         parser.error("Fee rate must be non-negative")
     if not Path(parquet_file).exists():
         parser.error(f"File not found: {parquet_file}")
-    
+
     # Validate start date format if provided
     if args.start_date:
         from datetime import datetime
+
         try:
             datetime.strptime(args.start_date, "%Y-%m-%d")
         except ValueError:
@@ -852,7 +900,9 @@ Default directories:
 
     # Print summary
     if not args.quiet:
-        symbol_name = args.symbol if not args.symbol.endswith('.parquet') else Path(args.symbol).stem
+        symbol_name = (
+            args.symbol if not args.symbol.endswith(".parquet") else Path(args.symbol).stem
+        )
         print_summary(summary, symbol_name)
 
         if len(trades_df) > 0:

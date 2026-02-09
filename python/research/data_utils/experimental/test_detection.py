@@ -37,10 +37,12 @@ Examples:
   uv run python src/research/data_utils/test_detection.py \\
     --dir /workspace/data/klines_daily --symbol ETHUSDT --window 3 \\
     --target 0.03 --max-single 0.02
-        """
+        """,
     )
     parser.add_argument("--dir", type=str, required=True, help="Path to daily parquet directory")
-    parser.add_argument("--symbol", type=str, default=None, help="Filter to single symbol (optional)")
+    parser.add_argument(
+        "--symbol", type=str, default=None, help="Filter to single symbol (optional)"
+    )
     parser.add_argument("--window", type=int, default=5, help="Detection window in days")
     parser.add_argument("--target", type=float, default=0.05, help="Target move (5% = 0.05)")
     parser.add_argument("--mid-offset", type=int, default=3, help="Mid-window checkpoint offset")
@@ -102,8 +104,17 @@ Examples:
         # Show last N rows with detection results
         date_col = "open_time" if "open_time" in df_out.columns else "date"
         show_cols = [
-            date_col, "close", "ret_window", "ret_mid", "max_day_ret",
-            "up_days", "spread_pass", "cap_pass", "updays_pass", "smooth_pass", "hybrid_pass"
+            date_col,
+            "close",
+            "ret_window",
+            "ret_mid",
+            "max_day_ret",
+            "up_days",
+            "spread_pass",
+            "cap_pass",
+            "updays_pass",
+            "smooth_pass",
+            "hybrid_pass",
         ]
         show_cols = [c for c in show_cols if c in df_out.columns]
 
@@ -125,6 +136,7 @@ Examples:
     except Exception as e:
         print(f"ERROR: {e}")
         import traceback
+
         traceback.print_exc()
 
 

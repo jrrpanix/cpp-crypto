@@ -30,7 +30,21 @@ def run(csv_path: Path, window: int = 5) -> None:
     df = df.sort("date")
 
     out = apply_detection_filters(df, window=window)
-    print(out.select("date", "close", "ret_window", "ret_mid", "max_day_ret", "up_days", "spread_pass", "cap_pass", "updays_pass", "smooth_pass", "hybrid_pass").tail(20))
+    print(
+        out.select(
+            "date",
+            "close",
+            "ret_window",
+            "ret_mid",
+            "max_day_ret",
+            "up_days",
+            "spread_pass",
+            "cap_pass",
+            "updays_pass",
+            "smooth_pass",
+            "hybrid_pass",
+        ).tail(20)
+    )
 
 
 def main() -> None:

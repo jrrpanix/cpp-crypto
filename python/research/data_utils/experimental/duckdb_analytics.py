@@ -11,6 +11,7 @@ from typing import Any, List, Optional
 
 try:
     import duckdb
+
     HAS_DUCKDB = True
 except ImportError:
     HAS_DUCKDB = False
@@ -25,7 +26,7 @@ def query_parquet(
     """
     Execute SQL query over parquet files matching glob_pattern.
     Returns list of dicts (rows).
-    
+
     Example:
       rows = query_parquet(
           "data/run_metrics/*.parquet",
@@ -34,13 +35,13 @@ def query_parquet(
     """
     if not HAS_DUCKDB:
         raise ImportError("duckdb not installed. Install with: uv add duckdb")
-    
+
     con = duckdb.connect(config={"memory_limit": memory_limit})
     # Use parameterized query to safely inject glob
     query = sql.replace("read_parquet(...)", f"read_parquet('{glob_pattern}')")
-    result = con.execute(query).df().to_dict('records')
+    result = con.execute(query).df().to_dict("records")
     con.close()
-    
+
     return result
 
 
@@ -51,7 +52,7 @@ def top_runs_by_sharpe(
     """Get top N runs by Sharpe ratio."""
     if not HAS_DUCKDB:
         raise ImportError("duckdb not installed. Install with: uv add duckdb")
-    
+
     sql = f"""
     SELECT 
         run_id,
@@ -63,7 +64,7 @@ def top_runs_by_sharpe(
     LIMIT {top_n}
     """
     con = duckdb.connect()
-    result = con.execute(sql).df().to_dict('records')
+    result = con.execute(sql).df().to_dict("records")
     con.close()
     return result
 
@@ -78,11 +79,11 @@ def universe_performance(
     """
     if not HAS_DUCKDB:
         raise ImportError("duckdb not installed. Install with: uv add duckdb")
-    
+
     con = duckdb.connect()
     con.execute("INSTALL sqlite; LOAD sqlite;")
     con.execute(f"ATTACH '{runs_db}' AS runlog_db (TYPE SQLITE);")
-    
+
     sql = f"""
     SELECT 
         r.tags as universe,
@@ -97,8 +98,8 @@ def universe_performance(
     GROUP BY r.tags
     ORDER BY avg_sharpe DESC
     """
-    
-    result = con.execute(sql).df().to_dict('records')
+
+    result = con.execute(sql).df().to_dict("records")
     con.close()
     return result
 
@@ -110,7 +111,7 @@ def build_con(
     """
     Build and return a DuckDB connection, optionally with sqlite extension.
     Caller is responsible for .close().
-    
+
     Example:
       con = build_con(runs_db="data/runlog.sqlite", attach_sqlite=True)
       result = con.execute("SELECT * FROM runlog_db.runs LIMIT 5").fetchall()
@@ -118,7 +119,7 @@ def build_con(
     """
     if not HAS_DUCKDB:
         raise ImportError("duckdb not installed. Install with: uv add duckdb")
-    
+
     con = duckdb.connect()
     if attach_sqlite and runs_db:
         con.execute("INSTALL sqlite; LOAD sqlite;")
