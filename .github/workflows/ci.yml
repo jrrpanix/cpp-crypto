@@ -39,7 +39,7 @@ jobs:
         cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev-cache:latest,mode=max
 
     - name: Start development container
-      run: make run-dev DEV_IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev:latest
+      run: make dev DEV_IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev:latest
 
     - name: Verify Dependency Installation
       run: |

@@ -4,16 +4,14 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'src/research/**/*.py'
-      - 'server/**/*.py'
-      - 'pyproject.toml'
+      - 'python/**/*.py'
+      - 'python/pyproject.toml'
       - '.github/workflows/python-ci.yml'
   pull_request:
     branches: [ main ]
     paths:
-      - 'src/research/**/*.py'
-      - 'server/**/*.py'
-      - 'pyproject.toml'
+      - 'python/**/*.py'
+      - 'python/pyproject.toml'
       - '.github/workflows/python-ci.yml'
 
 jobs:
@@ -36,24 +34,24 @@ jobs:
     
     - name: Install dependencies
       run: |
-        uv pip install --system -e ".[dev]"
+        cd python && uv pip install --system -e ".[dev]"
     
     - name: Check code formatting with Black
       run: |
         echo "Checking Python code formatting with Black..."
-        black --check --diff src/research server || echo "::warning::Code needs formatting. Run 'make py-format' locally or create a PR for auto-formatting."
+        black --check --diff python/research python/backtest || echo "::warning::Code needs formatting. Run 'make format' locally or create a PR for auto-formatting."
     
     - name: Lint with Ruff
       run: |
         echo "Linting Python code with Ruff..."
-        ruff check src/research server || echo "::warning::Code has linting issues. Run 'make py-lint' locally or create a PR for auto-fixing."
+        ruff check python/research python/backtest || echo "::warning::Code has linting issues. Run 'make format' locally or create a PR for auto-fixing."
     
     - name: Run tests
       if: always()
       run: |
         echo "Running Python tests..."
-        if [ -d "src/research/tests" ] && [ "$(ls -A src/research/tests/test_*.py 2>/dev/null)" ]; then
-          pytest src/research/tests
+        if [ -d "python/research/tests" ] && [ "$(ls -A python/research/tests/test_*.py 2>/dev/null)" ]; then
+          pytest python/research/tests
         else
           echo "No tests found, skipping..."
         fi
@@ -86,14 +84,14 @@ jobs:
     
     - name: Auto-format with Black
       run: |
-        black src/research server
+        black python/research python/backtest
     
     - name: Auto-fix with Ruff
       run: |
-        ruff check --fix src/research server || true
+        ruff check --fix python/research python/backtest || true
     
     - name: Commit changes
       uses: stefanzweifel/git-auto-commit-action@v5
       with:
         commit_message: "style: auto-format Python code with Black and Ruff"
-        file_pattern: "src/research/**/*.py server/**/*.py"
+        file_pattern: "python/**/*.py"
