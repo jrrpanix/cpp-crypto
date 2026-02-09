@@ -9,37 +9,18 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v2
-      with:
-        registry: ghcr.io
-        username: ${{ github.repository_owner }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Build and cache development image
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        file: ./docker/Dockerfile.dev
-        push: true
-        load: true
-        tags: ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev:latest
-        cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev-cache:latest
-        cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev-cache:latest,mode=max
+    - name: Build development image
+      run: docker build -t cpp-crypto-dev -f docker/Dockerfile.dev .
 
     - name: Start development container
-      run: make dev DEV_IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/cpp-crypto-dev:latest
+      run: |
+        docker run -d --rm -v $PWD:/workspace --name cpp-crypto-dev-container cpp-crypto-dev sleep infinity
+        docker ps
 
     - name: Verify Dependency Installation
       run: |
@@ -54,4 +35,4 @@ jobs:
         docker exec cpp-crypto-dev-container bash -x ./scripts/build/consumer_build.sh
 
     - name: Run tests
-      run: make test
+      run: docker exec cpp-crypto-dev-container bash -c "cd /workspace && make test"
