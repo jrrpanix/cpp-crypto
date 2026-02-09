@@ -15,7 +15,7 @@ COMPOSE_DIR := docker/compose
 # Shortcuts for running commands in dev container
 EXEC := docker exec -it $(DEV_CONTAINER)
 
-.PHONY: help dev stop backtest websocket logs format test rebuild clean
+.PHONY: help dev stop backtest producer live logs format test rebuild clean
 
 # ==============================================================================
 # Help - Show available commands
@@ -29,7 +29,8 @@ help:
 	@echo "  make dev         Build & start dev container, drop into shell"
 	@echo "  make stop        Stop all running containers"
 	@echo "  make backtest    Run backtest webapp (port 8084)"
-	@echo "  make websocket   Run websocket server (port 8082)"
+	@echo "  make producer    Run mock producer + consumer + frontend (port 8082)"
+	@echo "  make live        Run live Binance websocket + consumer (port 8083)"
 	@echo "  make logs        View logs from running services"
 	@echo "  make format      Format Python code"
 	@echo "  make test        Run tests"
@@ -101,17 +102,24 @@ backtest:
 	@DATA_DIR=$(shell cd ~/github && pwd)/data docker compose -f $(COMPOSE_DIR)/backtest.yml up -d --build
 	@echo "✅ Backtest running at http://localhost:8084"
 
-# Start websocket server (port 8082)
-websocket:
-	@echo "📡 Starting websocket server..."
+# Start mock producer + consumer + frontend (port 8082)
+producer:
+	@echo "📡 Starting mock producer + consumer + frontend..."
 	@docker compose -f $(COMPOSE_DIR)/websocket.yml up -d --build
-	@echo "✅ Websocket running at http://localhost:8082"
+	@echo "✅ Mock producer running at http://localhost:8082"
+
+# Start live Binance websocket + consumer (port 8083)
+live:
+	@echo "🌐 Starting live Binance websocket + consumer..."
+	@docker compose -f $(COMPOSE_DIR)/live-websocket.yml up -d --build
+	@echo "✅ Live Binance running at http://localhost:8083"
 
 # View logs from running services
 logs:
 	@echo "📋 Showing logs (Ctrl+C to exit)..."
 	@docker compose -f $(COMPOSE_DIR)/backtest.yml logs -f 2>/dev/null || \
 	 docker compose -f $(COMPOSE_DIR)/websocket.yml logs -f 2>/dev/null || \
+	 docker compose -f $(COMPOSE_DIR)/live-websocket.yml logs -f 2>/dev/null || \
 	 echo "No services running"
 
 # ==============================================================================
