@@ -33,7 +33,7 @@ endif()
 include_directories(${PROJECT_SRC_DIR}/cpp/third_party)
 
 # Add the dependency directories to the search paths
-include_directories(${DEPS_ROOT})
+include_directories(${DEPS_ROOT}/include)
 link_directories(${DEPS_ROOT}/lib)
 
 # Include directories
@@ -141,7 +141,9 @@ foreach(TEST_SRC ${TEST_SOURCES})
     target_include_directories(${TEST_NAME}
         PRIVATE
             ${PROJECT_SRC_DIR}/cpp/src
+            ${PROJECT_SRC_DIR}/cpp/third_party
             ${CMAKE_CURRENT_SOURCE_DIR}/book_ticker
+            ${CMAKE_CURRENT_SOURCE_DIR}/../common
     )
 
     target_link_directories(${TEST_NAME} PRIVATE ${DEPS_ROOT}/lib)
